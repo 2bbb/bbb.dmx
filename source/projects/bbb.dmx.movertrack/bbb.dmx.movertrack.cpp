@@ -101,7 +101,7 @@ public:
         }}
     };
 
-    c74::min::attribute<c74::min::atoms> rot{this, "rot", c74::min::atoms{0.0, 0.0, 0.0},
+    c74::min::attribute<c74::min::numbers> rot{this, "rot", c74::min::numbers{0.0, 0.0, 0.0},
         c74::min::description{"Fixture rotation rx ry rz in degrees. Rotation order is Rz * Ry * Rx."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             if(args.size() < 3 || !finite_atoms(args, 3)) {
@@ -237,8 +237,7 @@ public:
             rotation_x_value_ = (double)args[0];
             rotation_y_value_ = (double)args[1];
             rotation_z_value_ = (double)args[2];
-            rot = rotation_atoms();
-            apply_rotation();
+            rot.set(rotation_atoms());
             return {};
         }
     };

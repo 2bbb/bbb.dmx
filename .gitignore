@@ -1,3 +1,4 @@
 build/
 externals/
 .DS_Store
+build-external/
