@@ -28,7 +28,7 @@ jobs:
       - name: Verify universal binary
         run: |
           lipo -info externals/bbb.dmx.movertrack.mxo/Contents/MacOS/bbb.dmx.movertrack
-          lipo -verify_arch x86_64 arm64 externals/bbb.dmx.movertrack.mxo/Contents/MacOS/bbb.dmx.movertrack
+          lipo externals/bbb.dmx.movertrack.mxo/Contents/MacOS/bbb.dmx.movertrack -verify_arch x86_64 arm64
 
       - name: Upload externals
         uses: actions/upload-artifact@v4
