@@ -6,6 +6,23 @@
 #include <string>
 
 class bbb_dmx_movertrack : public c74::min::object<bbb_dmx_movertrack> {
+private:
+    bbb::dmx::movertrack_engine engine_{};
+    double fixture_x_value_{0.0};
+    double fixture_y_value_{0.0};
+    double fixture_z_value_{0.0};
+    double rotation_x_value_{0.0};
+    double rotation_y_value_{0.0};
+    double rotation_z_value_{0.0};
+    double pan_range_value_{540.0};
+    double tilt_range_value_{270.0};
+    double pan_offset_value_{0.0};
+    double tilt_offset_value_{0.0};
+    bbb::dmx::byte_order byte_order_value_{bbb::dmx::byte_order::coarse_fine};
+    bool warn_invalid_numeric_{false};
+    bool warn_invalid_range_{false};
+    bool warn_invalid_byte_order_{false};
+
 public:
     MIN_DESCRIPTION{"Convert a 3D target position to 16-bit moving-light DMX pan/tilt bytes."};
     MIN_TAGS{"dmx, lighting, mover, pan, tilt, tracking"};
@@ -228,20 +245,6 @@ public:
         }
     };
 
-    c74::min::message<> rot_message{this, "rot", "rot rx ry rz",
-        MIN_FUNCTION {
-            if(args.size() < 3 || !finite_atoms(args, 3)) {
-                warn_once(warn_invalid_numeric_, "invalid rot ignored");
-                return {};
-            }
-            rotation_x_value_ = (double)args[0];
-            rotation_y_value_ = (double)args[1];
-            rotation_z_value_ = (double)args[2];
-            rot.set(rotation_atoms());
-            return {};
-        }
-    };
-
     c74::min::message<> range_message{this, "range", "range pan_range tilt_range",
         MIN_FUNCTION {
             if(args.size() < 2 || !finite_atoms(args, 2)) {
@@ -328,21 +331,6 @@ private:
         output.send(output_atoms);
     }
 
-    bbb::dmx::movertrack_engine engine_{};
-    double fixture_x_value_{0.0};
-    double fixture_y_value_{0.0};
-    double fixture_z_value_{0.0};
-    double rotation_x_value_{0.0};
-    double rotation_y_value_{0.0};
-    double rotation_z_value_{0.0};
-    double pan_range_value_{540.0};
-    double tilt_range_value_{270.0};
-    double pan_offset_value_{0.0};
-    double tilt_offset_value_{0.0};
-    bbb::dmx::byte_order byte_order_value_{bbb::dmx::byte_order::coarse_fine};
-    bool warn_invalid_numeric_{false};
-    bool warn_invalid_range_{false};
-    bool warn_invalid_byte_order_{false};
 };
 
 MIN_EXTERNAL(bbb_dmx_movertrack);
