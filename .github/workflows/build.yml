@@ -1,0 +1,104 @@
+name: Build & Package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -B build -DBBB_DMX_BUILD_EXTERNALS=ON -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Verify universal binary
+        run: |
+          lipo -info externals/bbb.dmx.movertrack.mxo/Contents/MacOS/bbb.dmx.movertrack
+          lipo -verify_arch x86_64 arm64 externals/bbb.dmx.movertrack.mxo/Contents/MacOS/bbb.dmx.movertrack
+
+      - name: Upload externals
+        uses: actions/upload-artifact@v4
+        with:
+          name: bbb.dmx-macos
+          path: externals/
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DBBB_DMX_BUILD_EXTERNALS=ON
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Upload externals
+        uses: actions/upload-artifact@v4
+        with:
+          name: bbb.dmx-windows
+          path: externals/
+
+  package:
+    permissions:
+      contents: write
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download macOS externals
+        uses: actions/download-artifact@v4
+        with:
+          name: bbb.dmx-macos
+          path: dist/bbb.dmx/externals/
+
+      - name: Download Windows externals
+        uses: actions/download-artifact@v4
+        with:
+          name: bbb.dmx-windows
+          path: dist/bbb.dmx/externals/
+
+      - name: Assemble package
+        run: |
+          mkdir -p dist/bbb.dmx
+          cp package-info.json dist/bbb.dmx/
+          cp README.md dist/bbb.dmx/ 2>/dev/null || true
+          cp LICENSE dist/bbb.dmx/ 2>/dev/null || true
+          cp -r help dist/bbb.dmx/
+
+      - name: Create archive
+        run: |
+          cd dist
+          zip -r bbb.dmx.zip bbb.dmx/
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bbb.dmx-latest
+          path: dist/bbb.dmx.zip
+
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/bbb.dmx.zip
