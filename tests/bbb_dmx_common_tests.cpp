@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "bbb/dmx/common.hpp"
+#include "bbb/dmx/movertrack.hpp"
 
 namespace {
 
@@ -50,6 +51,34 @@ int main() {
     const bbb::dmx::vec3 local{bbb::dmx::world_to_fixture_local(world_forward, 0.0, 0.0, 90.0)};
     require(nearly_equal(local.x, 10.0), "inverse fixture rotation converts world forward to local right for rz=90");
     require(nearly_equal(local.y, 0.0, 1.0e-8), "inverse fixture rotation y component near zero");
+
+    bbb::dmx::movertrack_engine engine{};
+    auto output = engine.compute(bbb::dmx::vec3{0.0, 10.0, 0.0});
+    require(nearly_equal(output.pan_degrees, 0.0), "movertrack forward pan degrees");
+    require(nearly_equal(output.tilt_degrees, 0.0), "movertrack forward tilt degrees");
+    require(output.pan == 32768, "movertrack forward pan value");
+    require(output.tilt == 32768, "movertrack forward tilt value");
+
+    output = engine.compute(bbb::dmx::vec3{10.0, 0.0, 0.0});
+    require(nearly_equal(output.pan_degrees, 90.0), "movertrack right pan degrees");
+
+    bbb::dmx::movertrack_engine tracking_engine{};
+    output = tracking_engine.compute(bbb::dmx::vec3{0.0174524064, -0.999847695, 0.0});
+    require(nearly_equal(output.pan_degrees, 179.0, 1.0e-6), "movertrack initializes near +179");
+    output = tracking_engine.compute(bbb::dmx::vec3{-0.0174524064, -0.999847695, 0.0});
+    require(nearly_equal(output.pan_degrees, 181.0, 1.0e-6), "movertrack tracks shortest pan to +181");
+
+    bbb::dmx::movertrack_engine clamp_engine{};
+    clamp_engine.set_ranges(180.0, 270.0);
+    output = clamp_engine.compute(bbb::dmx::vec3{10.0, 0.0, 0.0});
+    require(nearly_equal(output.pan_degrees, 90.0), "movertrack pan at clamp boundary");
+    output = clamp_engine.compute(bbb::dmx::vec3{0.0174524064, -0.999847695, 0.0});
+    require(nearly_equal(output.pan_degrees, 90.0), "movertrack clamps pan above range");
+
+    bbb::dmx::byte_order parsed_order{bbb::dmx::byte_order::coarse_fine};
+    require(bbb::dmx::byte_order_from_string("finecoarse", parsed_order), "parse finecoarse");
+    require(parsed_order == bbb::dmx::byte_order::fine_coarse, "parsed finecoarse value");
+    require(!bbb::dmx::byte_order_from_string("bad", parsed_order), "reject bad byte order");
 
     std::cout << "bbb_dmx_common_tests passed" << std::endl;
     return 0;
