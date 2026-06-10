@@ -1,0 +1,25 @@
+{
+    "title": "bbb.dmx",
+    "description": "DMX utility external object suite for Max/MSP",
+    "author": "2bit",
+    "website": "https://github.com/2bbb/bbb.dmx",
+    "extends": "",
+    "extensible": 0,
+    "homepatcher": "",
+    "max_version_min": "8.0",
+    "os": {
+        "macintosh": {
+            "externals": ["externals/"],
+            "help": ["help/"]
+        },
+        "windows": {
+            "externals": ["externals/"],
+            "help": ["help/"]
+        }
+    },
+    "filelist": {
+        "externals/bbb.dmx.movertrack.mxo": {},
+        "externals/bbb.dmx.movertrack.mxe64": {},
+        "help/bbb.dmx.movertrack.maxhelp": {}
+    }
+}
