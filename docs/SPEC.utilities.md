@@ -96,11 +96,12 @@ Reports fixture metadata from loaded patch/profile JSON.
 
 ### `bbb.dmx.matrixmap`
 
-Samples `jit.matrix` color data into fixture parameters through the common fixture patch/profile layer.
+Samples `char` or `float32` `jit.matrix` color data into fixture parameters through the common fixture patch/profile layer.
 
 - Input: `jit_matrix`, `readpatch`, `readmap`, `reload`, `bang`, `dump`
 - Output: `universe <id> <512 byte values>`
 - Attributes: `@patch`, `@map`, `@universe`, `@universe_mode`, `@plane_order`, `@gamma`, `@brightness`, `@autobang`, `@invert_x`, `@invert_y`
+- Matrix values are normalized first, then expanded through the fixture parameter depth (`u8`, `u16`, or `u24`).
 - Map files live in `maps/`; see `docs/SPEC.matrixmap.md`.
 
 `changed` mode outputs full universe frames for universes whose data changed. It is not a per-channel delta protocol.

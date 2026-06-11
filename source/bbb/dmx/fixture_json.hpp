@@ -362,6 +362,10 @@ inline bool parse_parameter_type(const std::string &text, fixture_parameter_type
         type = fixture_parameter_type::u16;
         return true;
     }
+    if(text == "u24") {
+        type = fixture_parameter_type::u24;
+        return true;
+    }
     if(text == "enum") {
         type = fixture_parameter_type::enum_u8;
         return true;

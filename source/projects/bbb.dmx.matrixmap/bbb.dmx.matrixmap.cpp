@@ -44,18 +44,23 @@ enum class universe_output_mode {
     changed,
 };
 
+enum class matrix_value_kind {
+    uint8,
+    float32,
+};
+
 struct color_value {
 public:
-    int red{0};
-    int green{0};
-    int blue{0};
-    int alpha{255};
+    double red{0.0};
+    double green{0.0};
+    double blue{0.0};
+    double alpha{1.0};
 };
 
 struct color_source {
 public:
     color_source_kind kind{color_source_kind::red};
-    int constant_value{0};
+    double constant_value{0.0};
 };
 
 struct parameter_binding {
@@ -94,10 +99,24 @@ public:
     long stride_x{0};
     long stride_y{0};
     plane_order_kind plane_order{plane_order_kind::rgba};
+    matrix_value_kind value_kind{matrix_value_kind::uint8};
 };
 
-int clamp_byte_local(int value) {
-    return std::max(0, std::min(255, value));
+double clamp_normalized(double value) {
+    if(value < 0.0) {
+        return 0.0;
+    }
+    if(1.0 < value) {
+        return 1.0;
+    }
+    return value;
+}
+
+double constant_source_to_normalized(double value) {
+    if(1.0 < value) {
+        return clamp_normalized(value / 255.0);
+    }
+    return clamp_normalized(value);
 }
 
 bool parse_sample_mode(const std::string &text, sample_mode &mode) {
@@ -195,18 +214,18 @@ bool parse_color_source(const std::string &text, color_source &source) {
     const std::string prefix{"constant:"};
     if(text.rfind(prefix, 0) == 0) {
         source.kind = color_source_kind::constant;
-        source.constant_value = clamp_byte_local(std::atoi(text.substr(prefix.size()).c_str()));
+        source.constant_value = constant_source_to_normalized(std::atof(text.substr(prefix.size()).c_str()));
         return true;
     }
     return false;
 }
 
-int color_source_value(const color_source &source, const color_value &color) {
+double color_source_value(const color_source &source, const color_value &color) {
     switch(source.kind) {
         case color_source_kind::green: return color.green;
         case color_source_kind::blue: return color.blue;
         case color_source_kind::alpha: return color.alpha;
-        case color_source_kind::luma: return clamp_byte_local((int)std::round(0.2126 * color.red + 0.7152 * color.green + 0.0722 * color.blue));
+        case color_source_kind::luma: return clamp_normalized(0.2126 * color.red + 0.7152 * color.green + 0.0722 * color.blue);
         case color_source_kind::max_rgb: return std::max(color.red, std::max(color.green, color.blue));
         case color_source_kind::constant: return source.constant_value;
         case color_source_kind::red:
@@ -216,16 +235,6 @@ int color_source_value(const color_source &source, const color_value &color) {
 
 long clamp_long(long value, long minimum, long maximum) {
     return std::max(minimum, std::min(maximum, value));
-}
-
-double clamp_normalized(double value) {
-    if(value < 0.0) {
-        return 0.0;
-    }
-    if(1.0 < value) {
-        return 1.0;
-    }
-    return value;
 }
 
 int plane_index_for(plane_order_kind order, char component, long plane_count) {
@@ -260,18 +269,23 @@ int plane_index_for(plane_order_kind order, char component, long plane_count) {
     return index;
 }
 
-int pixel_component(const matrix_read_view &view, long x, long y, char component) {
+double pixel_component(const matrix_read_view &view, long x, long y, char component) {
     if(!view.data || view.width <= 0 || view.height <= 0) {
-        return component == 'a' ? 255 : 0;
+        return component == 'a' ? 1.0 : 0.0;
     }
     const int plane_index{plane_index_for(view.plane_order, component, view.plane_count)};
     if(plane_index < 0) {
-        return 255;
+        return 1.0;
     }
     x = clamp_long(x, 0, view.width - 1);
     y = clamp_long(y, 0, view.height - 1);
-    const unsigned char *pixel = (const unsigned char *)(view.data + y * view.stride_y + x * view.stride_x);
-    return (int)pixel[plane_index];
+    const char *pixel = view.data + y * view.stride_y + x * view.stride_x;
+    if(view.value_kind == matrix_value_kind::float32) {
+        const float *values = (const float *)pixel;
+        return clamp_normalized((double)values[plane_index]);
+    }
+    const unsigned char *values = (const unsigned char *)pixel;
+    return (double)values[plane_index] / 255.0;
 }
 
 color_value sample_point(const matrix_read_view &view, double normalized_x, double normalized_y) {
@@ -296,10 +310,10 @@ color_value sample_average(const matrix_read_view &view, const sample_region &re
     const long x1{clamp_long((long)std::ceil(right * (double)(view.width - 1)), 0, view.width - 1)};
     const long y0{clamp_long((long)std::floor(top * (double)(view.height - 1)), 0, view.height - 1)};
     const long y1{clamp_long((long)std::ceil(bottom * (double)(view.height - 1)), 0, view.height - 1)};
-    long long red{0};
-    long long green{0};
-    long long blue{0};
-    long long alpha{0};
+    double red{0.0};
+    double green{0.0};
+    double blue{0.0};
+    double alpha{0.0};
     long long count{0};
     for(long y = y0; y <= y1; y++) {
         for(long x = x0; x <= x1; x++) {
@@ -314,10 +328,10 @@ color_value sample_average(const matrix_read_view &view, const sample_region &re
         return sample_point(view, region.x, region.y);
     }
     return color_value{
-        (int)std::llround((double)red / (double)count),
-        (int)std::llround((double)green / (double)count),
-        (int)std::llround((double)blue / (double)count),
-        (int)std::llround((double)alpha / (double)count),
+        red / (double)count,
+        green / (double)count,
+        blue / (double)count,
+        alpha / (double)count,
     };
 }
 
@@ -369,7 +383,7 @@ bbb::dmx::mapper_result parse_parameter_bindings(const bbb::dmx::json_value &obj
             }
         } else if(entry.second.type == bbb::dmx::json_type::number) {
             binding.source.kind = color_source_kind::constant;
-            binding.source.constant_value = clamp_byte_local((int)std::round(entry.second.number_value));
+            binding.source.constant_value = constant_source_to_normalized(entry.second.number_value);
         } else {
             return bbb::dmx::mapper_result::failure("param source must be string or number: " + entry.first);
         }
@@ -805,8 +819,13 @@ private:
 
         c74::max::t_jit_matrix_info info{};
         c74::max::jit_object_method(matrix, c74::max::gensym("getinfo"), &info);
-        if(info.type != c74::max::gensym("char")) {
-            report_error("only char jit.matrix input is supported in this version");
+        matrix_value_kind value_kind{matrix_value_kind::uint8};
+        if(info.type == c74::max::gensym("char")) {
+            value_kind = matrix_value_kind::uint8;
+        } else if(info.type == c74::max::gensym("float32")) {
+            value_kind = matrix_value_kind::float32;
+        } else {
+            report_error("only char and float32 jit.matrix input is supported");
             return;
         }
         if(info.dim[0] <= 0 || info.planecount <= 0) {
@@ -829,6 +848,7 @@ private:
         view.stride_x = info.dimstride[0];
         view.stride_y = info.dimcount < 2 ? 0 : info.dimstride[1];
         view.plane_order = plane_order_value_;
+        view.value_kind = value_kind;
 
         apply_matrix(view);
         c74::max::jit_object_method(matrix, c74::max::gensym("lock"), (void *)savelock);
@@ -848,8 +868,8 @@ private:
             }
             const color_value sampled{adjust_color(sample_region_color(view, region))};
             for(const auto &binding : mapping.parameters) {
-                const int value{color_source_value(binding.source, sampled)};
-                const bbb::dmx::mapper_result result{mapper_.set_u8(mapping.fixture_id, binding.parameter, value)};
+                const double value{color_source_value(binding.source, sampled)};
+                const bbb::dmx::mapper_result result{mapper_.set_normalized(mapping.fixture_id, binding.parameter, value)};
                 if(!result.ok) {
                     report_error(result.message.c_str());
                 }
@@ -859,17 +879,17 @@ private:
 
     color_value adjust_color(const color_value &color) const {
         return color_value{
-            adjust_byte(color.red),
-            adjust_byte(color.green),
-            adjust_byte(color.blue),
-            adjust_byte(color.alpha),
+            adjust_normalized(color.red),
+            adjust_normalized(color.green),
+            adjust_normalized(color.blue),
+            adjust_normalized(color.alpha),
         };
     }
 
-    int adjust_byte(int value) const {
-        const double normalized{std::max(0.0, std::min(1.0, (double)value / 255.0))};
+    double adjust_normalized(double value) const {
+        const double normalized{clamp_normalized(value)};
         const double corrected{std::pow(normalized, gamma_value_) * brightness_value_};
-        return clamp_byte_local((int)std::round(corrected * 255.0));
+        return clamp_normalized(corrected);
     }
 
     void output_universes() {

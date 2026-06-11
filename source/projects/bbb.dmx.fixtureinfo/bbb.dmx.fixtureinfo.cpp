@@ -285,6 +285,7 @@ private:
     static const char *parameter_type_to_string(bbb::dmx::fixture_parameter_type type) {
         switch(type) {
             case bbb::dmx::fixture_parameter_type::u16: return "u16";
+            case bbb::dmx::fixture_parameter_type::u24: return "u24";
             case bbb::dmx::fixture_parameter_type::enum_u8: return "enum_u8";
             case bbb::dmx::fixture_parameter_type::u8:
             default: return "u8";

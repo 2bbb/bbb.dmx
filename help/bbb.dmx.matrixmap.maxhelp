@@ -79,7 +79,7 @@
                         760,
                         38
                     ],
-                    "text": "Load a fixture patch and a matrix map JSON. Send a char jit_matrix. Left outlet outputs universe <id> followed by 512 DMX bytes; right outlet reports status/errors."
+                    "text": "Load a fixture patch and a matrix map JSON. Send a char or float32 jit_matrix. Values are normalized and expanded through u8/u16/u24 fixture params. Left outlet outputs universe <id> + 512 DMX bytes; right outlet reports status/errors."
                 }
             },
             {
@@ -232,7 +232,7 @@
                         145,
                         22
                     ],
-                    "text": "jit.noise 4 char 16 16",
+                    "text": "jit.noise 4 float32 16 16",
                     "outlettype": [
                         "jit_matrix"
                     ]
@@ -250,7 +250,7 @@
                         720,
                         40
                     ],
-                    "text": "Map schema: grid.fixture_pattern expands fixture ids with printf-style %d, cols/rows split the matrix into normalized cells, params maps profile parameters to r/g/b/a/luma/maxrgb or constant:N."
+                    "text": "Map schema: grid.fixture_pattern expands fixture ids with printf-style %d, cols/rows split the matrix into normalized cells, params maps profile parameters to r/g/b/a/luma/maxrgb or constant:N. char = byte/255; float32 = clamp 0..1."
                 }
             },
             {

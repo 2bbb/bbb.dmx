@@ -167,7 +167,7 @@ Optional fields:
 
 | Field | Type | Default | Meaning |
 |---|---|---:|---|
-| `default` | int | `0` | Startup byte value, clamped `0..255` |
+| `default` | int | `0` | Startup value. Channel defaults are bytes clamped `0..255`; parameter defaults are clamped to that parameter type range. |
 | `label` | string | `key` | Human-readable label |
 | `hold` | bool | `false` | If true, preserve previous value on reset |
 
@@ -178,8 +178,20 @@ Supported `type` values for v1:
 | Type | Runtime value | Channel write |
 |---|---|---|
 | `u8` | `0..255` or normalized `0..1` | one byte |
-| `u16` | `0..65535` or normalized `0..1` | two bytes |
+| `u16` | `0..65535` or normalized `0..1` | two contiguous bytes |
+| `u24` | `0..16777215` or normalized `0..1` | three contiguous bytes |
 | `enum` | symbol or index | one byte from range table |
+
+`byte_order` values:
+
+| Value | Meaning |
+|---|---|
+| `coarsefine` | 16-bit MSB then LSB |
+| `finecoarse` | 16-bit LSB then MSB |
+| `coarsemidfine` | 24-bit MSB, middle, LSB |
+| `finemidcoarse` | 24-bit LSB, middle, MSB |
+
+For high-resolution color channels, the current mapper writes contiguous bytes starting at the first channel listed in `channels`. Do not describe non-contiguous 16-bit/24-bit fixture channels yet; that would be dishonest, because the implementation does not support them.
 
 For v1, `float physical unit -> DMX` conversion should only be implemented where it is essential:
 
@@ -311,7 +323,7 @@ nset spot_01 pan 0.5
 nset spot_01 tilt 0.5
 ```
 
-`nset` maps `0.0..1.0` onto the target parameter's DMX range.
+`nset` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`.
 
 #### Raw channel override
 
@@ -414,7 +426,7 @@ Core responsibilities:
 - `universe.hpp` defines a strict 512-channel DMX universe.
 - `frame_set.hpp` defines a multi-universe frame set shared by utility externals.
 - `fixture_profile.hpp` and `fixture_patch.hpp` define profile/mode/parameter/patch data structures.
-- `fixture_mapper.hpp` owns strict mapping, defaults, raw channel writes, `set_u8`, `set_u16`, `set_normalized`, and `set_pan_tilt_bytes`.
+- `fixture_mapper.hpp` owns strict mapping, defaults, raw channel writes, `set_u8`, `set_u16`, `set_u24`, `set_normalized`, and `set_pan_tilt_bytes`.
 - `fixture_json.hpp` loads the normalized JSON profile/patch files and resolves profile paths relative to the patch file.
 - `value.hpp` provides byte-order helpers shared with `movertrack`.
 

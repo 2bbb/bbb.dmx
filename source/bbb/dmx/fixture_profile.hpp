@@ -11,6 +11,7 @@ namespace bbb::dmx {
 enum class fixture_parameter_type {
     u8,
     u16,
+    u24,
     enum_u8,
 };
 

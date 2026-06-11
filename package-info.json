@@ -1,7 +1,7 @@
 {
     "title": "bbb.dmx",
     "description": "DMX utility external object suite for Max/MSP",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "author": "2bit",
     "website": "https://github.com/2bbb/bbb.dmx",
     "extends": "",
@@ -63,6 +63,8 @@
         "externals/bbb.dmx.matrixmap.mxe64": {},
         "help/bbb.dmx.matrixmap.maxhelp": {},
         "fixtures/generic.rgb.3ch.json": {},
+        "fixtures/generic.rgb.16bit.json": {},
+        "fixtures/generic.rgb.24bit.json": {},
         "patches/rgb-grid.example.json": {},
         "maps/rgb-grid.example.json": {},
         "docs/SPEC.matrixmap.md": {},

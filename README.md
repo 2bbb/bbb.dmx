@@ -206,7 +206,7 @@ Movertrack integration is intentionally byte-tuple based for now:
 [bbb.dmx.matrixmap @patch patches/rgb-grid.example.json @map maps/rgb-grid.example.json @universe_mode all]
 ```
 
-`matrixmap` reads a `char` `jit.matrix`, samples colors at normalized positions, writes the sampled bytes into fixture parameters, and outputs explicit multi-universe frames:
+`matrixmap` reads a `char` or `float32` `jit.matrix`, samples colors at normalized positions, writes normalized values into fixture parameters (`u8`, `u16`, or `u24`), and outputs explicit multi-universe frames:
 
 ```text
 universe 1 <512 values>
@@ -255,9 +255,11 @@ Matrix map example:
 }
 ```
 
-Supported color sources are `r`, `g`, `b`, `a`, `luma`, `maxrgb`, and `constant:N`. The package includes a minimal multi-universe RGB example:
+Supported color sources are `r`, `g`, `b`, `a`, `luma`, `maxrgb`, and `constant:N`. `char` matrices are normalized with `byte / 255`; `float32` matrices are clamped directly to `0.0..1.0`. Constants in `0.0..1.0` are normalized, while values greater than `1.0` keep legacy byte-constant behavior. The package includes a minimal multi-universe RGB example plus higher-resolution RGB fixture profiles:
 
 - `fixtures/generic.rgb.3ch.json`
+- `fixtures/generic.rgb.16bit.json`
+- `fixtures/generic.rgb.24bit.json`
 - `patches/rgb-grid.example.json`
 - `maps/rgb-grid.example.json`
 

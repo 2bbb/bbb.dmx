@@ -167,22 +167,36 @@ public:
         return write_u16(*resolved.fixture, *first_channel, value, resolved.parameter->order);
     }
 
+    mapper_result set_u24(const std::string &fixture_id, const std::string &parameter_key, std::uint32_t value) {
+        const resolved_parameter resolved{resolve_parameter(fixture_id, parameter_key)};
+        if(!resolved.ok) {
+            return mapper_result::failure(resolved.message);
+        }
+        if(resolved.parameter->type != fixture_parameter_type::u24) {
+            return mapper_result::failure("parameter is not u24: " + parameter_key);
+        }
+        if(resolved.parameter->channels.size() < 3) {
+            return mapper_result::failure("u24 parameter needs three channels: " + parameter_key);
+        }
+        const fixture_channel *first_channel{resolved.mode->find_channel(resolved.parameter->channels[0])};
+        if(!first_channel) {
+            return mapper_result::failure("parameter first channel missing: " + parameter_key);
+        }
+        return write_u24(*resolved.fixture, *first_channel, value, resolved.parameter->order);
+    }
+
     mapper_result set_normalized(const std::string &fixture_id, const std::string &parameter_key, double value) {
         const resolved_parameter resolved{resolve_parameter(fixture_id, parameter_key)};
         if(!resolved.ok) {
             return mapper_result::failure(resolved.message);
         }
-        if(value < 0.0) {
-            value = 0.0;
-        }
-        if(1.0 < value) {
-            value = 1.0;
-        }
         if(resolved.parameter->type == fixture_parameter_type::u16) {
-            const auto int_value = (std::uint16_t)std::round(value * 65535.0);
-            return set_u16(fixture_id, parameter_key, int_value);
+            return set_u16(fixture_id, parameter_key, normalized_to_u16(value));
         }
-        const int int_value{(int)std::round(value * 255.0)};
+        if(resolved.parameter->type == fixture_parameter_type::u24) {
+            return set_u24(fixture_id, parameter_key, normalized_to_u24(value));
+        }
+        const int int_value{(int)normalized_to_u8(value)};
         return set_u8(fixture_id, parameter_key, int_value);
     }
 
@@ -295,6 +309,16 @@ private:
         return mapper_result::success();
     }
 
+    mapper_result write_u24(const fixture_instance &fixture, const fixture_channel &first_channel, std::uint32_t value, byte_order order) {
+        dmx_universe &universe = universes_[fixture.universe];
+        const int address{fixture.address + first_channel.offset - 1};
+        const write_result result{universe.set_u24(address, value, order)};
+        if(!result.ok) {
+            return mapper_result::failure(result.message);
+        }
+        return mapper_result::success();
+    }
+
     mapper_result set_u8_bytes(const fixture_instance &fixture, const fixture_mode &mode, const fixture_parameter &parameter, int first_value, int second_value) {
         if(parameter.channels.size() < 2) {
             return mapper_result::failure("u16 byte parameter needs two channels: " + parameter.key);
@@ -314,6 +338,9 @@ private:
     mapper_result write_parameter_default(const fixture_instance &fixture, const fixture_mode &mode, const fixture_parameter &parameter) {
         if(parameter.type == fixture_parameter_type::u16) {
             return set_u16(fixture.id, parameter.key, (std::uint16_t)std::max(0, std::min(65535, parameter.default_value)));
+        }
+        if(parameter.type == fixture_parameter_type::u24) {
+            return set_u24(fixture.id, parameter.key, (std::uint32_t)std::max(0, std::min(16777215, parameter.default_value)));
         }
         return set_u8(fixture.id, parameter.key, parameter.default_value);
     }

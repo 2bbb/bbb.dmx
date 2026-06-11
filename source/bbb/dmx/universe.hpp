@@ -58,6 +58,23 @@ public:
         return write_result{true, ""};
     }
 
+    write_result set_u24(int first_address, std::uint32_t value, byte_order order) {
+        if(!valid_address(first_address) || !valid_address(first_address + 2)) {
+            return write_result{false, "u24 write exceeds universe bounds"};
+        }
+        const split_u24 split{split_24(value)};
+        if(order == byte_order::fine_mid_coarse) {
+            channels_[(std::size_t)(first_address - 1)] = split.fine;
+            channels_[(std::size_t)first_address] = split.middle;
+            channels_[(std::size_t)(first_address + 1)] = split.coarse;
+        } else {
+            channels_[(std::size_t)(first_address - 1)] = split.coarse;
+            channels_[(std::size_t)first_address] = split.middle;
+            channels_[(std::size_t)(first_address + 1)] = split.fine;
+        }
+        return write_result{true, ""};
+    }
+
     int channel(int address) const {
         if(!valid_address(address)) {
             return 0;

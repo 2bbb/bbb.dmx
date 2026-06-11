@@ -146,7 +146,10 @@ public:
                     return {};
                 }
                 const int value{(int)args[2]};
-                result = mapper_.set_u16(fixture_id, parameter, (std::uint16_t)clamp_int(value, 0, 65535));
+                result = mapper_.set_u24(fixture_id, parameter, (std::uint32_t)clamp_int(value, 0, 16777215));
+                if(!result.ok) {
+                    result = mapper_.set_u16(fixture_id, parameter, (std::uint16_t)clamp_int(value, 0, 65535));
+                }
                 if(!result.ok) {
                     result = mapper_.set_u8(fixture_id, parameter, value);
                 }

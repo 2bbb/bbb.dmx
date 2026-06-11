@@ -32,6 +32,9 @@ int main() {
 
     const std::array<int, 4> fine_coarse{bbb::dmx::pan_tilt_to_bytes(0x1234, 0xABCD, bbb::dmx::byte_order::fine_coarse)};
     require(fine_coarse == std::array<int, 4>{52, 18, 205, 171}, "fine/coarse byte order");
+    require(bbb::dmx::normalized_to_u8(0.5) == 128, "normalized half maps to u8 128");
+    require(bbb::dmx::normalized_to_u16(0.5) == 32768, "normalized half maps to u16 32768");
+    require(bbb::dmx::normalized_to_u24(1.0) == 16777215, "normalized one maps to max u24");
 
     require(nearly_equal(bbb::dmx::choose_shortest_pan(-179.0, 179.0), 181.0), "shortest pan crosses atan2 wrap");
 
@@ -119,6 +122,8 @@ int main() {
     bbb::dmx::byte_order parsed_order{bbb::dmx::byte_order::coarse_fine};
     require(bbb::dmx::byte_order_from_string("finecoarse", parsed_order), "parse finecoarse");
     require(parsed_order == bbb::dmx::byte_order::fine_coarse, "parsed finecoarse value");
+    require(bbb::dmx::byte_order_from_string("coarsemidfine", parsed_order), "parse coarsemidfine");
+    require(parsed_order == bbb::dmx::byte_order::coarse_mid_fine, "parsed coarsemidfine value");
     require(!bbb::dmx::byte_order_from_string("bad", parsed_order), "reject bad byte order");
 
     bbb::dmx::tracking_mode parsed_tracking_mode{bbb::dmx::tracking_mode::off};
@@ -204,6 +209,50 @@ int main() {
     map_result = mapper.set_patch(overlap_patch);
     require(!map_result.ok, "fixture mapper rejects overlapping fixtures");
 
+    bbb::dmx::fixture_profile rgb24_profile{};
+    rgb24_profile.key = "generic.rgb.24bit";
+    bbb::dmx::fixture_mode rgb24_mode{};
+    rgb24_mode.key = "rgb24";
+    rgb24_mode.footprint = 9;
+    rgb24_mode.channels = {
+        bbb::dmx::fixture_channel{1, "red.coarse", 0},
+        bbb::dmx::fixture_channel{2, "red.middle", 0},
+        bbb::dmx::fixture_channel{3, "red.fine", 0},
+        bbb::dmx::fixture_channel{4, "green.coarse", 0},
+        bbb::dmx::fixture_channel{5, "green.middle", 0},
+        bbb::dmx::fixture_channel{6, "green.fine", 0},
+        bbb::dmx::fixture_channel{7, "blue.coarse", 0},
+        bbb::dmx::fixture_channel{8, "blue.middle", 0},
+        bbb::dmx::fixture_channel{9, "blue.fine", 0},
+    };
+    bbb::dmx::fixture_parameter red24_parameter{};
+    red24_parameter.key = "red";
+    red24_parameter.type = bbb::dmx::fixture_parameter_type::u24;
+    red24_parameter.channels = {"red.coarse", "red.middle", "red.fine"};
+    red24_parameter.order = bbb::dmx::byte_order::coarse_mid_fine;
+    rgb24_mode.parameters = {red24_parameter};
+    rgb24_profile.modes = {rgb24_mode};
+
+    bbb::dmx::fixture_patch rgb24_patch{};
+    bbb::dmx::fixture_instance rgb24_fixture{};
+    rgb24_fixture.id = "pixel_01";
+    rgb24_fixture.profile = "generic.rgb.24bit";
+    rgb24_fixture.mode = "rgb24";
+    rgb24_fixture.universe = 2;
+    rgb24_fixture.address = 100;
+    rgb24_patch.fixtures = {rgb24_fixture};
+
+    bbb::dmx::fixture_mapper rgb24_mapper{};
+    map_result = rgb24_mapper.add_profile(rgb24_profile);
+    require(map_result.ok, "fixture mapper accepts u24 profile");
+    map_result = rgb24_mapper.set_patch(rgb24_patch);
+    require(map_result.ok, "fixture mapper accepts u24 patch");
+    map_result = rgb24_mapper.set_normalized("pixel_01", "red", 0.5);
+    require(map_result.ok, "fixture mapper sets u24 normalized parameter");
+    require(rgb24_mapper.universe(2).channel(100) == 128, "fixture mapper maps u24 coarse byte");
+    require(rgb24_mapper.universe(2).channel(101) == 0, "fixture mapper maps u24 middle byte");
+    require(rgb24_mapper.universe(2).channel(102) == 0, "fixture mapper maps u24 fine byte");
+
 
 
     const std::string profile_json{R"json({
@@ -224,6 +273,7 @@ int main() {
                 "parameters": {
                     "pan": { "type": "u16", "channels": ["pan.coarse", "pan.fine"], "byte_order": "coarsefine", "default": 32768 },
                     "tilt": { "type": "u16", "channels": ["tilt.coarse", "tilt.fine"], "byte_order": "coarsefine", "default": 32768 },
+                    "color24": { "type": "u24", "channels": ["pan.coarse", "pan.fine", "tilt.coarse"], "byte_order": "coarsemidfine", "default": 8388608 },
                     "dimmer": { "type": "u8", "channel": "dimmer", "default": 0 }
                 }
             }
@@ -235,6 +285,10 @@ int main() {
     require(parsed_profile.key == "generic.json.mover", "fixture JSON profile key");
     require(parsed_profile.modes.size() == 1, "fixture JSON profile mode count");
     require(parsed_profile.modes[0].channels.size() == 5, "fixture JSON channel count");
+    const bbb::dmx::fixture_parameter *parsed_color24{parsed_profile.modes[0].find_parameter("color24")};
+    require(parsed_color24 != nullptr, "fixture JSON u24 parameter exists");
+    require(parsed_color24->type == bbb::dmx::fixture_parameter_type::u24, "fixture JSON u24 parameter type");
+    require(parsed_color24->order == bbb::dmx::byte_order::coarse_mid_fine, "fixture JSON u24 byte order");
 
     const std::string patch_json{R"json({
         "schema": "bbb.dmx.patch.v1",
