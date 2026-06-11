@@ -36,6 +36,10 @@ ctest --test-dir build --output-on-failure
 
 macOS builds universal `.mxo` externals (`x86_64` + `arm64`). Windows builds `.mxe64` via Visual Studio 2022.
 
+## JSON format specification
+
+The canonical interchange spec for external apps is [`docs/SPEC.json.md`](docs/SPEC.json.md). Machine-readable JSON Schemas live in [`schemas/`](schemas/). Do not treat examples as the full contract; validate generated files against the schema files and then run semantic checks in Max with `bbb.dmx.patchcheck`, `bbb.dmx.fixtureinfo`, or the relevant object.
+
 ## Converter CLI
 
 `tools/bbb-dmx-convert` is a TypeScript/Node.js converter for existing fixture datasets. It converts `.gdtf`, `.mvr`, direct GDTF `description.xml`, and compatible MA3 fixture XML into `bbb.dmx` JSON profiles and, for MVR scenes, patch JSON.
