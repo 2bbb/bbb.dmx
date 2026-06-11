@@ -240,7 +240,7 @@ private:
     }
 
     void load_config(const std::string &path) {
-        const std::string resolved_path{resolve_file_path(path)};
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
         std::string text{};
         bbb::dmx::mapper_result result{bbb::dmx::read_text_file(resolved_path, text)};
         if(!result.ok) {
@@ -308,25 +308,14 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
-    std::string resolve_file_path(const std::string &path) {
-        if(path.empty() || bbb::dmx::path_is_absolute(path)) {
-            return path;
-        }
-        c74::max::t_symbol *resolved_symbol{nullptr};
-        const c74::max::t_max_err error{c74::max::path_absolutepath(&resolved_symbol, c74::max::gensym(path.c_str()), nullptr, 0)};
-        if(error == 0 && resolved_symbol && resolved_symbol->s_name) {
-            return resolved_symbol->s_name;
-        }
-        return path;
-    }
 
     void report_status(const char *message) {
-        status_output.send(bbb::dmx::maxutil::status_atoms("status", message));
+        bbb::dmx::maxutil::send_status(status_output, "status", message);
     }
 
     void report_error(const std::string &message) {
         cerr << "bbb.dmx.curve: " << message << c74::min::endl;
-        status_output.send(bbb::dmx::maxutil::status_atoms("error", message));
+        bbb::dmx::maxutil::send_status(status_output, "error", message);
     }
 };
 

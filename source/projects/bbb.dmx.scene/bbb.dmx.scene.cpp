@@ -237,7 +237,7 @@ private:
 
     void load_patch(const std::string &path) {
         bbb::dmx::fixture_mapper loaded_mapper{};
-        const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(resolve_file_path(path), loaded_mapper)};
+        const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(bbb::dmx::maxutil::resolve_file_path(path), loaded_mapper)};
         if(!result.ok) {
             patch_loaded_ = false;
             report_error(result.message);
@@ -250,7 +250,7 @@ private:
 
     void load_scene(const std::string &path) {
         std::string text{};
-        bbb::dmx::mapper_result result{bbb::dmx::read_text_file(resolve_file_path(path), text)};
+        bbb::dmx::mapper_result result{bbb::dmx::read_text_file(bbb::dmx::maxutil::resolve_file_path(path), text)};
         if(!result.ok) {
             scene_loaded_ = false;
             report_error(result.message);
@@ -311,25 +311,14 @@ private:
         }
     }
 
-    std::string resolve_file_path(const std::string &path) {
-        if(path.empty() || bbb::dmx::path_is_absolute(path)) {
-            return path;
-        }
-        c74::max::t_symbol *resolved_symbol{nullptr};
-        const c74::max::t_max_err error{c74::max::path_absolutepath(&resolved_symbol, c74::max::gensym(path.c_str()), nullptr, 0)};
-        if(error == 0 && resolved_symbol && resolved_symbol->s_name) {
-            return resolved_symbol->s_name;
-        }
-        return path;
-    }
 
     void report_status(const char *message) {
-        status_output.send(bbb::dmx::maxutil::status_atoms("status", message));
+        bbb::dmx::maxutil::send_status(status_output, "status", message);
     }
 
     void report_error(const std::string &message) {
         cerr << "bbb.dmx.scene: " << message << c74::min::endl;
-        status_output.send(bbb::dmx::maxutil::status_atoms("error", message));
+        bbb::dmx::maxutil::send_status(status_output, "error", message);
     }
 };
 

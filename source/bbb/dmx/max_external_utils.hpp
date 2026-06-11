@@ -75,4 +75,41 @@ inline c74::min::atoms status_atoms(const char *selector, const std::string &mes
     return atoms;
 }
 
+inline bool path_is_absolute(const std::string &path) {
+    if(path.empty()) {
+        return false;
+    }
+    if(path[0] == '/' || path[0] == '\\') {
+        return true;
+    }
+    return 1 < path.size() && path[1] == ':';
+}
+
+inline std::string resolve_file_path(const std::string &path) {
+    if(path.empty() || path_is_absolute(path)) {
+        return path;
+    }
+    c74::max::t_symbol *resolved_symbol{nullptr};
+    const c74::max::t_max_err error{c74::max::path_absolutepath(
+        &resolved_symbol,
+        c74::max::gensym(path.c_str()),
+        nullptr,
+        0
+    )};
+    if(error == 0 && resolved_symbol && resolved_symbol->s_name) {
+        return resolved_symbol->s_name;
+    }
+    return path;
+}
+
+template <typename outlet_type>
+void send_status(outlet_type &outlet, const char *selector, const std::string &message) {
+    outlet.send(status_atoms(selector, message));
+}
+
+template <typename outlet_type>
+void send_status(outlet_type &outlet, const char *selector, const char *message) {
+    outlet.send(status_atoms(selector, std::string(message)));
+}
+
 } // namespace bbb::dmx::maxutil

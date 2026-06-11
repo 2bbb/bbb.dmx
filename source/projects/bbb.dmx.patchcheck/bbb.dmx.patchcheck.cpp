@@ -72,7 +72,7 @@ public:
 
 private:
     void validate_patch(const std::string &path) {
-        const std::string resolved_path{resolve_file_path(path)};
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
         bbb::dmx::fixture_mapper mapper{};
         const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(resolved_path, mapper)};
         if(!result.ok) {
@@ -94,21 +94,10 @@ private:
         output.send(atoms);
     }
 
-    std::string resolve_file_path(const std::string &path) {
-        if(path.empty() || bbb::dmx::path_is_absolute(path)) {
-            return path;
-        }
-        c74::max::t_symbol *resolved_symbol{nullptr};
-        const c74::max::t_max_err error{c74::max::path_absolutepath(&resolved_symbol, c74::max::gensym(path.c_str()), nullptr, 0)};
-        if(error == 0 && resolved_symbol && resolved_symbol->s_name) {
-            return resolved_symbol->s_name;
-        }
-        return path;
-    }
 
     void send_error(const char *message) {
         cerr << "bbb.dmx.patchcheck: " << message << c74::min::endl;
-        output.send(bbb::dmx::maxutil::status_atoms("error", message));
+        bbb::dmx::maxutil::send_status(output, "error", message);
     }
 };
 
