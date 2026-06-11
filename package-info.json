@@ -9,17 +9,30 @@
     "max_version_min": "8.0",
     "os": {
         "macintosh": {
-            "externals": ["externals/"],
-            "help": ["help/"]
+            "externals": [
+                "externals/"
+            ],
+            "help": [
+                "help/"
+            ]
         },
         "windows": {
-            "externals": ["externals/"],
-            "help": ["help/"]
+            "externals": [
+                "externals/"
+            ],
+            "help": [
+                "help/"
+            ]
         }
     },
     "filelist": {
         "externals/bbb.dmx.movertrack.mxo": {},
         "externals/bbb.dmx.movertrack.mxe64": {},
-        "help/bbb.dmx.movertrack.maxhelp": {}
+        "help/bbb.dmx.movertrack.maxhelp": {},
+        "externals/bbb.dmx.fixturemap.mxo": {},
+        "externals/bbb.dmx.fixturemap.mxe64": {},
+        "help/bbb.dmx.fixturemap.maxhelp": {},
+        "fixtures/generic.mover.16bit.json": {},
+        "patches/example.json": {}
     }
 }

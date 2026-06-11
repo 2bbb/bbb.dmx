@@ -245,14 +245,32 @@ public:
 
 private:
     void load_patch_file(const std::string &path) {
+        const std::string resolved_path{resolve_file_path(path)};
         bbb::dmx::fixture_mapper loaded_mapper{};
-        const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(path, loaded_mapper)};
+        const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(resolved_path, loaded_mapper)};
         if(!handle_result(result)) {
             return;
         }
         mapper_ = loaded_mapper;
         report_status("loaded");
         output_if_autobang();
+    }
+
+    std::string resolve_file_path(const std::string &path) {
+        if(path.empty() || bbb::dmx::path_is_absolute(path)) {
+            return path;
+        }
+        c74::max::t_symbol *resolved_symbol{nullptr};
+        const c74::max::t_max_err error{c74::max::path_absolutepath(
+            &resolved_symbol,
+            c74::max::gensym(path.c_str()),
+            nullptr,
+            0
+        )};
+        if(error == 0 && resolved_symbol && resolved_symbol->s_name) {
+            return resolved_symbol->s_name;
+        }
+        return path;
     }
 
     void output_if_autobang() {

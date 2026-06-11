@@ -95,7 +95,7 @@ fixtures/        # reusable profile JSON files
 patches/         # show patch JSON files
 ```
 
-The release package should include these folders once the object exists.
+The release package includes these folders once the mapper object exists. Profile paths in patch files are resolved relative to the patch JSON file path.
 
 ---
 
@@ -198,7 +198,7 @@ Trying to model every fixture's physical units immediately is fake precision. It
 {
   "schema": "bbb.dmx.patch.v1",
   "profiles": [
-    "fixtures/generic.mover.16bit.json"
+    "../fixtures/generic.mover.16bit.json"
   ],
   "fixtures": [
     {

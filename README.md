@@ -2,9 +2,10 @@
 
 DMX utility external object suite for Max/MSP.
 
-Current object:
+Current objects:
 
 - `bbb.dmx.movertrack` — converts a 3D target position into 16-bit DMX pan/tilt bytes for a moving light.
+- `bbb.dmx.fixturemap` — maps fixture parameters into a full 512-channel DMX universe list.
 
 ## Build
 
@@ -36,3 +37,22 @@ pan_byte_1 pan_byte_2 tilt_byte_1 tilt_byte_2
 ```
 
 Default byte order is `coarsefine`.
+
+## `bbb.dmx.fixturemap`
+
+```max
+[bbb.dmx.fixturemap @patch patches/example.json @universe 1]
+```
+
+Useful messages:
+
+```max
+set spot_01 dimmer 255
+set spot_01 pan 32768
+set spot_01 pan_tilt 32768 32768
+nset spot_01 dimmer 1.0
+ptbytes spot_01 127 255 127 255
+bang
+```
+
+The object outputs a 512-integer list: DMX channel 1 first, channel 512 last. Fixture profiles live in `fixtures/`; show patch files live in `patches/`. Profile paths inside patch JSON are resolved relative to the patch file.
