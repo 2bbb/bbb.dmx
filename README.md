@@ -36,6 +36,21 @@ ctest --test-dir build --output-on-failure
 
 macOS builds universal `.mxo` externals (`x86_64` + `arm64`). Windows builds `.mxe64` via Visual Studio 2022.
 
+## Converter CLI
+
+`tools/bbb-dmx-convert` is a TypeScript/Node.js converter for existing fixture datasets. It converts `.gdtf`, `.mvr`, direct GDTF `description.xml`, and compatible MA3 fixture XML into `bbb.dmx` JSON profiles and, for MVR scenes, patch JSON.
+
+```sh
+cd tools/bbb-dmx-convert
+npm install
+npm run build
+node dist/index.js convert path/to/fixture.gdtf --out-dir converted --overwrite
+node dist/index.js convert path/to/scene.mvr --out-dir converted --patch patches/from-mvr.json --overwrite
+node dist/index.js convert path/to/ma3-fixture.xml --format ma3 --out-dir converted --overwrite
+```
+
+See [`docs/SPEC.convert.md`](docs/SPEC.convert.md). Treat conversion warnings as blockers until you have checked the result with `bbb.dmx.fixtureinfo`, `bbb.dmx.patchcheck`, and `bbb.dmx.fixtureview`. GDTF/MVR/MA3 files are not consistent enough to trust blind conversion.
+
 ## Multi-universe convention
 
 Most utility objects use this message shape:

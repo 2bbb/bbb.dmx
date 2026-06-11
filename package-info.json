@@ -95,6 +95,14 @@
         "externals/bbb.dmx.assert.mxo": {},
         "externals/bbb.dmx.assert.mxe64": {},
         "help/bbb.dmx.assert.maxhelp": {},
-        "asserts/example.json": {}
+        "asserts/example.json": {},
+        "docs/SPEC.convert.md": {},
+        "tools/bbb-dmx-convert/package.json": {},
+        "tools/bbb-dmx-convert/package-lock.json": {},
+        "tools/bbb-dmx-convert/tsconfig.json": {},
+        "tools/bbb-dmx-convert/src/index.ts": {},
+        "tools/bbb-dmx-convert/dist/index.js": {},
+        "tools/bbb-dmx-convert/test/minimal.gdtf.xml": {},
+        "tools/bbb-dmx-convert/test/smoke.mjs": {}
     }
 }
