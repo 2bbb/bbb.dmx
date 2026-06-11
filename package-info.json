@@ -88,6 +88,9 @@
         "scenes/example.json": {},
         "externals/bbb.dmx.fixtureview.mxo": {},
         "externals/bbb.dmx.fixtureview.mxe64": {},
-        "help/bbb.dmx.fixtureview.maxhelp": {}
+        "help/bbb.dmx.fixtureview.maxhelp": {},
+        "externals/bbb.dmx.diff.mxo": {},
+        "externals/bbb.dmx.diff.mxe64": {},
+        "help/bbb.dmx.diff.maxhelp": {}
     }
 }

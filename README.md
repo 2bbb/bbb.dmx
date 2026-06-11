@@ -22,6 +22,7 @@ This repository deliberately does **not** implement DMX network output. Art-Net 
 - `bbb.dmx.palette` — applies named normalized parameter palettes to fixture patterns.
 - `bbb.dmx.scene` — recalls deterministic fixture-pattern scenes into multi-universe frames.
 - `bbb.dmx.fixtureview` — decodes current DMX frame bytes through fixture patch/profile metadata.
+- `bbb.dmx.diff` — compares two multi-universe DMX frame sets and reports per-channel deltas.
 
 ## Build
 
@@ -269,6 +270,30 @@ Supported color sources are `r`, `g`, `b`, `a`, `luma`, `maxrgb`, and `constant:
 - `maps/rgb-grid.example.json`
 
 ## Frame utilities
+
+### `bbb.dmx.diff`
+
+```max
+[bbb.dmx.diff @changed_only 1]
+```
+
+Compares two frame sets. Use `a universe ...` / `b universe ...` or `before` / `after` aliases, then `compare` or `bang`.
+
+Messages:
+
+- `a universe value1 ... value512` / `before ...` — store the baseline frame.
+- `b universe value1 ... value512` / `after ...` — store the comparison frame.
+- `list value1 ... value512` — store comparison frame for `@universe`.
+- `compare [universe]` — output channel deltas and summaries.
+- `clear` — clear both frame sets.
+
+Output examples:
+
+```text
+channel 1 2 0 255 255
+universe 1 changed 1 max_delta 255
+summary universes 1 changed 1
+```
 
 ### `bbb.dmx.monitor`
 
