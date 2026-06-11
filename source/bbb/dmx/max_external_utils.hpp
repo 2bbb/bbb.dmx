@@ -46,6 +46,88 @@ inline std::vector<int> values_from_atoms(const c74::min::atoms &atoms, std::siz
     return values;
 }
 
+struct frame_write_result {
+public:
+    bool ok{false};
+    int universe{1};
+    std::string message{};
+
+    static frame_write_result success(int universe_id) {
+        return frame_write_result{true, sanitize_universe_id(universe_id), ""};
+    }
+
+    static frame_write_result failure(const std::string &error_message) {
+        return frame_write_result{false, 1, error_message};
+    }
+};
+
+inline frame_write_result write_universe_from_atoms(
+    bbb::dmx::dmx_frame_set &frames,
+    int universe_id,
+    const c74::min::atoms &atoms,
+    std::size_t start,
+    const std::string &error_message
+) {
+    if(atoms.size() < start + (std::size_t)universe_channel_count || !finite_atoms(atoms, start, universe_channel_count)) {
+        return frame_write_result::failure(error_message);
+    }
+    const int sanitized_universe{sanitize_universe_id(universe_id)};
+    const bbb::dmx::write_result result{frames.set_universe(sanitized_universe, values_from_atoms(atoms, start))};
+    if(!result.ok) {
+        return frame_write_result::failure(result.message);
+    }
+    return frame_write_result::success(sanitized_universe);
+}
+
+inline frame_write_result write_universe_message(
+    bbb::dmx::dmx_frame_set &frames,
+    const c74::min::atoms &atoms,
+    const std::string &error_message
+) {
+    if(atoms.size() < 513 || !finite_atom(atoms[0])) {
+        return frame_write_result::failure(error_message);
+    }
+    return write_universe_from_atoms(frames, (int)atoms[0], atoms, 1, error_message);
+}
+
+inline frame_write_result write_channel_message(
+    bbb::dmx::dmx_frame_set &frames,
+    const c74::min::atoms &atoms,
+    const std::string &error_message
+) {
+    if(atoms.size() < 3 || !finite_atoms(atoms, 0, 3)) {
+        return frame_write_result::failure(error_message);
+    }
+    const int sanitized_universe{sanitize_universe_id((int)atoms[0])};
+    const bbb::dmx::write_result result{frames.set_channel(sanitized_universe, (int)atoms[1], (int)atoms[2])};
+    if(!result.ok) {
+        return frame_write_result::failure(result.message);
+    }
+    return frame_write_result::success(sanitized_universe);
+}
+
+inline frame_write_result write_channels_message(
+    bbb::dmx::dmx_frame_set &frames,
+    const c74::min::atoms &atoms,
+    const std::string &error_message,
+    const std::string &pair_error_message
+) {
+    if(atoms.size() < 3 || ((atoms.size() - 1) % 2) != 0 || !finite_atom(atoms[0])) {
+        return frame_write_result::failure(error_message);
+    }
+    const int sanitized_universe{sanitize_universe_id((int)atoms[0])};
+    for(std::size_t index = 1; index < atoms.size(); index += 2) {
+        if(!finite_atoms(atoms, index, 2)) {
+            return frame_write_result::failure(pair_error_message);
+        }
+        const bbb::dmx::write_result result{frames.set_channel(sanitized_universe, (int)atoms[index], (int)atoms[index + 1])};
+        if(!result.ok) {
+            return frame_write_result::failure(result.message);
+        }
+    }
+    return frame_write_result::success(sanitized_universe);
+}
+
 inline c74::min::atoms universe_atoms(int universe_id, const bbb::dmx::dmx_universe &universe) {
     c74::min::atoms atoms;
     atoms.reserve((std::size_t)universe_channel_count + 2);

@@ -110,58 +110,47 @@ public:
 
     c74::min::message<> list_message{this, "list", "512 values for default universe.",
         MIN_FUNCTION {
-            handle_universe(universe_value_, args, 0);
+            handle_frame_write(bbb::dmx::maxutil::write_universe_from_atoms(
+                input_frames_,
+                universe_value_,
+                args,
+                0,
+                "universe input requires 512 numeric values"
+            ));
             return {};
         }
     };
 
     c74::min::message<> universe_message{this, "universe", "universe id value1 ... value512",
         MIN_FUNCTION {
-            if(args.size() < 513 || !bbb::dmx::maxutil::finite_atom(args[0])) {
-                report_error("universe requires id and 512 values");
-                return {};
-            }
-            handle_universe((int)args[0], args, 1);
+            handle_frame_write(bbb::dmx::maxutil::write_universe_message(
+                input_frames_,
+                args,
+                "universe requires id and 512 values"
+            ));
             return {};
         }
     };
 
     c74::min::message<> channel_message{this, "channel", "channel universe address value",
         MIN_FUNCTION {
-            if(args.size() < 3 || !bbb::dmx::maxutil::finite_atoms(args, 0, 3)) {
-                report_error("channel requires universe address value");
-                return {};
-            }
-            const int universe_id{bbb::dmx::sanitize_universe_id((int)args[0])};
-            const bbb::dmx::write_result result{input_frames_.set_channel(universe_id, (int)args[1], (int)args[2])};
-            if(!result.ok) {
-                report_error(result.message);
-                return {};
-            }
-            apply_and_output(universe_id);
+            handle_frame_write(bbb::dmx::maxutil::write_channel_message(
+                input_frames_,
+                args,
+                "channel requires universe address value"
+            ));
             return {};
         }
     };
 
     c74::min::message<> channels_message{this, "channels", "channels universe address value ...",
         MIN_FUNCTION {
-            if(args.size() < 3 || ((args.size() - 1) % 2) != 0 || !bbb::dmx::maxutil::finite_atom(args[0])) {
-                report_error("channels requires universe and address/value pairs");
-                return {};
-            }
-            const int universe_id{bbb::dmx::sanitize_universe_id((int)args[0])};
-            for(std::size_t index = 1; index < args.size(); index += 2) {
-                if(!bbb::dmx::maxutil::finite_atoms(args, index, 2)) {
-                    report_error("channels pair must be numeric");
-                    return {};
-                }
-                const bbb::dmx::write_result result{input_frames_.set_channel(universe_id, (int)args[index], (int)args[index + 1])};
-                if(!result.ok) {
-                    report_error(result.message);
-                    return {};
-                }
-            }
-            apply_and_output(universe_id);
+            handle_frame_write(bbb::dmx::maxutil::write_channels_message(
+                input_frames_,
+                args,
+                "channels requires universe and address/value pairs",
+                "channels pair must be numeric"
+            ));
             return {};
         }
     };
@@ -249,18 +238,12 @@ private:
         report_status("rule_added");
     }
 
-    void handle_universe(int universe_id, const c74::min::atoms &args, std::size_t start) {
-        if(args.size() < start + (std::size_t)bbb::dmx::universe_channel_count || !bbb::dmx::maxutil::finite_atoms(args, start, bbb::dmx::universe_channel_count)) {
-            report_error("universe input requires 512 numeric values");
-            return;
-        }
-        const int sanitized_universe{bbb::dmx::sanitize_universe_id(universe_id)};
-        const bbb::dmx::write_result result{input_frames_.set_universe(sanitized_universe, bbb::dmx::maxutil::values_from_atoms(args, start))};
+    void handle_frame_write(const bbb::dmx::maxutil::frame_write_result &result) {
         if(!result.ok) {
             report_error(result.message);
             return;
         }
-        apply_and_output(sanitized_universe);
+        apply_and_output(result.universe);
     }
 
     void apply_and_output(int universe_id) {
