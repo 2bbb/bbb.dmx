@@ -86,8 +86,10 @@ jobs:
           cp package-info.json dist/bbb.dmx/
           cp README.md dist/bbb.dmx/ 2>/dev/null || true
           cp LICENSE dist/bbb.dmx/ 2>/dev/null || true
+          cp -r docs dist/bbb.dmx/ 2>/dev/null || true
           cp -r help dist/bbb.dmx/
           cp -r fixtures dist/bbb.dmx/
+          cp -r maps dist/bbb.dmx/
           cp -r patches dist/bbb.dmx/
 
       - name: Create archive

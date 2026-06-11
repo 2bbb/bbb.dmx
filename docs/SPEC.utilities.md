@@ -94,12 +94,23 @@ Reports fixture metadata from loaded patch/profile JSON.
 - Input: `read`, `bang`, `listfixtures`, `fixture`, `listparams`, `param`, `dump`
 - Output selectors: `summary`, `fixture`, `param`, `error`
 
+### `bbb.dmx.matrixmap`
+
+Samples `jit.matrix` color data into fixture parameters through the common fixture patch/profile layer.
+
+- Input: `jit_matrix`, `readpatch`, `readmap`, `reload`, `bang`, `dump`
+- Output: `universe <id> <512 byte values>`
+- Attributes: `@patch`, `@map`, `@universe`, `@universe_mode`, `@plane_order`, `@gamma`, `@brightness`, `@autobang`, `@invert_x`, `@invert_y`
+- Map files live in `maps/`; see `docs/SPEC.matrixmap.md`.
+
+`changed` mode outputs full universe frames for universes whose data changed. It is not a per-channel delta protocol.
+
 ## 4. Chain example
 
 A realistic Max chain should be explicit about universe boundaries:
 
 ```text
-fixturemap / generator / controllers
+fixturemap / matrixmap / generator / controllers
   -> merge
   -> fade
   -> safety

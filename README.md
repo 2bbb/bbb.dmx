@@ -16,6 +16,7 @@ This repository deliberately does **not** implement DMX network output. Art-Net 
 - `bbb.dmx.record` — records and plays back multi-universe frame snapshots.
 - `bbb.dmx.patchcheck` — validates fixture patch/profile JSON.
 - `bbb.dmx.fixtureinfo` — inspects fixture patch/profile metadata.
+- `bbb.dmx.matrixmap` — samples `jit.matrix` color data into fixture parameters and outputs multi-universe DMX frames.
 
 ## Build
 
@@ -198,6 +199,67 @@ Movertrack integration is intentionally byte-tuple based for now:
 ```
 
 `ptbytes` accepts `pan_byte_1 pan_byte_2 tilt_byte_1 tilt_byte_2` and converts them through the target fixture profile's pan/tilt byte-order metadata.
+
+## `bbb.dmx.matrixmap`
+
+```max
+[bbb.dmx.matrixmap @patch patches/rgb-grid.example.json @map maps/rgb-grid.example.json @universe_mode all]
+```
+
+`matrixmap` reads a `char` `jit.matrix`, samples colors at normalized positions, writes the sampled bytes into fixture parameters, and outputs explicit multi-universe frames:
+
+```text
+universe 1 <512 values>
+universe 2 <512 values>
+```
+
+It does not send Art-Net. Treat it as a fixture-aware matrix-to-DMX translator before `merge` / `fade` / `safety` / sender.
+
+Messages:
+
+```max
+readpatch patches/rgb-grid.example.json
+readmap maps/rgb-grid.example.json
+jit_matrix mymatrix
+reload
+dump
+bang
+```
+
+Important attributes:
+
+- `@universe_mode all|selected|changed` — output all patched universes, one selected universe, or only universes whose full frame changed.
+- `@universe` — selected universe when `@universe_mode selected`.
+- `@plane_order rgba|argb|bgra|gray` — input plane layout.
+- `@gamma`, `@brightness` — color correction.
+- `@invert_x`, `@invert_y` — mirror normalized sampling coordinates.
+- `@autobang` — output immediately after receiving `jit_matrix`.
+
+Matrix map example:
+
+```json
+{
+  "schema": "bbb.dmx.matrixmap.v1",
+  "grid": {
+    "fixture_pattern": "pixel_%03d",
+    "start_index": 1,
+    "cols": 2,
+    "rows": 2,
+    "mode": "average",
+    "params": {
+      "red": "r",
+      "green": "g",
+      "blue": "b"
+    }
+  }
+}
+```
+
+Supported color sources are `r`, `g`, `b`, `a`, `luma`, `maxrgb`, and `constant:N`. The package includes a minimal multi-universe RGB example:
+
+- `fixtures/generic.rgb.3ch.json`
+- `patches/rgb-grid.example.json`
+- `maps/rgb-grid.example.json`
 
 ## Frame utilities
 

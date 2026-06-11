@@ -66,41 +66,42 @@ macro(bbb_add_external)
     endif()
 
     # --- min-api pre-target ---
-    include(${C74_MIN_API_DIR}/script/min-pretarget.cmake)
-
-    # --- propagate directory-level variables to parent scope ---
-    # min-pretarget -> max-pretarget sets CMAKE_*_LINKER_FLAGS and
-    # CMAKE_*_OUTPUT_DIRECTORY.  These are directory-scope variables
-    # that the CMake generator reads when producing link commands and output
-    # paths.  Because we are inside a function(), changes to these variables
-    # are confined to the function scope and silently dropped on return.
-    # Without PARENT_SCOPE the generated link command omits the -Wl,-U flags
-    # from max-linker-flags.txt, causing "Undefined symbols" at link time.
-    # NOTE: Standard and custom build configurations are propagated.
-    # CMAKE_CONFIGURATION_TYPES (multi-config) and CMAKE_BUILD_TYPE
-    # (single-config) are included alongside the four standard configs.
-    foreach(_var CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS
-                 CMAKE_EXE_LINKER_FLAGS CMAKE_STATIC_LINKER_FLAGS
-                 CMAKE_C_FLAGS CMAKE_CXX_FLAGS CMAKE_MSVC_RUNTIME_LIBRARY
-                 CMAKE_LIBRARY_OUTPUT_DIRECTORY CMAKE_RUNTIME_OUTPUT_DIRECTORY
-                 CMAKE_ARCHIVE_OUTPUT_DIRECTORY CMAKE_PDB_OUTPUT_DIRECTORY
-                 CMAKE_COMPILE_PDB_OUTPUT_DIRECTORY
-                 CMAKE_INTERPROCEDURAL_OPTIMIZATION CMAKE_POSITION_INDEPENDENT_CODE
-                 CMAKE_OSX_DEPLOYMENT_TARGET)
-        if(DEFINED ${_var})
-            set(${_var} "${${_var}}" PARENT_SCOPE)
+    #
+    # max-pretarget.cmake appends the huge max-linker-flags.txt symbol list to
+    # directory-scope CMAKE_*_LINKER_FLAGS.  With many externals this silently
+    # accumulates one full copy per subdirectory and eventually trips macOS'
+    # "argument list too long" during link.  Capture the flags for this target
+    # only, then restore the directory variables before returning to the parent
+    # directory.
+    foreach(_bbb_var CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS
+                     CMAKE_EXE_LINKER_FLAGS CMAKE_STATIC_LINKER_FLAGS)
+        if(DEFINED ${_bbb_var})
+            set(_bbb_saved_${_bbb_var} "${${_bbb_var}}")
+            set(_bbb_had_${_bbb_var} TRUE)
+        else()
+            unset(_bbb_saved_${_bbb_var})
+            set(_bbb_had_${_bbb_var} FALSE)
         endif()
-        foreach(_config DEBUG RELEASE RELWITHDEBINFO MINSIZEREL
-                       ${CMAKE_CONFIGURATION_TYPES} ${CMAKE_BUILD_TYPE})
-            string(TOUPPER "${_config}" _config_upper)
-            if(DEFINED ${_var}_${_config_upper})
-                set(${_var}_${_config_upper} "${${_var}_${_config_upper}}" PARENT_SCOPE)
-            endif()
-        endforeach()
+    endforeach()
+
+    include(${C74_MIN_API_DIR}/script/min-pretarget.cmake)
+    set(_bbb_target_link_flags "${CMAKE_MODULE_LINKER_FLAGS}")
+
+    foreach(_bbb_var CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS
+                     CMAKE_EXE_LINKER_FLAGS CMAKE_STATIC_LINKER_FLAGS)
+        if(_bbb_had_${_bbb_var})
+            set(${_bbb_var} "${_bbb_saved_${_bbb_var}}")
+        else()
+            unset(${_bbb_var})
+        endif()
     endforeach()
 
     # --- build library ---
     add_library(${PROJECT_NAME} MODULE ${_bbb_sources})
+
+    if(_bbb_target_link_flags)
+        set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "${_bbb_target_link_flags}")
+    endif()
 
     # --- MSVC: report correct __cplusplus value ---
     # Without /Zc:__cplusplus, MSVC reports __cplusplus as 199711L regardless
@@ -137,6 +138,12 @@ macro(bbb_add_external)
     # --- cleanup: unset internal variables to avoid scope pollution (macro shares caller scope) ---
     unset(_bbb_sources)
     unset(_bbb_should_build)
+    unset(_bbb_target_link_flags)
+    foreach(_bbb_var CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS
+                     CMAKE_EXE_LINKER_FLAGS CMAKE_STATIC_LINKER_FLAGS)
+        unset(_bbb_saved_${_bbb_var})
+        unset(_bbb_had_${_bbb_var})
+    endforeach()
     unset(BBB_ARG_MACOS_ONLY)
     unset(BBB_ARG_WIN32_ONLY)
     unset(BBB_ARG_RPATH)

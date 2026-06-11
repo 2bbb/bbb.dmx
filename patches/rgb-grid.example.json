@@ -1,0 +1,12 @@
+{
+  "schema": "bbb.dmx.patch.v1",
+  "profiles": [
+    "../fixtures/generic.rgb.3ch.json"
+  ],
+  "fixtures": [
+    { "id": "pixel_001", "profile": "generic.rgb.3ch", "mode": "rgb", "universe": 1, "address": 1 },
+    { "id": "pixel_002", "profile": "generic.rgb.3ch", "mode": "rgb", "universe": 1, "address": 4 },
+    { "id": "pixel_003", "profile": "generic.rgb.3ch", "mode": "rgb", "universe": 2, "address": 1 },
+    { "id": "pixel_004", "profile": "generic.rgb.3ch", "mode": "rgb", "universe": 2, "address": 4 }
+  ]
+}
