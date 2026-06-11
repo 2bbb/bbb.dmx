@@ -38,6 +38,26 @@ pan_byte_1 pan_byte_2 tilt_byte_1 tilt_byte_2
 
 Default byte order is `coarsefine`.
 
+Coordinate convention:
+
+```text
++X = stage right / local right
++Y = forward / pan center
++Z = up
+```
+
+For a ceiling-hung fixture mounted upside down with pan center facing the `y = 0` side of the room/stage, use:
+
+```max
+[bbb.dmx.movertrack 0. 3.84 2.55 @rot 180. 0. 0. @tilt_invert 0 @tilt_offset -90.]
+```
+
+This separates the two corrections:
+
+- `@rot 180. 0. 0.` describes the physical upside-down orientation.
+- `@tilt_offset -90.` calibrates the fixture-specific tilt horizontal point.
+- Keep `@tilt_invert 0` for this installation; `@rot` already accounts for the world up/down reversal.
+
 ## `bbb.dmx.fixturemap`
 
 ```max

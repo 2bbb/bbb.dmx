@@ -75,6 +75,18 @@ int main() {
     output = clamp_engine.compute(bbb::dmx::vec3{0.0174524064, -0.999847695, 0.0});
     require(nearly_equal(output.pan_degrees, 90.0), "movertrack clamps pan above range");
 
+    bbb::dmx::movertrack_engine inverted_hang_engine{};
+    inverted_hang_engine.set_fixture_position(bbb::dmx::vec3{0.0, 3.84, 2.55});
+    inverted_hang_engine.set_rotation_degrees(bbb::dmx::vec3{180.0, 0.0, 0.0});
+    inverted_hang_engine.set_tilt_invert(false);
+    inverted_hang_engine.set_tilt_offset(-90.0);
+    const bbb::dmx::movertrack_output inverted_horizontal{inverted_hang_engine.compute(bbb::dmx::vec3{0.0, 0.0, 2.55})};
+    const bbb::dmx::movertrack_output inverted_floor{inverted_hang_engine.compute(bbb::dmx::vec3{0.0, 0.0, 0.0})};
+    const bbb::dmx::movertrack_output inverted_ceiling{inverted_hang_engine.compute(bbb::dmx::vec3{0.0, 0.0, 4.0})};
+    require(nearly_equal(inverted_horizontal.pan_degrees, 0.0), "inverted hang faces y=0 at pan center");
+    require(inverted_horizontal.tilt < inverted_floor.tilt, "inverted hang floor target increases tilt DMX");
+    require(inverted_ceiling.tilt < inverted_horizontal.tilt, "inverted hang ceiling target decreases tilt DMX");
+
     bbb::dmx::byte_order parsed_order{bbb::dmx::byte_order::coarse_fine};
     require(bbb::dmx::byte_order_from_string("finecoarse", parsed_order), "parse finecoarse");
     require(parsed_order == bbb::dmx::byte_order::fine_coarse, "parsed finecoarse value");
