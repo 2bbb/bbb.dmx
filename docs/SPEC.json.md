@@ -57,7 +57,7 @@ Rules for future versions:
 
 Use stable ASCII-ish identifiers where possible:
 
-- Fixture profile keys: `manufacturer.model.variant`, e.g. `generic.rgb.3ch`.
+- Fixture profile keys: `manufacturer.model[.variant]`, e.g. `generic.rgb.3ch` or `exampleco.testspot`. The `variant` segment is optional; hand-written generic profiles often use it, while converted GDTF/MVR profiles typically omit it because DMX modes already live under `modes`.
 - Fixture ids: patch-local ids, e.g. `spot_01`, `pixel_001`.
 - Mode keys: short stable names, e.g. `basic16`, `rgb`.
 - Parameter keys: semantic names, e.g. `pan`, `tilt`, `dimmer`, `red`, `green`, `blue`.
