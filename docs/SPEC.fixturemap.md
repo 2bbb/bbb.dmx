@@ -6,14 +6,14 @@ Add a common fixture-mapping layer for the `bbb.dmx.*` suite.
 
 The layer takes:
 
-- one DMX universe buffer (`512` channels, 1-based DMX channel numbers)
+- one or more DMX universe buffers (`512` channels each, 1-based DMX channel numbers)
 - fixture profile data (what channels a fixture mode exposes)
 - fixture patch data (which profile/mode is placed at which universe/address)
 - runtime parameter updates (`fixture.parameter value`)
 
 It outputs:
 
-- a fully resolved `512`-integer DMX universe list, each value clamped to `0..255`
+- fully resolved `512`-integer DMX universe buffers, each value clamped to `0..255`. The current `bbb.dmx.fixturemap` external outputs one selected universe per object instance.
 
 This is intentionally separate from `bbb.dmx.movertrack`. `movertrack` computes values. The mapper decides where those values land in a universe.
 
@@ -399,16 +399,21 @@ The Max-independent implementation lives under `source/bbb/dmx/`:
 
 ```text
 common.hpp
+frame_set.hpp
 fixture_json.hpp
 fixture_mapper.hpp
-fixture_model.hpp
+fixture_patch.hpp
+fixture_profile.hpp
 math.hpp
+universe.hpp
 value.hpp
 ```
 
 Core responsibilities:
 
-- `fixture_model.hpp` defines universe/profile/mode/parameter/patch data structures.
+- `universe.hpp` defines a strict 512-channel DMX universe.
+- `frame_set.hpp` defines a multi-universe frame set shared by utility externals.
+- `fixture_profile.hpp` and `fixture_patch.hpp` define profile/mode/parameter/patch data structures.
 - `fixture_mapper.hpp` owns strict mapping, defaults, raw channel writes, `set_u8`, `set_u16`, `set_normalized`, and `set_pan_tilt_bytes`.
 - `fixture_json.hpp` loads the normalized JSON profile/patch files and resolves profile paths relative to the patch file.
 - `value.hpp` provides byte-order helpers shared with `movertrack`.
@@ -428,6 +433,8 @@ Implemented:
 5. `fixture_mapper` unit tests.
 6. `bbb.dmx.fixturemap` external.
 7. Help patch and sample `fixtures/` + `patches/` data.
+8. Patch validation/inspection utilities: `bbb.dmx.patchcheck` and `bbb.dmx.fixtureinfo`.
+9. Multi-universe utility layer documented in `docs/SPEC.utilities.md`.
 
 Remaining future work:
 

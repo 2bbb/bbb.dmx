@@ -4,7 +4,7 @@
 
 `bbb.dmx.movertrack` is a Max external that converts a 3D target position into 16-bit DMX pan/tilt bytes for a moving light.
 
-It is one object in the broader `bbb.dmx.*` utility suite. Keep the mover-specific aiming math here; fixture profile and universe mapping belong to `bbb.dmx.fixturemap`.
+It is one object in the broader `bbb.dmx.*` utility suite. Keep the mover-specific aiming math here; fixture profile and universe mapping belong to `bbb.dmx.fixturemap`; multi-universe frame utilities are specified in `docs/SPEC.utilities.md`.
 
 Output is always four integers:
 

@@ -2,10 +2,20 @@
 
 DMX utility external object suite for Max/MSP.
 
-Current objects:
+This repository deliberately does **not** implement DMX network output. Art-Net output belongs in `bbb.artnet`. `bbb.dmx.*` objects produce, inspect, transform, and guard DMX frame data inside Max.
+
+## Current objects
 
 - `bbb.dmx.movertrack` — converts a 3D target position into 16-bit DMX pan/tilt bytes for a moving light.
-- `bbb.dmx.fixturemap` — maps fixture parameters into a full 512-channel DMX universe list.
+- `bbb.dmx.fixturemap` — maps fixture parameters into a selected 512-channel DMX universe list.
+- `bbb.dmx.monitor` — stores and reports multi-universe DMX frames and changed channels.
+- `bbb.dmx.merge` — merges named layers across multiple universes with `priority`, `htp`, or `ltp` modes.
+- `bbb.dmx.fade` — fades incoming multi-universe frames over time.
+- `bbb.dmx.generator` — generates test frames such as blackout, full, range, ramp, and chase.
+- `bbb.dmx.safety` — clamps, slews, freezes, blackouts, and deadman-protects multi-universe streams.
+- `bbb.dmx.record` — records and plays back multi-universe frame snapshots.
+- `bbb.dmx.patchcheck` — validates fixture patch/profile JSON.
+- `bbb.dmx.fixtureinfo` — inspects fixture patch/profile metadata.
 
 ## Build
 
@@ -16,7 +26,23 @@ cmake --build build --config Release
 ctest --test-dir build --output-on-failure
 ```
 
-macOS builds a universal `.mxo` (`x86_64` + `arm64`). Windows builds `.mxe64` via Visual Studio 2022.
+macOS builds universal `.mxo` externals (`x86_64` + `arm64`). Windows builds `.mxe64` via Visual Studio 2022.
+
+## Multi-universe convention
+
+Most utility objects use this message shape:
+
+```max
+universe <id> <512 byte values>
+```
+
+- `id` is 1-based and sanitized to at least `1`.
+- DMX addresses are 1-based: `1..512`.
+- Byte values are clamped to `0..255`.
+- Bare `list` input, where supported, means the object's default `@universe`.
+- Multi-universe objects output the same `universe <id> <512 byte values>` format, making them chainable before a sender such as `bbb.artnet`.
+
+This is not cosmetic. A 512-value bare list is ambiguous once a show uses more than one universe. Use explicit `universe` messages at object boundaries unless you are intentionally staying in a one-universe patch.
 
 ## `bbb.dmx.movertrack`
 
@@ -123,7 +149,9 @@ bang              // recomputes the last target, or outputs neutral center befor
 [bbb.dmx.fixturemap @patch patches/example.json @universe 1 @autobang 1]
 ```
 
-The left outlet outputs a 512-integer list: DMX channel 1 first, channel 512 last. The right outlet outputs status/error messages such as load failures and `dump` status. Fixture profiles live in `fixtures/`; show patch files live in `patches/`. Profile paths inside patch JSON are resolved relative to the patch file.
+The left outlet outputs a 512-integer list for the selected universe: DMX channel 1 first, channel 512 last. The right outlet outputs status/error messages such as load failures and `dump` status. Fixture profiles live in `fixtures/`; show patch files live in `patches/`. Profile paths inside patch JSON are resolved relative to the patch file.
+
+`fixturemap` can load patches containing multiple universes, but each object instance outputs one selected universe. If you need a fully explicit multi-universe stream, run one `fixturemap` per universe or pass its output through `prepend universe <id>` before the rest of the chain.
 
 Attributes:
 
@@ -170,3 +198,174 @@ Movertrack integration is intentionally byte-tuple based for now:
 ```
 
 `ptbytes` accepts `pan_byte_1 pan_byte_2 tilt_byte_1 tilt_byte_2` and converts them through the target fixture profile's pan/tilt byte-order metadata.
+
+## Frame utilities
+
+### `bbb.dmx.monitor`
+
+```max
+[bbb.dmx.monitor @universe 1 @changed_only 0]
+```
+
+Input:
+
+```max
+universe 1 <512 values>
+channel 1 42 255
+channels 1 1 255 2 128
+bang
+bangall
+dump
+clear
+```
+
+Output is either full `universe <id> ...` frames or `changed <id> address value ...` when `@changed_only 1`.
+
+### `bbb.dmx.merge`
+
+```max
+[bbb.dmx.merge @mode priority]
+```
+
+Messages:
+
+```max
+universe layer_a 1 <512 values>
+layer layer_b 2 <512 values>
+priority layer_a 10
+channel layer_a 1 42 255
+channels layer_b 2 1 255 2 128
+clear layer_a
+clear all
+bangall
+```
+
+Modes:
+
+- `priority` — highest layer priority wins per channel.
+- `htp` — highest byte value wins per channel.
+- `ltp` — most recently updated layer wins per channel.
+
+### `bbb.dmx.fade`
+
+```max
+[bbb.dmx.fade @time_ms 1000 @fps 30]
+```
+
+Messages:
+
+```max
+universe 1 1000 <512 target values>
+channel 1 42 255 500
+channels 1 750 1 255 2 128
+stop
+clear
+bangall
+```
+
+The object outputs interpolated `universe <id> ...` frames from a main-thread timer.
+
+### `bbb.dmx.record`
+
+```max
+[bbb.dmx.record @fps 30 @loop 0]
+```
+
+Messages:
+
+```max
+record 1
+universe 1 <512 values>
+universe 2 <512 values>
+record 0
+play 1
+play 0
+frame 0
+bangall
+write /tmp/show.dmxrec
+read /tmp/show.dmxrec
+clear
+```
+
+Recording stores snapshots of the full known frame set, so multiple universes are preserved per recorded frame.
+
+## Test, safety, and inspection utilities
+
+### `bbb.dmx.generator`
+
+```max
+[bbb.dmx.generator]
+```
+
+Messages:
+
+```max
+blackout 1
+full 2
+all 1 64
+range 1 1 16 255
+ramp 1 1 512 0 255
+chase 1 42 255
+```
+
+### `bbb.dmx.safety`
+
+```max
+[bbb.dmx.safety @max_value 255 @max_delta 255 @timeout_ms 0 @blackout 0 @freeze 0]
+```
+
+Messages:
+
+```max
+universe 1 <512 values>
+channel 1 42 255
+channels 1 1 255 2 128
+blackout 1
+freeze 1
+bangall
+```
+
+- `@max_value` clamps every output byte.
+- `@max_delta` limits per-update channel jumps.
+- `@timeout_ms` blackouts if no input arrives within the configured interval.
+- `@blackout` forces zero output.
+- `@freeze` holds the last safe frame.
+
+### `bbb.dmx.patchcheck`
+
+```max
+[bbb.dmx.patchcheck @patch patches/example.json]
+```
+
+Messages:
+
+```max
+read patches/example.json
+bang
+```
+
+Output:
+
+```text
+ok fixtures <count> universes <id...>
+error <message>
+```
+
+### `bbb.dmx.fixtureinfo`
+
+```max
+[bbb.dmx.fixtureinfo @patch patches/example.json]
+```
+
+Messages:
+
+```max
+bang
+listfixtures
+fixture spot_01
+listparams spot_01
+param spot_01 pan
+dump
+```
+
+Typical output selectors are `summary`, `fixture`, `param`, and `error`.
