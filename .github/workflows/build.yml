@@ -91,6 +91,10 @@ jobs:
           cp -r fixtures dist/bbb.dmx/
           cp -r maps dist/bbb.dmx/
           cp -r patches dist/bbb.dmx/
+          cp -r curves dist/bbb.dmx/ 2>/dev/null || true
+          cp -r masks dist/bbb.dmx/ 2>/dev/null || true
+          cp -r palettes dist/bbb.dmx/ 2>/dev/null || true
+          cp -r scenes dist/bbb.dmx/ 2>/dev/null || true
 
       - name: Create archive
         run: |
