@@ -5,7 +5,10 @@
 #include <iostream>
 
 #include "bbb/dmx/common.hpp"
+#include "bbb/dmx/curve.hpp"
+#include "bbb/dmx/mask.hpp"
 #include "bbb/dmx/movertrack.hpp"
+#include "bbb/dmx/pattern.hpp"
 
 namespace {
 
@@ -35,6 +38,41 @@ int main() {
     require(bbb::dmx::normalized_to_u8(0.5) == 128, "normalized half maps to u8 128");
     require(bbb::dmx::normalized_to_u16(0.5) == 32768, "normalized half maps to u16 32768");
     require(bbb::dmx::normalized_to_u24(1.0) == 16777215, "normalized one maps to max u24");
+    require(bbb::dmx::wildcard_match("pixel_*", "pixel_001"), "wildcard star matches suffix");
+    require(!bbb::dmx::wildcard_match("spot_*", "pixel_001"), "wildcard rejects wrong prefix");
+
+    bbb::dmx::dmx_universe curve_input{};
+    curve_input.set_channel(1, 64);
+    curve_input.set_channel(2, 128);
+    bbb::dmx::dmx_curve_rule gamma_rule{};
+    gamma_rule.universe = 1;
+    gamma_rule.start = 1;
+    gamma_rule.count = 1;
+    gamma_rule.type = bbb::dmx::dmx_curve_type::gamma;
+    gamma_rule.gamma = 2.0;
+    const bbb::dmx::dmx_universe curve_output{bbb::dmx::apply_curve_rules(curve_input, 1, {gamma_rule})};
+    require(curve_output.channel(1) < curve_input.channel(1), "gamma curve darkens low value");
+    require(curve_output.channel(2) == 128, "curve only touches matching range");
+
+    bbb::dmx::dmx_mask_rule mute_rule{};
+    mute_rule.universe = 1;
+    mute_rule.start = 2;
+    mute_rule.count = 1;
+    mute_rule.action = bbb::dmx::dmx_mask_action::mute;
+    bbb::dmx::dmx_universe previous_mask_output{};
+    previous_mask_output.set_channel(1, 99);
+    previous_mask_output.set_channel(2, 88);
+    const bbb::dmx::dmx_universe mask_output{bbb::dmx::apply_mask_rules(curve_input, previous_mask_output, 1, {mute_rule})};
+    require(mask_output.channel(1) == 64, "mask leaves unmatched channel");
+    require(mask_output.channel(2) == 0, "mask mutes matching channel");
+
+    bbb::dmx::dmx_mask_rule hold_rule{};
+    hold_rule.universe = 1;
+    hold_rule.start = 1;
+    hold_rule.count = 1;
+    hold_rule.action = bbb::dmx::dmx_mask_action::hold;
+    const bbb::dmx::dmx_universe hold_output{bbb::dmx::apply_mask_rules(curve_input, previous_mask_output, 1, {hold_rule})};
+    require(hold_output.channel(1) == 99, "mask hold preserves previous output");
 
     require(nearly_equal(bbb::dmx::choose_shortest_pan(-179.0, 179.0), 181.0), "shortest pan crosses atan2 wrap");
 

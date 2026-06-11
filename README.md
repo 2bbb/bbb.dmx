@@ -17,6 +17,8 @@ This repository deliberately does **not** implement DMX network output. Art-Net 
 - `bbb.dmx.patchcheck` — validates fixture patch/profile JSON.
 - `bbb.dmx.fixtureinfo` — inspects fixture patch/profile metadata.
 - `bbb.dmx.matrixmap` — samples `jit.matrix` color data into fixture parameters and outputs multi-universe DMX frames.
+- `bbb.dmx.curve` — applies gamma/invert/threshold/point curves to channel ranges across one or more universes.
+- `bbb.dmx.mask` — mutes, holds, allows, or forces channel ranges across one or more universes.
 
 ## Build
 
@@ -352,6 +354,78 @@ clear
 ```
 
 Recording stores snapshots of the full known frame set, so multiple universes are preserved per recorded frame.
+
+## Channel transform utilities
+
+### `bbb.dmx.curve`
+
+```max
+[bbb.dmx.curve @config curves/example.json]
+```
+
+Input and output use explicit full frames:
+
+```max
+universe 1 <512 values>
+channel 1 42 255
+channels 1 1 255 2 128
+bangall
+```
+
+Rules are channel-range based, not fixture-semantic. `universe: 0` means all universes. `start` and `count` are 1-based DMX channel ranges. Supported curves are `linear`, `gamma`, `invert`, `threshold`, and point interpolation:
+
+```json
+{
+  "schema": "bbb.dmx.curve.v1",
+  "rules": [
+    { "universe": 0, "start": 1, "count": 512, "curve": "gamma", "gamma": 2.2 },
+    { "universe": 2, "start": 1, "count": 64, "points": [[0.0, 0.0], [0.2, 0.05], [1.0, 1.0]] }
+  ]
+}
+```
+
+Quick rule message:
+
+```max
+gamma 0 1 512 2.2
+```
+
+### `bbb.dmx.mask`
+
+```max
+[bbb.dmx.mask @config masks/example.json]
+```
+
+`mask` is for hard show-control constraints before the sender: blackout a range, freeze a range, whitelist only specific channels, or force a value. It is deliberately lower-level than fixture patches because it must still work when profile data is wrong.
+
+Actions:
+
+- `mute` — force matching channels to 0.
+- `hold` — keep the previous output value for matching channels.
+- `allow` — if any allow rule exists, channels not matched by an allow rule output 0.
+- `force` — force matching channels to `value`.
+
+Example config:
+
+```json
+{
+  "schema": "bbb.dmx.mask.v1",
+  "rules": [
+    { "universe": 1, "start": 1, "count": 16, "action": "hold" },
+    { "universe": 2, "start": 100, "count": 12, "action": "mute" },
+    { "universe": 0, "start": 512, "count": 1, "action": "force", "value": 0 }
+  ]
+}
+```
+
+Quick rule messages:
+
+```max
+mute 1 100 12
+hold 1 1 16
+allow 2 1 128
+force 0 512 1 0
+```
 
 ## Test, safety, and inspection utilities
 

@@ -106,6 +106,30 @@ Samples `char` or `float32` `jit.matrix` color data into fixture parameters thro
 
 `changed` mode outputs full universe frames for universes whose data changed. It is not a per-channel delta protocol.
 
+### `bbb.dmx.curve`
+
+Applies channel/range transfer curves to explicit multi-universe DMX frames.
+
+- Input: `list`, `universe`, `channel`, `channels`, `read`, `reload`, `clear`, `gamma`, `bang`, `bangall`, `dump`
+- Output: curved `universe <id> <512 byte values>`
+- Attributes: `@config`, `@universe`, `@autobang`
+- Config file: `curves/*.json` with `rules[]`.
+- Rule fields: `universe` (`0` = all), `start`, `count` or `end`, `curve`, `gamma`, `threshold`, `points`.
+
+Supported curves: `linear`, `gamma`, `invert`, `threshold`, and `points` (`[[input, output], ...]`, normalized `0.0..1.0`). Rules are applied in array order, so overlapping rules are intentional and deterministic.
+
+### `bbb.dmx.mask`
+
+Applies hard channel/range constraints to explicit multi-universe DMX frames.
+
+- Input: `list`, `universe`, `channel`, `channels`, `read`, `reload`, `clear`, `mute`, `hold`, `allow`, `force`, `bang`, `bangall`, `dump`
+- Output: masked `universe <id> <512 byte values>`
+- Attributes: `@config`, `@universe`, `@autobang`
+- Config file: `masks/*.json` with `rules[]`.
+- Rule fields: `universe` (`0` = all), `start`, `count` or `end`, `action`, `value`.
+
+Actions: `mute` outputs zero, `hold` keeps the previous output value, `force` outputs a fixed byte, and `allow` switches the object into whitelist mode where non-allowed channels output zero.
+
 ## 4. Chain example
 
 A realistic Max chain should be explicit about universe boundaries:

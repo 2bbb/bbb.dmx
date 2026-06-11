@@ -69,6 +69,14 @@
         "maps/rgb-grid.example.json": {},
         "docs/SPEC.matrixmap.md": {},
         "docs/SPEC.utilities.md": {},
-        "docs/SPEC.fixturemap.md": {}
+        "docs/SPEC.fixturemap.md": {},
+        "externals/bbb.dmx.curve.mxo": {},
+        "externals/bbb.dmx.curve.mxe64": {},
+        "help/bbb.dmx.curve.maxhelp": {},
+        "curves/example.json": {},
+        "externals/bbb.dmx.mask.mxo": {},
+        "externals/bbb.dmx.mask.mxe64": {},
+        "help/bbb.dmx.mask.maxhelp": {},
+        "masks/example.json": {}
     }
 }
