@@ -1,0 +1,630 @@
+#pragma once
+
+#include <cctype>
+#include <cstdlib>
+#include <cmath>
+#include <fstream>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include "bbb/dmx/fixture_mapper.hpp"
+
+namespace bbb::dmx {
+
+enum class json_type {
+    null_value,
+    boolean,
+    number,
+    string,
+    array,
+    object,
+};
+
+struct json_value {
+public:
+    json_type type{json_type::null_value};
+    bool boolean_value{false};
+    double number_value{0.0};
+    std::string string_value{};
+    std::vector<json_value> array_value{};
+    std::map<std::string, json_value> object_value{};
+
+    const json_value *find(const std::string &key) const {
+        if(type != json_type::object) {
+            return nullptr;
+        }
+        const auto found = object_value.find(key);
+        if(found == object_value.end()) {
+            return nullptr;
+        }
+        return &found->second;
+    }
+};
+
+struct json_parse_result {
+public:
+    bool ok{false};
+    std::string message{};
+    json_value value{};
+};
+
+class json_parser {
+public:
+    explicit json_parser(const std::string &text)
+    : text_{text}
+    {}
+
+    json_parse_result parse() {
+        skip_space();
+        json_value value{};
+        if(!parse_value(value)) {
+            return json_parse_result{false, error_, {}};
+        }
+        skip_space();
+        if(position_ != text_.size()) {
+            return json_parse_result{false, "trailing content after JSON value", {}};
+        }
+        return json_parse_result{true, "", value};
+    }
+
+private:
+    bool parse_value(json_value &value) {
+        skip_space();
+        if(position_ >= text_.size()) {
+            return fail("unexpected end of JSON");
+        }
+        const char character{text_[position_]};
+        if(character == '{') {
+            return parse_object(value);
+        }
+        if(character == '[') {
+            return parse_array(value);
+        }
+        if(character == '"') {
+            std::string parsed_string{};
+            if(!parse_string(parsed_string)) {
+                return false;
+            }
+            value.type = json_type::string;
+            value.string_value = parsed_string;
+            return true;
+        }
+        if(character == '-' || std::isdigit((unsigned char)character)) {
+            return parse_number(value);
+        }
+        if(match_literal("true")) {
+            value.type = json_type::boolean;
+            value.boolean_value = true;
+            return true;
+        }
+        if(match_literal("false")) {
+            value.type = json_type::boolean;
+            value.boolean_value = false;
+            return true;
+        }
+        if(match_literal("null")) {
+            value.type = json_type::null_value;
+            return true;
+        }
+        return fail("unexpected JSON token");
+    }
+
+    bool parse_object(json_value &value) {
+        value.type = json_type::object;
+        value.object_value.clear();
+        position_++;
+        skip_space();
+        if(consume('}')) {
+            return true;
+        }
+        while(position_ < text_.size()) {
+            std::string key{};
+            if(!parse_string(key)) {
+                return false;
+            }
+            skip_space();
+            if(!consume(':')) {
+                return fail("expected ':' after object key");
+            }
+            json_value child{};
+            if(!parse_value(child)) {
+                return false;
+            }
+            value.object_value[key] = child;
+            skip_space();
+            if(consume('}')) {
+                return true;
+            }
+            if(!consume(',')) {
+                return fail("expected ',' or '}' in object");
+            }
+            skip_space();
+        }
+        return fail("unterminated object");
+    }
+
+    bool parse_array(json_value &value) {
+        value.type = json_type::array;
+        value.array_value.clear();
+        position_++;
+        skip_space();
+        if(consume(']')) {
+            return true;
+        }
+        while(position_ < text_.size()) {
+            json_value child{};
+            if(!parse_value(child)) {
+                return false;
+            }
+            value.array_value.push_back(child);
+            skip_space();
+            if(consume(']')) {
+                return true;
+            }
+            if(!consume(',')) {
+                return fail("expected ',' or ']' in array");
+            }
+            skip_space();
+        }
+        return fail("unterminated array");
+    }
+
+    bool parse_string(std::string &value) {
+        skip_space();
+        if(position_ >= text_.size() || text_[position_] != '"') {
+            return fail("expected JSON string");
+        }
+        position_++;
+        value.clear();
+        while(position_ < text_.size()) {
+            const char character{text_[position_++]};
+            if(character == '"') {
+                return true;
+            }
+            if(character == '\\') {
+                if(position_ >= text_.size()) {
+                    return fail("unterminated string escape");
+                }
+                const char escaped{text_[position_++]};
+                switch(escaped) {
+                    case '"': value.push_back('"'); break;
+                    case '\\': value.push_back('\\'); break;
+                    case '/': value.push_back('/'); break;
+                    case 'b': value.push_back('\b'); break;
+                    case 'f': value.push_back('\f'); break;
+                    case 'n': value.push_back('\n'); break;
+                    case 'r': value.push_back('\r'); break;
+                    case 't': value.push_back('\t'); break;
+                    default: return fail("unsupported string escape");
+                }
+            } else {
+                value.push_back(character);
+            }
+        }
+        return fail("unterminated string");
+    }
+
+    bool parse_number(json_value &value) {
+        const char *start{text_.c_str() + position_};
+        char *end{nullptr};
+        const double parsed{std::strtod(start, &end)};
+        if(end == start) {
+            return fail("invalid number");
+        }
+        position_ += (std::size_t)(end - start);
+        value.type = json_type::number;
+        value.number_value = parsed;
+        return true;
+    }
+
+    bool consume(char expected) {
+        skip_space();
+        if(position_ < text_.size() && text_[position_] == expected) {
+            position_++;
+            return true;
+        }
+        return false;
+    }
+
+    bool match_literal(const char *literal) {
+        const std::string literal_string{literal};
+        if(text_.compare(position_, literal_string.size(), literal_string) == 0) {
+            position_ += literal_string.size();
+            return true;
+        }
+        return false;
+    }
+
+    void skip_space() {
+        while(position_ < text_.size() && std::isspace((unsigned char)text_[position_])) {
+            position_++;
+        }
+    }
+
+    bool fail(const std::string &message) {
+        error_ = message + " at byte " + std::to_string(position_);
+        return false;
+    }
+
+    const std::string &text_;
+    std::size_t position_{0};
+    std::string error_{};
+};
+
+inline json_parse_result parse_json_text(const std::string &text) {
+    json_parser parser{text};
+    return parser.parse();
+}
+
+inline bool json_string(const json_value &object, const std::string &key, std::string &value, bool required, std::string &error) {
+    const json_value *child{object.find(key)};
+    if(!child) {
+        if(required) {
+            error = "missing string: " + key;
+            return false;
+        }
+        return true;
+    }
+    if(child->type != json_type::string) {
+        error = "expected string: " + key;
+        return false;
+    }
+    value = child->string_value;
+    return true;
+}
+
+inline bool json_int(const json_value &object, const std::string &key, int &value, bool required, std::string &error) {
+    const json_value *child{object.find(key)};
+    if(!child) {
+        if(required) {
+            error = "missing number: " + key;
+            return false;
+        }
+        return true;
+    }
+    if(child->type != json_type::number) {
+        error = "expected number: " + key;
+        return false;
+    }
+    value = (int)std::round(child->number_value);
+    return true;
+}
+
+inline bool json_double(const json_value &object, const std::string &key, double &value, bool required, std::string &error) {
+    const json_value *child{object.find(key)};
+    if(!child) {
+        if(required) {
+            error = "missing number: " + key;
+            return false;
+        }
+        return true;
+    }
+    if(child->type != json_type::number) {
+        error = "expected number: " + key;
+        return false;
+    }
+    value = child->number_value;
+    return true;
+}
+
+inline bool json_bool(const json_value &object, const std::string &key, bool &value, bool required, std::string &error) {
+    const json_value *child{object.find(key)};
+    if(!child) {
+        if(required) {
+            error = "missing bool: " + key;
+            return false;
+        }
+        return true;
+    }
+    if(child->type != json_type::boolean) {
+        error = "expected bool: " + key;
+        return false;
+    }
+    value = child->boolean_value;
+    return true;
+}
+
+inline bool json_vec3(const json_value &object, const std::string &key, vec3 &value, bool required, std::string &error) {
+    const json_value *child{object.find(key)};
+    if(!child) {
+        if(required) {
+            error = "missing vec3: " + key;
+            return false;
+        }
+        return true;
+    }
+    if(child->type != json_type::array || child->array_value.size() < 3) {
+        error = "expected 3-number array: " + key;
+        return false;
+    }
+    for(std::size_t index = 0; index < 3; index++) {
+        if(child->array_value[index].type != json_type::number) {
+            error = "expected numeric vec3 element: " + key;
+            return false;
+        }
+    }
+    value = vec3{child->array_value[0].number_value, child->array_value[1].number_value, child->array_value[2].number_value};
+    return true;
+}
+
+inline bool parse_byte_order_string(const std::string &text, byte_order &order) {
+    return byte_order_from_string(text, order);
+}
+
+inline bool parse_parameter_type(const std::string &text, fixture_parameter_type &type) {
+    if(text == "u8") {
+        type = fixture_parameter_type::u8;
+        return true;
+    }
+    if(text == "u16") {
+        type = fixture_parameter_type::u16;
+        return true;
+    }
+    if(text == "enum") {
+        type = fixture_parameter_type::enum_u8;
+        return true;
+    }
+    return false;
+}
+
+inline mapper_result fixture_profile_from_json(const json_value &root, fixture_profile &profile) {
+    if(root.type != json_type::object) {
+        return mapper_result::failure("profile root must be object");
+    }
+    std::string error{};
+    if(!json_string(root, "key", profile.key, true, error)) {
+        return mapper_result::failure(error);
+    }
+    json_string(root, "manufacturer", profile.manufacturer, false, error);
+    json_string(root, "model", profile.model, false, error);
+
+    const json_value *modes{root.find("modes")};
+    if(!modes || modes->type != json_type::object) {
+        return mapper_result::failure("profile modes must be object");
+    }
+
+    profile.modes.clear();
+    for(const auto &mode_pair : modes->object_value) {
+        if(mode_pair.second.type != json_type::object) {
+            return mapper_result::failure("mode must be object: " + mode_pair.first);
+        }
+        fixture_mode mode{};
+        mode.key = mode_pair.first;
+        json_string(mode_pair.second, "label", mode.label, false, error);
+        if(!json_int(mode_pair.second, "footprint", mode.footprint, true, error)) {
+            return mapper_result::failure(error);
+        }
+
+        const json_value *channels{mode_pair.second.find("channels")};
+        if(!channels || channels->type != json_type::array) {
+            return mapper_result::failure("mode channels must be array: " + mode.key);
+        }
+        for(const auto &channel_value : channels->array_value) {
+            if(channel_value.type != json_type::object) {
+                return mapper_result::failure("channel must be object in mode: " + mode.key);
+            }
+            fixture_channel channel{};
+            if(!json_int(channel_value, "offset", channel.offset, true, error)) {
+                return mapper_result::failure(error);
+            }
+            if(!json_string(channel_value, "key", channel.key, true, error)) {
+                return mapper_result::failure(error);
+            }
+            json_int(channel_value, "default", channel.default_value, false, error);
+            json_string(channel_value, "label", channel.label, false, error);
+            json_bool(channel_value, "hold", channel.hold, false, error);
+            mode.channels.push_back(channel);
+        }
+
+        const json_value *parameters{mode_pair.second.find("parameters")};
+        if(parameters && parameters->type == json_type::object) {
+            for(const auto &parameter_pair : parameters->object_value) {
+                if(parameter_pair.second.type != json_type::object) {
+                    return mapper_result::failure("parameter must be object: " + parameter_pair.first);
+                }
+                fixture_parameter parameter{};
+                parameter.key = parameter_pair.first;
+                std::string type_text{"u8"};
+                if(!json_string(parameter_pair.second, "type", type_text, true, error)) {
+                    return mapper_result::failure(error);
+                }
+                if(!parse_parameter_type(type_text, parameter.type)) {
+                    return mapper_result::failure("unknown parameter type: " + type_text);
+                }
+                json_int(parameter_pair.second, "default", parameter.default_value, false, error);
+                json_double(parameter_pair.second, "range_degrees", parameter.range_degrees, false, error);
+                std::string order_text{"coarsefine"};
+                json_string(parameter_pair.second, "byte_order", order_text, false, error);
+                if(!parse_byte_order_string(order_text, parameter.order)) {
+                    return mapper_result::failure("unknown byte_order: " + order_text);
+                }
+
+                const json_value *channel{parameter_pair.second.find("channel")};
+                if(channel) {
+                    if(channel->type != json_type::string) {
+                        return mapper_result::failure("parameter channel must be string: " + parameter.key);
+                    }
+                    parameter.channels.push_back(channel->string_value);
+                }
+                const json_value *parameter_channels{parameter_pair.second.find("channels")};
+                if(parameter_channels) {
+                    if(parameter_channels->type != json_type::array) {
+                        return mapper_result::failure("parameter channels must be array: " + parameter.key);
+                    }
+                    for(const auto &entry : parameter_channels->array_value) {
+                        if(entry.type != json_type::string) {
+                            return mapper_result::failure("parameter channel entry must be string: " + parameter.key);
+                        }
+                        parameter.channels.push_back(entry.string_value);
+                    }
+                }
+                mode.parameters.push_back(parameter);
+            }
+        }
+        profile.modes.push_back(mode);
+    }
+    return mapper_result::success();
+}
+
+inline mapper_result fixture_patch_from_json(const json_value &root, fixture_patch &patch) {
+    if(root.type != json_type::object) {
+        return mapper_result::failure("patch root must be object");
+    }
+    patch = fixture_patch{};
+    const json_value *profiles{root.find("profiles")};
+    if(profiles) {
+        if(profiles->type != json_type::array) {
+            return mapper_result::failure("patch profiles must be array");
+        }
+        for(const auto &profile_path : profiles->array_value) {
+            if(profile_path.type != json_type::string) {
+                return mapper_result::failure("profile path must be string");
+            }
+            patch.profile_paths.push_back(profile_path.string_value);
+        }
+    }
+
+    const json_value *fixtures{root.find("fixtures")};
+    if(!fixtures || fixtures->type != json_type::array) {
+        return mapper_result::failure("patch fixtures must be array");
+    }
+
+    std::string error{};
+    for(const auto &fixture_value : fixtures->array_value) {
+        if(fixture_value.type != json_type::object) {
+            return mapper_result::failure("fixture must be object");
+        }
+        fixture_instance fixture{};
+        if(!json_string(fixture_value, "id", fixture.id, true, error)) {
+            return mapper_result::failure(error);
+        }
+        if(!json_string(fixture_value, "profile", fixture.profile, true, error)) {
+            return mapper_result::failure(error);
+        }
+        if(!json_string(fixture_value, "mode", fixture.mode, true, error)) {
+            return mapper_result::failure(error);
+        }
+        if(!json_int(fixture_value, "universe", fixture.universe, true, error)) {
+            return mapper_result::failure(error);
+        }
+        if(!json_int(fixture_value, "address", fixture.address, true, error)) {
+            return mapper_result::failure(error);
+        }
+        json_vec3(fixture_value, "position", fixture.position, false, error);
+        json_vec3(fixture_value, "rotation", fixture.rotation, false, error);
+        const json_value *calibration{fixture_value.find("calibration")};
+        if(calibration) {
+            if(calibration->type != json_type::object) {
+                return mapper_result::failure("calibration must be object: " + fixture.id);
+            }
+            json_double(*calibration, "pan_offset", fixture.calibration.pan_offset, false, error);
+            json_double(*calibration, "tilt_offset", fixture.calibration.tilt_offset, false, error);
+            json_bool(*calibration, "pan_invert", fixture.calibration.pan_invert, false, error);
+            json_bool(*calibration, "tilt_invert", fixture.calibration.tilt_invert, false, error);
+        }
+        patch.fixtures.push_back(fixture);
+    }
+    return mapper_result::success();
+}
+
+inline mapper_result read_text_file(const std::string &path, std::string &text) {
+    std::ifstream stream(path.c_str(), std::ios::in | std::ios::binary);
+    if(!stream) {
+        return mapper_result::failure("cannot open file: " + path);
+    }
+    std::ostringstream buffer{};
+    buffer << stream.rdbuf();
+    text = buffer.str();
+    return mapper_result::success();
+}
+
+inline mapper_result parse_fixture_profile_text(const std::string &text, fixture_profile &profile) {
+    const json_parse_result parsed{parse_json_text(text)};
+    if(!parsed.ok) {
+        return mapper_result::failure(parsed.message);
+    }
+    return fixture_profile_from_json(parsed.value, profile);
+}
+
+inline mapper_result parse_fixture_patch_text(const std::string &text, fixture_patch &patch) {
+    const json_parse_result parsed{parse_json_text(text)};
+    if(!parsed.ok) {
+        return mapper_result::failure(parsed.message);
+    }
+    return fixture_patch_from_json(parsed.value, patch);
+}
+
+inline mapper_result read_fixture_profile_file(const std::string &path, fixture_profile &profile) {
+    std::string text{};
+    mapper_result result{read_text_file(path, text)};
+    if(!result.ok) {
+        return result;
+    }
+    return parse_fixture_profile_text(text, profile);
+}
+
+inline mapper_result read_fixture_patch_file(const std::string &path, fixture_patch &patch) {
+    std::string text{};
+    mapper_result result{read_text_file(path, text)};
+    if(!result.ok) {
+        return result;
+    }
+    return parse_fixture_patch_text(text, patch);
+}
+
+inline std::string parent_directory(const std::string &path) {
+    const std::size_t slash_position{path.find_last_of("/\\")};
+    if(slash_position == std::string::npos) {
+        return "";
+    }
+    return path.substr(0, slash_position + 1);
+}
+
+inline bool path_is_absolute(const std::string &path) {
+    if(path.empty()) {
+        return false;
+    }
+    if(path[0] == '/' || path[0] == '\\') {
+        return true;
+    }
+    return 1 < path.size() && path[1] == ':';
+}
+
+inline std::string join_relative_path(const std::string &base_directory, const std::string &path) {
+    if(path_is_absolute(path) || base_directory.empty()) {
+        return path;
+    }
+    return base_directory + path;
+}
+
+inline mapper_result load_fixture_mapper_from_patch_file(const std::string &patch_path, fixture_mapper &mapper) {
+    fixture_patch patch{};
+    mapper_result result{read_fixture_patch_file(patch_path, patch)};
+    if(!result.ok) {
+        return result;
+    }
+
+    fixture_mapper loaded_mapper{};
+    const std::string base_directory{parent_directory(patch_path)};
+    for(const auto &profile_path : patch.profile_paths) {
+        fixture_profile profile{};
+        result = read_fixture_profile_file(join_relative_path(base_directory, profile_path), profile);
+        if(!result.ok) {
+            return result;
+        }
+        result = loaded_mapper.add_profile(profile);
+        if(!result.ok) {
+            return result;
+        }
+    }
+    result = loaded_mapper.set_patch(patch);
+    if(!result.ok) {
+        return result;
+    }
+    mapper = loaded_mapper;
+    return mapper_result::success();
+}
+
+} // namespace bbb::dmx

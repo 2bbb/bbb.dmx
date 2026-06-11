@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <cmath>
+#include <string>
 
 #include "bbb/dmx/math.hpp"
 
@@ -48,6 +49,25 @@ inline std::array<int, 4> pan_tilt_to_bytes(std::uint16_t pan_value, std::uint16
 
 inline std::uint16_t neutral_u16() {
     return 32768;
+}
+
+inline bool byte_order_from_string(const std::string &text, byte_order &order) {
+    if(text == "coarsefine") {
+        order = byte_order::coarse_fine;
+        return true;
+    }
+    if(text == "finecoarse") {
+        order = byte_order::fine_coarse;
+        return true;
+    }
+    return false;
+}
+
+inline const char *byte_order_to_string(byte_order order) {
+    if(order == byte_order::fine_coarse) {
+        return "finecoarse";
+    }
+    return "coarsefine";
 }
 
 } // namespace bbb::dmx

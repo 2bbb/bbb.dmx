@@ -158,6 +158,71 @@ int main() {
     map_result = mapper.set_patch(overlap_patch);
     require(!map_result.ok, "fixture mapper rejects overlapping fixtures");
 
+
+
+    const std::string profile_json{R"json({
+        "schema": "bbb.dmx.fixture.profile.v1",
+        "key": "generic.json.mover",
+        "manufacturer": "Generic",
+        "model": "JSON Mover",
+        "modes": {
+            "basic16": {
+                "footprint": 5,
+                "channels": [
+                    { "offset": 1, "key": "pan.coarse", "default": 128 },
+                    { "offset": 2, "key": "pan.fine", "default": 0 },
+                    { "offset": 3, "key": "tilt.coarse", "default": 128 },
+                    { "offset": 4, "key": "tilt.fine", "default": 0 },
+                    { "offset": 5, "key": "dimmer", "default": 0 }
+                ],
+                "parameters": {
+                    "pan": { "type": "u16", "channels": ["pan.coarse", "pan.fine"], "byte_order": "coarsefine", "default": 32768 },
+                    "tilt": { "type": "u16", "channels": ["tilt.coarse", "tilt.fine"], "byte_order": "coarsefine", "default": 32768 },
+                    "dimmer": { "type": "u8", "channel": "dimmer", "default": 0 }
+                }
+            }
+        }
+    })json"};
+    bbb::dmx::fixture_profile parsed_profile{};
+    map_result = bbb::dmx::parse_fixture_profile_text(profile_json, parsed_profile);
+    require(map_result.ok, "fixture JSON profile parses");
+    require(parsed_profile.key == "generic.json.mover", "fixture JSON profile key");
+    require(parsed_profile.modes.size() == 1, "fixture JSON profile mode count");
+    require(parsed_profile.modes[0].channels.size() == 5, "fixture JSON channel count");
+
+    const std::string patch_json{R"json({
+        "schema": "bbb.dmx.patch.v1",
+        "profiles": ["fixtures/generic.json.mover.json"],
+        "fixtures": [
+            {
+                "id": "json_spot_01",
+                "profile": "generic.json.mover",
+                "mode": "basic16",
+                "universe": 1,
+                "address": 21,
+                "position": [0.0, 0.0, 3.0],
+                "rotation": [0.0, 0.0, 0.0],
+                "calibration": { "pan_offset": 1.0, "tilt_offset": -2.0, "pan_invert": true, "tilt_invert": false }
+            }
+        ]
+    })json"};
+    bbb::dmx::fixture_patch parsed_patch{};
+    map_result = bbb::dmx::parse_fixture_patch_text(patch_json, parsed_patch);
+    require(map_result.ok, "fixture JSON patch parses");
+    require(parsed_patch.profile_paths.size() == 1, "fixture JSON patch profile path count");
+    require(parsed_patch.fixtures.size() == 1, "fixture JSON patch fixture count");
+    require(parsed_patch.fixtures[0].address == 21, "fixture JSON patch address");
+    require(parsed_patch.fixtures[0].calibration.pan_invert, "fixture JSON patch calibration bool");
+
+    bbb::dmx::fixture_mapper json_mapper{};
+    map_result = json_mapper.add_profile(parsed_profile);
+    require(map_result.ok, "fixture JSON mapper accepts parsed profile");
+    map_result = json_mapper.set_patch(parsed_patch);
+    require(map_result.ok, "fixture JSON mapper accepts parsed patch");
+    map_result = json_mapper.set_normalized("json_spot_01", "dimmer", 0.5);
+    require(map_result.ok, "fixture JSON mapper normalized set");
+    require(json_mapper.universe(1).channel(25) == 128, "fixture JSON mapper normalized dimmer");
+
     std::cout << "bbb_dmx_common_tests passed" << std::endl;
     return 0;
 }
