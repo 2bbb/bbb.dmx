@@ -12,7 +12,7 @@ jobs:
   build-macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -27,13 +27,13 @@ jobs:
 
       - name: Verify universal binaries
         run: |
-          for external in bbb.dmx.fixturemap bbb.dmx.movertrack; do
-            lipo -info externals/${external}.mxo/Contents/MacOS/${external}
-            lipo externals/${external}.mxo/Contents/MacOS/${external} -verify_arch x86_64 arm64
-          done
+          while IFS= read -r binary; do
+            lipo -info "$binary"
+            lipo "$binary" -verify_arch x86_64 arm64
+          done < <(find externals -path '*/Contents/MacOS/*' -type f | sort)
 
       - name: Upload externals
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bbb.dmx-macos
           path: externals/
@@ -41,7 +41,7 @@ jobs:
   build-windows:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -55,7 +55,7 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure
 
       - name: Upload externals
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bbb.dmx-windows
           path: externals/
@@ -66,16 +66,16 @@ jobs:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download macOS externals
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: bbb.dmx-macos
           path: dist/bbb.dmx/externals/
 
       - name: Download Windows externals
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: bbb.dmx-windows
           path: dist/bbb.dmx/externals/
@@ -96,13 +96,13 @@ jobs:
           zip -r bbb.dmx.zip bbb.dmx/
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bbb.dmx-latest
           path: dist/bbb.dmx.zip
 
       - name: Upload to Release
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/bbb.dmx.zip
