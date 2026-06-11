@@ -30,11 +30,25 @@ inline std::uint16_t angle_to_u16(double degrees, double range_degrees) {
     return (std::uint16_t)value;
 }
 
+inline double u16_to_angle(std::uint16_t value, double range_degrees) {
+    const double sanitized_range{sanitize_positive_range(range_degrees)};
+    const double half_range{sanitized_range * 0.5};
+    const double normalized{(double)value / 65535.0};
+    return normalized * sanitized_range - half_range;
+}
+
 inline split_u16 split_16(std::uint16_t value) {
     return split_u16{
         (std::uint8_t)(value >> 8),
         (std::uint8_t)(value & 255),
     };
+}
+
+inline std::uint16_t combine_16(std::uint8_t first, std::uint8_t second, byte_order order) {
+    if(order == byte_order::fine_coarse) {
+        return (std::uint16_t)(((std::uint16_t)second << 8) | first);
+    }
+    return (std::uint16_t)(((std::uint16_t)first << 8) | second);
 }
 
 inline std::array<int, 4> pan_tilt_to_bytes(std::uint16_t pan_value, std::uint16_t tilt_value, byte_order order) {

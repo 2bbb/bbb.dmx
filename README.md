@@ -38,6 +38,18 @@ pan_byte_1 pan_byte_2 tilt_byte_1 tilt_byte_2
 
 Default byte order is `coarsefine`.
 
+Tracking modes:
+
+```max
+tracking_mode smart
+tracking_mode pan
+tracking_mode off
+```
+
+- `smart` is the default. It tries direct and pan+180/tilt-flipped candidates, rejects candidates outside the configured pan/tilt ranges, then chooses the smallest move from the previous output.
+- `pan` keeps the legacy pan-only shortest-path behavior. It can still choose an out-of-range equivalent pan and then clip, so use it only if you explicitly want that old behavior.
+- `off` disables tracking and outputs the direct pan/tilt solution. This avoids history-induced wrong turns, but it can spin through atan2 wrap points.
+
 Coordinate convention:
 
 ```text
@@ -57,6 +69,19 @@ This separates the two corrections:
 - `@rot 180. 0. 0.` describes the physical upside-down orientation.
 - `@tilt_offset -90.` calibrates the fixture-specific tilt horizontal point.
 - Keep `@tilt_invert 0` for this installation; `@rot` already accounts for the world up/down reversal.
+
+You can also derive offsets from a known target and a DMX value instead of hand-tuning degrees:
+
+```max
+calibrate_pan 0. 0. 2.55 32768
+calibrate_tilt 0. 0. 2.55 10923
+```
+
+With two byte arguments, the current `byte_order` is used:
+
+```max
+calibrate_tilt 0. 0. 2.55 42 171
+```
 
 ## `bbb.dmx.fixturemap`
 

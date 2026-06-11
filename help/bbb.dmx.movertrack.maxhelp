@@ -82,7 +82,16 @@
             { "box": { "id": "obj-39", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 525.0, 660.0, 20.0], "text": "Same-height y = 0 target is horizontal; floor target should not require tilt_invert." } },
             { "box": { "id": "obj-40", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [40.0, 555.0, 125.0, 22.0], "text": "target 0. 0. 2.55" } },
             { "box": { "id": "obj-41", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [175.0, 555.0, 110.0, 22.0], "text": "target 0. 0. 0." } },
-            { "box": { "id": "obj-42", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [300.0, 555.0, 440.0, 20.0], "text": "If floor/ceiling are swapped, fix rot/tilt_offset before touching tilt_invert." } }
+            { "box": { "id": "obj-42", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [300.0, 555.0, 440.0, 20.0], "text": "If floor/ceiling are swapped, fix rot/tilt_offset before touching tilt_invert." } },
+
+            { "box": { "id": "obj-43", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [540.0, 430.0, 360.0, 20.0], "text": "Tracking mode: smart rejects out-of-range flip candidates before clipping." } },
+            { "box": { "id": "obj-44", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [540.0, 455.0, 130.0, 22.0], "text": "tracking_mode smart" } },
+            { "box": { "id": "obj-45", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [680.0, 455.0, 120.0, 22.0], "text": "tracking_mode pan" } },
+            { "box": { "id": "obj-46", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [810.0, 455.0, 115.0, 22.0], "text": "tracking_mode off" } },
+            { "box": { "id": "obj-47", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [540.0, 495.0, 350.0, 20.0], "text": "Offset calibration from a known target and measured DMX value." } },
+            { "box": { "id": "obj-48", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [540.0, 525.0, 215.0, 22.0], "text": "calibrate_pan 0. 0. 2.55 32768" } },
+            { "box": { "id": "obj-49", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [540.0, 555.0, 215.0, 22.0], "text": "calibrate_tilt 0. 0. 2.55 10923" } },
+            { "box": { "id": "obj-50", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [540.0, 585.0, 210.0, 22.0], "text": "calibrate_tilt 0. 0. 2.55 42 171" } }
         ],
         "lines": [
             { "patchline": { "source": ["obj-3", 0], "destination": ["obj-7", 0] } },
@@ -112,7 +121,13 @@
             { "patchline": { "source": ["obj-37", 0], "destination": ["obj-7", 0] } },
             { "patchline": { "source": ["obj-38", 0], "destination": ["obj-7", 0] } },
             { "patchline": { "source": ["obj-40", 0], "destination": ["obj-7", 0] } },
-            { "patchline": { "source": ["obj-41", 0], "destination": ["obj-7", 0] } }
+            { "patchline": { "source": ["obj-41", 0], "destination": ["obj-7", 0] } },
+            { "patchline": { "source": ["obj-44", 0], "destination": ["obj-7", 0] } },
+            { "patchline": { "source": ["obj-45", 0], "destination": ["obj-7", 0] } },
+            { "patchline": { "source": ["obj-46", 0], "destination": ["obj-7", 0] } },
+            { "patchline": { "source": ["obj-48", 0], "destination": ["obj-7", 0] } },
+            { "patchline": { "source": ["obj-49", 0], "destination": ["obj-7", 0] } },
+            { "patchline": { "source": ["obj-50", 0], "destination": ["obj-7", 0] } }
         ]
     }
 }

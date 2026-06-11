@@ -75,6 +75,35 @@ int main() {
     output = clamp_engine.compute(bbb::dmx::vec3{0.0174524064, -0.999847695, 0.0});
     require(nearly_equal(output.pan_degrees, 90.0), "movertrack clamps pan above range");
 
+    bbb::dmx::movertrack_engine smart_engine{};
+    smart_engine.set_ranges(180.0, 270.0);
+    smart_engine.set_tilt_offset(-90.0);
+    output = smart_engine.compute(bbb::dmx::vec3{1.0, 0.1, 0.0});
+    require(nearly_equal(output.pan_degrees, 84.28940686250036), "smart tracking initializes direct candidate");
+    output = smart_engine.compute(bbb::dmx::vec3{-0.1, -1.0, 0.0});
+    require(nearly_equal(output.pan_degrees, 5.710593137499643), "smart tracking chooses valid pan-flip candidate");
+    require(nearly_equal(output.tilt_degrees, 90.0), "smart tracking chooses flipped tilt candidate");
+
+    bbb::dmx::movertrack_engine pan_only_engine{};
+    pan_only_engine.set_ranges(180.0, 270.0);
+    pan_only_engine.set_tilt_offset(-90.0);
+    pan_only_engine.set_tracking_mode(bbb::dmx::tracking_mode::pan);
+    output = pan_only_engine.compute(bbb::dmx::vec3{1.0, 0.1, 0.0});
+    output = pan_only_engine.compute(bbb::dmx::vec3{-0.1, -1.0, 0.0});
+    require(nearly_equal(output.pan_degrees, 90.0), "pan-only tracking still clamps invalid pan candidate");
+
+    bbb::dmx::movertrack_engine calibration_engine{};
+    require(calibration_engine.calibrate_tilt_offset(
+        bbb::dmx::vec3{0.0, 10.0, 0.0},
+        bbb::dmx::angle_to_u16(-90.0, 270.0)
+    ), "calibrate tilt offset from target and u16");
+    require(nearly_equal(calibration_engine.settings().tilt_offset_degrees, -90.0, 0.01), "calibrated tilt offset reflects u16 quantization");
+    require(calibration_engine.calibrate_pan_offset(
+        bbb::dmx::vec3{10.0, 0.0, 0.0},
+        bbb::dmx::angle_to_u16(0.0, 540.0)
+    ), "calibrate pan offset from target and u16");
+    require(nearly_equal(calibration_engine.settings().pan_offset_degrees, -90.0, 0.01), "calibrated pan offset reflects u16 quantization");
+
     bbb::dmx::movertrack_engine inverted_hang_engine{};
     inverted_hang_engine.set_fixture_position(bbb::dmx::vec3{0.0, 3.84, 2.55});
     inverted_hang_engine.set_rotation_degrees(bbb::dmx::vec3{180.0, 0.0, 0.0});
@@ -91,6 +120,11 @@ int main() {
     require(bbb::dmx::byte_order_from_string("finecoarse", parsed_order), "parse finecoarse");
     require(parsed_order == bbb::dmx::byte_order::fine_coarse, "parsed finecoarse value");
     require(!bbb::dmx::byte_order_from_string("bad", parsed_order), "reject bad byte order");
+
+    bbb::dmx::tracking_mode parsed_tracking_mode{bbb::dmx::tracking_mode::off};
+    require(bbb::dmx::tracking_mode_from_string("smart", parsed_tracking_mode), "parse smart tracking mode");
+    require(parsed_tracking_mode == bbb::dmx::tracking_mode::smart, "parsed smart tracking mode value");
+    require(!bbb::dmx::tracking_mode_from_string("bad", parsed_tracking_mode), "reject bad tracking mode");
 
 
 

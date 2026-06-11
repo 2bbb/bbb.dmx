@@ -2,7 +2,9 @@
 
 #include <bbb/dmx/movertrack.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cstdint>
 #include <string>
 
 class bbb_dmx_movertrack : public c74::min::object<bbb_dmx_movertrack> {
@@ -19,9 +21,11 @@ private:
     double pan_offset_value_{0.0};
     double tilt_offset_value_{0.0};
     bbb::dmx::byte_order byte_order_value_{bbb::dmx::byte_order::coarse_fine};
+    bbb::dmx::tracking_mode tracking_mode_value_{bbb::dmx::tracking_mode::smart};
     bool warn_invalid_numeric_{false};
     bool warn_invalid_range_{false};
     bool warn_invalid_byte_order_{false};
+    bool warn_invalid_tracking_mode_{false};
 
 public:
     MIN_DESCRIPTION{"Convert a 3D target position to 16-bit moving-light DMX pan/tilt bytes."};
@@ -198,11 +202,30 @@ public:
     };
 
     c74::min::attribute<bool> shortest_pan{this, "shortest_pan", true,
-        c74::min::description{"Use closest equivalent pan angle to avoid atan2 wrap jumps."},
+        c74::min::description{"Compatibility switch. 1 enables smart pan/tilt tracking; 0 disables tracking."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             const bool value{args.empty() || ((int)args[0] != 0)};
-            engine_.set_shortest_pan(value);
+            set_tracking_mode_value(value ? bbb::dmx::tracking_mode::smart : bbb::dmx::tracking_mode::off);
             return {value};
+        }}
+    };
+
+    c74::min::attribute<c74::min::symbol> tracking_mode{this, "tracking_mode", "smart",
+        c74::min::description{"Tracking mode: off, pan, or smart. smart chooses valid pan/tilt flip candidates before clipping."},
+        c74::min::enum_map{"off", "pan", "smart"},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                warn_once(warn_invalid_tracking_mode_, "invalid tracking_mode ignored");
+                return {c74::min::symbol(bbb::dmx::tracking_mode_to_string(tracking_mode_value_))};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            bbb::dmx::tracking_mode parsed_mode{tracking_mode_value_};
+            if(!bbb::dmx::tracking_mode_from_string(symbol_value.c_str(), parsed_mode)) {
+                warn_once(warn_invalid_tracking_mode_, "invalid tracking_mode ignored");
+                return {c74::min::symbol(bbb::dmx::tracking_mode_to_string(tracking_mode_value_))};
+            }
+            set_tracking_mode_value(parsed_mode);
+            return {c74::min::symbol(bbb::dmx::tracking_mode_to_string(tracking_mode_value_))};
         }}
     };
 
@@ -256,6 +279,44 @@ public:
             pan_range = pan_range_value_;
             tilt_range = tilt_range_value_;
             engine_.set_ranges(pan_range_value_, tilt_range_value_);
+            return {};
+        }
+    };
+
+    c74::min::message<> calibrate_pan_message{this, "calibrate_pan", "calibrate_pan target_x target_y target_z pan_u16 | pan_byte_1 pan_byte_2",
+        MIN_FUNCTION {
+            if(args.size() < 4 || !finite_atoms(args, args.size() < 5 ? 4 : 5)) {
+                warn_once(warn_invalid_numeric_, "invalid calibrate_pan ignored");
+                return {};
+            }
+            const bbb::dmx::vec3 target_position{(double)args[0], (double)args[1], (double)args[2]};
+            const std::uint16_t desired_value{u16_from_calibration_args(args, 3)};
+            if(!engine_.calibrate_pan_offset(target_position, desired_value)) {
+                warn_once(warn_invalid_numeric_, "invalid calibrate_pan target ignored");
+                return {};
+            }
+            pan_offset_value_ = engine_.settings().pan_offset_degrees;
+            pan_offset = pan_offset_value_;
+            compute_and_output(target_position.x, target_position.y, target_position.z);
+            return {};
+        }
+    };
+
+    c74::min::message<> calibrate_tilt_message{this, "calibrate_tilt", "calibrate_tilt target_x target_y target_z tilt_u16 | tilt_byte_1 tilt_byte_2",
+        MIN_FUNCTION {
+            if(args.size() < 4 || !finite_atoms(args, args.size() < 5 ? 4 : 5)) {
+                warn_once(warn_invalid_numeric_, "invalid calibrate_tilt ignored");
+                return {};
+            }
+            const bbb::dmx::vec3 target_position{(double)args[0], (double)args[1], (double)args[2]};
+            const std::uint16_t desired_value{u16_from_calibration_args(args, 3)};
+            if(!engine_.calibrate_tilt_offset(target_position, desired_value)) {
+                warn_once(warn_invalid_numeric_, "invalid calibrate_tilt target ignored");
+                return {};
+            }
+            tilt_offset_value_ = engine_.settings().tilt_offset_degrees;
+            tilt_offset = tilt_offset_value_;
+            compute_and_output(target_position.x, target_position.y, target_position.z);
             return {};
         }
     };
@@ -316,6 +377,24 @@ private:
 
     void apply_rotation() {
         engine_.set_rotation_degrees(bbb::dmx::vec3{rotation_x_value_, rotation_y_value_, rotation_z_value_});
+    }
+
+    void set_tracking_mode_value(bbb::dmx::tracking_mode mode) {
+        tracking_mode_value_ = mode;
+        engine_.set_tracking_mode(mode);
+    }
+
+    static int clamp_int(int value, int minimum, int maximum) {
+        return std::max(minimum, std::min(maximum, value));
+    }
+
+    std::uint16_t u16_from_calibration_args(const c74::min::atoms &args, std::size_t start_index) const {
+        if(start_index + 1 < args.size()) {
+            const std::uint8_t first{(std::uint8_t)clamp_int((int)args[start_index], 0, 255)};
+            const std::uint8_t second{(std::uint8_t)clamp_int((int)args[start_index + 1], 0, 255)};
+            return bbb::dmx::combine_16(first, second, byte_order_value_);
+        }
+        return (std::uint16_t)clamp_int((int)args[start_index], 0, 65535);
     }
 
     void compute_and_output(double target_x, double target_y, double target_z) {
