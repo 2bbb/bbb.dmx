@@ -1,39 +1,21 @@
 #include "c74_min.h"
 
 #include <bbb/dmx/fixture_json.hpp>
+#include <bbb/dmx/fixture_runtime.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 #include <bbb/dmx/pattern.hpp>
 
 #include <map>
-#include <set>
 #include <string>
 #include <vector>
 
 namespace {
 
-using parameter_map = std::map<std::string, double>;
-
 struct scene_rule {
 public:
     std::string fixture_pattern{};
-    parameter_map parameters{};
+    bbb::dmx::fixture_parameter_values parameters{};
 };
-
-bool parse_parameter_map(const bbb::dmx::json_value &value, parameter_map &parameters, std::string &error) {
-    if(value.type != bbb::dmx::json_type::object) {
-        error = "parameter map must be object";
-        return false;
-    }
-    parameters.clear();
-    for(const auto &entry : value.object_value) {
-        if(entry.second.type != bbb::dmx::json_type::number) {
-            error = "scene parameter must be numeric: " + entry.first;
-            return false;
-        }
-        parameters[entry.first] = entry.second.number_value;
-    }
-    return true;
-}
 
 } // namespace
 
@@ -281,7 +263,6 @@ private:
             return bbb::dmx::mapper_result::failure("scenes must be object");
         }
         std::map<std::string, std::vector<scene_rule>> loaded{};
-        std::string error{};
         for(const auto &scene_entry : scenes_value->object_value) {
             if(scene_entry.second.type != bbb::dmx::json_type::object) {
                 return bbb::dmx::mapper_result::failure("scene entry must be object: " + scene_entry.first);
@@ -290,8 +271,9 @@ private:
             for(const auto &rule_entry : scene_entry.second.object_value) {
                 scene_rule rule{};
                 rule.fixture_pattern = rule_entry.first;
-                if(!parse_parameter_map(rule_entry.second, rule.parameters, error)) {
-                    return bbb::dmx::mapper_result::failure(error);
+                const bbb::dmx::mapper_result result{bbb::dmx::parse_fixture_parameter_values(rule_entry.second, rule.parameters, "scene")};
+                if(!result.ok) {
+                    return result;
                 }
                 rules.push_back(rule);
             }
@@ -302,11 +284,7 @@ private:
     }
 
     void output_all_universes() {
-        std::set<int> universes{};
-        for(const auto &fixture : mapper_.patch().fixtures) {
-            universes.insert(fixture.universe);
-        }
-        for(const int universe_id : universes) {
+        for(const int universe_id : bbb::dmx::fixture_universe_ids(mapper_)) {
             output.send(bbb::dmx::maxutil::universe_atoms(universe_id, mapper_.universe(universe_id)));
         }
     }

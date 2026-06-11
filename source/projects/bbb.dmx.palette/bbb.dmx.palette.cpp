@@ -1,39 +1,17 @@
 #include "c74_min.h"
 
 #include <bbb/dmx/fixture_json.hpp>
+#include <bbb/dmx/fixture_runtime.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 #include <bbb/dmx/pattern.hpp>
 
 #include <map>
-#include <set>
 #include <string>
-
-namespace {
-
-using parameter_map = std::map<std::string, double>;
-
-bool parse_parameter_map(const bbb::dmx::json_value &value, parameter_map &parameters, std::string &error) {
-    if(value.type != bbb::dmx::json_type::object) {
-        error = "parameter map must be object";
-        return false;
-    }
-    parameters.clear();
-    for(const auto &entry : value.object_value) {
-        if(entry.second.type != bbb::dmx::json_type::number) {
-            error = "palette parameter must be numeric: " + entry.first;
-            return false;
-        }
-        parameters[entry.first] = entry.second.number_value;
-    }
-    return true;
-}
-
-} // namespace
 
 class bbb_dmx_palette : public c74::min::object<bbb_dmx_palette> {
 private:
     bbb::dmx::fixture_mapper mapper_{};
-    std::map<std::string, parameter_map> palettes_{};
+    std::map<std::string, bbb::dmx::fixture_parameter_values> palettes_{};
     std::string patch_path_value_{};
     std::string palette_path_value_{};
     bool patch_loaded_{false};
@@ -294,12 +272,12 @@ private:
         if(!palettes_value || palettes_value->type != bbb::dmx::json_type::object) {
             return bbb::dmx::mapper_result::failure("palettes must be object");
         }
-        std::map<std::string, parameter_map> loaded{};
-        std::string error{};
+        std::map<std::string, bbb::dmx::fixture_parameter_values> loaded{};
         for(const auto &entry : palettes_value->object_value) {
-            parameter_map parameters{};
-            if(!parse_parameter_map(entry.second, parameters, error)) {
-                return bbb::dmx::mapper_result::failure(error);
+            bbb::dmx::fixture_parameter_values parameters{};
+            const bbb::dmx::mapper_result result{bbb::dmx::parse_fixture_parameter_values(entry.second, parameters, "palette")};
+            if(!result.ok) {
+                return result;
             }
             loaded[entry.first] = parameters;
         }
@@ -308,11 +286,7 @@ private:
     }
 
     void output_all_universes() {
-        std::set<int> universes{};
-        for(const auto &fixture : mapper_.patch().fixtures) {
-            universes.insert(fixture.universe);
-        }
-        for(const int universe_id : universes) {
+        for(const int universe_id : bbb::dmx::fixture_universe_ids(mapper_)) {
             output.send(bbb::dmx::maxutil::universe_atoms(universe_id, mapper_.universe(universe_id)));
         }
     }
