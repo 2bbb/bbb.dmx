@@ -64,9 +64,12 @@ mvr.file('GeneralSceneDescription.xml', `<?xml version="1.0"?>
 <GeneralSceneDescription>
   <Scene>
     <Fixtures>
-      <Fixture Name="Spot 1" GDTFSpec="Tiny RGB Mover.gdtf" GDTFMode="Basic">
+      <Fixture Name="Spot 1" UUID="00000000-0000-0000-0000-000000000001" GDTFSpec="Tiny RGB Mover.gdtf" GDTFMode="Basic">
         <Matrix>{1.000000,0.000000,0.000000}{0.000000,-1.000000,0.000000}{0.000000,0.000000,-1.000000}{-2000.000000,1500.000000,4000.000000}</Matrix>
         <Addresses><Address Universe="2" Address="17" /></Addresses>
+      </Fixture>
+      <Fixture Name="Spot 1" UUID="00000000-0000-0000-0000-000000000002" GDTFSpec="Tiny RGB Mover.gdtf" GDTFMode="Basic">
+        <Addresses><Address Universe="2" Address="18" /></Addresses>
       </Fixture>
     </Fixtures>
   </Scene>
@@ -77,8 +80,12 @@ writeFileSync(join(temp, 'scene.mvr'), await mvr.generateAsync({ type: 'nodebuff
 run(['convert', join(temp, 'scene.mvr'), '--format', 'mvr', '--out-dir', join(temp, 'mvr'), '--patch', 'patches/from-mvr.json', '--overwrite']);
 const patch = readJson(join(temp, 'mvr/patches/from-mvr.json'));
 const fixture = patch.fixtures?.[0];
-if(fixture?.universe !== 2 || fixture?.address !== 17) {
+const duplicateNameFixture = patch.fixtures?.[1];
+if(fixture?.universe !== 2 || fixture?.address !== 17 || duplicateNameFixture?.universe !== 2 || duplicateNameFixture?.address !== 18) {
   throw new Error('MVR smoke patch did not preserve universe/address');
+}
+if(fixture.id !== 'spot_1' || duplicateNameFixture.id !== 'spot_1_2') {
+  throw new Error(`MVR fixture ids should prefer readable Name over UUID and uniquify duplicates, got ${fixture.id}, ${duplicateNameFixture.id}`);
 }
 assertClose(fixture.position[0], -2.0, 'MVR matrix position.x');
 assertClose(fixture.position[1], 1.5, 'MVR matrix position.y');

@@ -49,6 +49,7 @@ The converter maps DMX channels into this project’s fixture profile schema:
 - Multi-byte offsets inside a single GDTF `DMXChannel` become `u16` or `u24` parameters with `coarsefine` / `coarsemidfine` byte order. Separate `DMXChannel` elements with the same attribute are not merged into one multi-byte parameter.
 - Pan/tilt physical ranges become `range_degrees` when present in the source XML.
 - MVR fixture addresses become `universe` + `address` entries when the scene XML exposes usable address data.
+- MVR fixture ids prefer `FixtureID` / `UnitNumber`, then human-readable `Name`, and only fall back to `UUID`; duplicate ids are uniquified with `_2`, `_3`, ... suffixes.
 - MVR `<Matrix>` transforms are converted to patch `position` and `rotation`: translation is converted from millimeters to meters, and rotation is decomposed to XYZ Euler degrees matching the `bbb.dmx.movertrack` rotation convention.
 
 ## Hard limitation

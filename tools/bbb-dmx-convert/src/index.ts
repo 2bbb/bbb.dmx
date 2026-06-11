@@ -438,6 +438,11 @@ function uniqueKey(base: string, used: Set<string>): string {
   }
 }
 
+function uniqueFixtureId(raw: string, fallback: string, used: Set<string>): string {
+  const base = sanitizeKey(raw, fallback).replace(/\./g, "_");
+  return uniqueKey(base, used);
+}
+
 function vectorLength(vector: Vec3): number {
   return Math.hypot(vector[0], vector[1], vector[2]);
 }
@@ -584,8 +589,9 @@ function buildPatchFromMvrScene(xml: string, profiles: ConvertedProfile[], warni
   const doc = parser.parse(xml) as unknown;
   const fixtureNodes = findNodes(doc, "Fixture");
   const fixtures: PatchFile["fixtures"] = [];
+  const usedFixtureIds = new Set<string>();
   for(const [index, fixture] of fixtureNodes.entries()) {
-    const id = attr(fixture, ["FixtureID", "fixtureID", "UnitNumber", "UUID", "uuid", "Name", "name"]) ?? `fixture_${index + 1}`;
+    const id = attr(fixture, ["FixtureID", "fixtureID", "UnitNumber", "Name", "name", "UUID", "uuid"]) ?? `fixture_${index + 1}`;
     const spec = attr(fixture, ["GDTFSpec", "gdtfSpec", "GdtfSpec", "FixtureTypeId", "FixtureTypeID", "Profile"]);
     const profileKey = profileKeyFromSpec(spec, profiles);
     if(!profileKey) {
@@ -607,7 +613,7 @@ function buildPatchFromMvrScene(xml: string, profiles: ConvertedProfile[], warni
       continue;
     }
     const entry: PatchFile["fixtures"][number] = {
-      id: sanitizeKey(id, `fixture_${index + 1}`).replace(/\./g, "_"),
+      id: uniqueFixtureId(id, `fixture_${index + 1}`, usedFixtureIds),
       profile: profileKey,
       mode,
       universe: parsed.universe,
