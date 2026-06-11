@@ -91,6 +91,10 @@
         "help/bbb.dmx.fixtureview.maxhelp": {},
         "externals/bbb.dmx.diff.mxo": {},
         "externals/bbb.dmx.diff.mxe64": {},
-        "help/bbb.dmx.diff.maxhelp": {}
+        "help/bbb.dmx.diff.maxhelp": {},
+        "externals/bbb.dmx.assert.mxo": {},
+        "externals/bbb.dmx.assert.mxe64": {},
+        "help/bbb.dmx.assert.maxhelp": {},
+        "asserts/example.json": {}
     }
 }

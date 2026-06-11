@@ -23,6 +23,7 @@ This repository deliberately does **not** implement DMX network output. Art-Net 
 - `bbb.dmx.scene` — recalls deterministic fixture-pattern scenes into multi-universe frames.
 - `bbb.dmx.fixtureview` — decodes current DMX frame bytes through fixture patch/profile metadata.
 - `bbb.dmx.diff` — compares two multi-universe DMX frame sets and reports per-channel deltas.
+- `bbb.dmx.assert` — validates DMX frames against JSON range/equality rules.
 
 ## Build
 
@@ -270,6 +271,41 @@ Supported color sources are `r`, `g`, `b`, `a`, `luma`, `maxrgb`, and `constant:
 - `maps/rgb-grid.example.json`
 
 ## Frame utilities
+
+### `bbb.dmx.assert`
+
+```max
+[bbb.dmx.assert @config asserts/example.json @autobang 1]
+```
+
+Validates incoming multi-universe DMX frames against JSON rules. Use it as a patch-level guardrail when checking generated scenes, palettes, matrix maps, or recorded looks.
+
+Rule example:
+
+```json
+{
+  "schema": "bbb.dmx.assert.v1",
+  "rules": [
+    { "name": "blackout channel", "universe": 1, "channel": 10, "equals": 0 },
+    { "name": "safe range", "universe": 1, "start": 1, "end": 16, "min": 0, "max": 255 }
+  ]
+}
+```
+
+Messages:
+
+- `read assert_json_path` / `reload` — load assertion rules.
+- `list value1 ... value512` — store frame for `@universe`.
+- `universe id value1 ... value512`, `channel universe address value`, `channels universe address value ...` — update frame data.
+- `bang` — run all assertions.
+
+Output examples:
+
+```text
+fail 1 10 255 equals name blackout
+summary pass 511 fail 1
+ok pass 512 fail 0
+```
 
 ### `bbb.dmx.diff`
 
