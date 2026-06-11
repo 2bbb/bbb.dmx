@@ -64,7 +64,7 @@
             620,
             24
           ],
-          "text": "bbb.dmx.fixturemap \u2014 map fixture parameters into a 512-channel DMX universe"
+          "text": "bbb.dmx.fixturemap — map fixture parameters into a 512-channel DMX universe"
         }
       },
       {
@@ -320,6 +320,110 @@
           ],
           "text": "Patch files reference fixture profile JSON files relative to the patch file. The included sample patch maps spot_01 at address 1 and spot_02 at address 17 in universe 1."
         }
+      },
+      {
+        "box": {
+          "id": "obj-17",
+          "maxclass": "message",
+          "patching_rect": [
+            30,
+            180,
+            220,
+            22
+          ],
+          "text": "set spot_01 pan_tilt 32768 32768"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-18",
+          "maxclass": "message",
+          "patching_rect": [
+            260,
+            180,
+            190,
+            22
+          ],
+          "text": "channels 1 255 2 128 3 0"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-19",
+          "maxclass": "message",
+          "patching_rect": [
+            460,
+            180,
+            55,
+            22
+          ],
+          "text": "dump"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-20",
+          "maxclass": "message",
+          "patching_rect": [
+            525,
+            180,
+            55,
+            22
+          ],
+          "text": "reset"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-21",
+          "maxclass": "message",
+          "patching_rect": [
+            590,
+            180,
+            50,
+            22
+          ],
+          "text": "clear"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-22",
+          "maxclass": "message",
+          "patching_rect": [
+            650,
+            180,
+            85,
+            22
+          ],
+          "text": "autobang 0"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-23",
+          "maxclass": "comment",
+          "patching_rect": [
+            30,
+            415,
+            760,
+            36
+          ],
+          "text": "Current API: read/reload/dump/clear/reset/bang, set/nset/ptbytes, raw channel/channels, and @autobang."
+        }
+      },
+      {
+        "box": {
+          "id": "obj-24",
+          "maxclass": "comment",
+          "patching_rect": [
+            30,
+            455,
+            760,
+            22
+          ],
+          "text": "ptbytes consumes movertrack byte output and uses the fixture profile byte_order for pan/tilt mapping."
+        }
       }
     ],
     "lines": [
@@ -439,6 +543,78 @@
           ],
           "destination": [
             "obj-13",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-17",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-18",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-19",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-20",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-21",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-22",
+            0
+          ],
+          "destination": [
+            "obj-10",
             0
           ]
         }

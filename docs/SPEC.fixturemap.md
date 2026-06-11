@@ -251,19 +251,26 @@ Do not implement these policies first. Start strict.
 
 ---
 
-## 7. Runtime API proposal
+## 7. Current Max API
 
-### 7.1 New object
+### 7.1 Object
 
 ```max
-[bbb.dmx.fixturemap @patch patches/show.json @universe 1]
+[bbb.dmx.fixturemap @patch patches/show.json @universe 1 @autobang 1]
 ```
 
-Output:
+Attributes implemented today:
 
-```text
-512 integers, channel 1 first, channel 512 last
-```
+| Attribute | Type | Default | Description |
+|---|---|---:|---|
+| `@patch` | symbol/string | empty | Patch JSON path. Loaded on initialization and by `read`. |
+| `@universe` | int | `1` | Selected universe to output. Universes are 1-based. |
+| `@autobang` | bool | `1` | If non-zero, successful updates immediately output the full selected universe. |
+
+Outlets:
+
+1. left outlet: `512` integers, channel 1 first and channel 512 last
+2. right outlet: status/error messages
 
 ### 7.2 Messages
 
@@ -275,7 +282,15 @@ reload
 dump
 clear
 reset
+bang
 ```
+
+- `read` loads a patch JSON path.
+- `reload` reloads the current patch.
+- `dump` reports current load status from the right outlet.
+- `clear` clears loaded profiles, patch data, and universe buffers.
+- `reset` restores loaded fixture channels to profile defaults.
+- `bang` outputs the current selected universe from the left outlet.
 
 #### Set fixture parameter
 
@@ -286,6 +301,8 @@ set spot_01 tilt 32768
 set spot_01 pan_tilt 32768 32768
 ```
 
+`set` first attempts the parameter as a 16-bit value and falls back to 8-bit where appropriate. `pan_tilt` is a convenience pseudo-parameter for setting both 16-bit pan and tilt in one message.
+
 #### Normalized input
 
 ```max
@@ -294,7 +311,7 @@ nset spot_01 pan 0.5
 nset spot_01 tilt 0.5
 ```
 
-`nset` maps `0.0..1.0` onto the parameter's DMX range.
+`nset` maps `0.0..1.0` onto the target parameter's DMX range.
 
 #### Raw channel override
 
@@ -303,59 +320,59 @@ channel 1 255
 channels 1 255 2 128 3 0
 ```
 
-Raw override is useful for testing, but it should be visibly separate from fixture parameters. Otherwise patches become unreadable.
+Raw override is implemented for testing and emergency control. It should stay visibly separate from fixture parameters; otherwise patches become unreadable.
 
 #### Movertrack integration
 
-`bbb.dmx.movertrack` currently outputs:
+`bbb.dmx.movertrack` outputs:
 
 ```text
 pan_byte_1 pan_byte_2 tilt_byte_1 tilt_byte_2
 ```
 
-The mapper should support either:
+The mapper currently accepts that tuple directly:
 
 ```max
 ptbytes spot_01 pan1 pan2 tilt1 tilt2
 ```
 
-or, preferably after a later movertrack update:
+`ptbytes` combines the incoming pan/tilt bytes using the target fixture profile's `byte_order`. There is no separate `set16` message in the current object; use `set spot_01 pan_tilt pan_u16 tilt_u16` for semantic 16-bit values.
+
+A typical patch is:
 
 ```max
-set16 spot_01 pan pan_u16 tilt tilt_u16
+[bbb.dmx.movertrack ...]
+|
+[prepend ptbytes spot_01]
+|
+[bbb.dmx.fixturemap @patch patches/show.json @universe 1]
 ```
-
-The better long-term API is 16-bit semantic values, not byte tuples. Byte tuples are transport detail.
 
 ---
 
 ## 8. Output behavior
 
-Attributes:
-
-```max
-@autobang 1
-@dirty_only 0
-@include_selector 0
-```
-
-Recommended v1 behavior:
+Current behavior:
 
 - Every successful value update recomputes the internal universe buffer.
-- If `@autobang 1`, immediately output the full 512-byte list.
-- `bang` always outputs the current full universe.
-- `reset` restores profile defaults and outputs if `@autobang 1`.
+- If `@autobang 1`, successful `read`, `reload`, `set`, `nset`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output the full selected 512-byte universe.
+- `bang` always outputs the current full selected universe.
+- `reset` restores profile defaults for loaded fixtures.
+- `clear` leaves the object empty and outputs a zeroed selected universe when `@autobang 1`.
 
-Later optimization:
+Not implemented today:
 
-- `@dirty_only 1` outputs changed `(channel value)` pairs from a second outlet.
-- Full universe list remains available because many Max patches prefer a simple list.
+- `@dirty_only`
+- `@include_selector`
+- changed-channel delta output
+
+Those are future optimizations. The simple full-universe list is the compatibility contract for v1 because many Max patches prefer a single list.
 
 ---
 
 ## 9. Error policy
 
-This object must be strict and loud during load, quiet during high-rate runtime updates.
+This object is strict and loud during load, quiet during high-rate runtime updates.
 
 Load-time errors:
 
@@ -365,7 +382,7 @@ Load-time errors:
 - footprint overflow
 - overlap
 
-Runtime warnings should be once-per-condition:
+Runtime warnings should be once-per-condition where practical:
 
 - unknown fixture id
 - unknown parameter
@@ -376,62 +393,47 @@ Invalid runtime updates must not corrupt the universe buffer.
 
 ---
 
-## 10. Shared C++ layer
+## 10. Current shared C++ layer
 
-Add these Max-independent types under `source/bbb/dmx/`:
+The Max-independent implementation lives under `source/bbb/dmx/`:
 
 ```text
-fixture_profile.hpp
-fixture_patch.hpp
-universe.hpp
+common.hpp
+fixture_json.hpp
 fixture_mapper.hpp
+fixture_model.hpp
+math.hpp
+value.hpp
 ```
 
-Suggested core types:
+Core responsibilities:
 
-```cpp
-struct dmx_universe {
-    std::array<std::uint8_t, 512> channels;
-};
+- `fixture_model.hpp` defines universe/profile/mode/parameter/patch data structures.
+- `fixture_mapper.hpp` owns strict mapping, defaults, raw channel writes, `set_u8`, `set_u16`, `set_normalized`, and `set_pan_tilt_bytes`.
+- `fixture_json.hpp` loads the normalized JSON profile/patch files and resolves profile paths relative to the patch file.
+- `value.hpp` provides byte-order helpers shared with `movertrack`.
 
-struct fixture_profile;
-struct fixture_mode;
-struct fixture_parameter;
-struct fixture_instance;
-
-class fixture_mapper {
-public:
-    bool load_profiles(...);
-    bool load_patch(...);
-    bool set_u8(std::string fixture_id, std::string parameter, int value);
-    bool set_u16(std::string fixture_id, std::string parameter, std::uint16_t value);
-    bool set_normalized(std::string fixture_id, std::string parameter, double value);
-    const dmx_universe &universe(int universe_id) const;
-};
-```
-
-The JSON parser should stay outside the pure mapping math if possible. Tests should construct C++ objects directly first, then test parsing second.
+The JSON parser is intentionally separate from the pure mapping path so unit tests can construct fixtures directly without file I/O.
 
 ---
 
-## 11. Implementation order
+## 11. Implementation status / remaining work
 
-1. `dmx_universe` and low-level write helpers:
-   - address conversion
-   - bounds checks
-   - u8/u16 byte-order writes
+Implemented:
+
+1. `dmx_universe` and low-level write helpers.
 2. Profile/mode/parameter data structures.
-3. Strict patch validator.
-4. `fixture_mapper` C++ tests with hand-built fixtures.
-5. JSON/dict loader.
+3. Strict patch validation.
+4. JSON patch/profile loading.
+5. `fixture_mapper` unit tests.
 6. `bbb.dmx.fixturemap` external.
-7. Help patch showing:
-   - load patch
-   - set dimmer
-   - feed movertrack pan/tilt
-   - output 512-channel list
+7. Help patch and sample `fixtures/` + `patches/` data.
 
-Do not start with a GUI editor. That is premature. The first useful tool is a deterministic mapper with strict validation.
+Remaining future work:
+
+- Optional importers from GDTF/OFL/vendor data into the normalized JSON schema.
+- Higher-level fixture editors. Do not start with this until the deterministic mapper API has more real-show mileage.
+- Optional dirty/delta outlet if full-universe output becomes a measured performance problem.
 
 ---
 

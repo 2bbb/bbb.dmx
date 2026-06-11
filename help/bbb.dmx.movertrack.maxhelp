@@ -71,7 +71,7 @@
             { "box": { "id": "obj-30", "maxclass": "newobj", "numinlets": 1, "numoutlets": 1, "outlettype": [""], "patching_rect": [40.0, 340.0, 70.0, 22.0], "text": "print dmx" } },
             { "box": { "id": "obj-31", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [120.0, 340.0, 450.0, 20.0], "text": "Connect this list to your DMX output object, e.g. an Art-Net/sACN sender." } },
 
-            { "box": { "id": "obj-32", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [40.0, 405.0, 340.0, 22.0], "text": "script sendbox obj-7 bang" } },
+            { "box": { "id": "obj-32", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [40.0, 405.0, 55.0, 22.0], "text": "bang" } },
             { "box": { "id": "obj-33", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 380.0, 520.0, 20.0], "text": "bang recomputes the last target; before any target it outputs neutral center bytes." } },
 
             { "box": { "id": "obj-34", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 455.0, 620.0, 20.0], "text": "Upside-down ceiling hang: pan center faces the y = 0 side" } },
@@ -84,7 +84,7 @@
             { "box": { "id": "obj-41", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [175.0, 555.0, 110.0, 22.0], "text": "target 0. 0. 0." } },
             { "box": { "id": "obj-42", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [300.0, 555.0, 440.0, 20.0], "text": "If floor/ceiling are swapped, fix rot/tilt_offset before touching tilt_invert." } },
 
-            { "box": { "id": "obj-43", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [540.0, 430.0, 360.0, 20.0], "text": "Tracking mode: smart rejects out-of-range flip candidates before clipping." } },
+            { "box": { "id": "obj-43", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [540.0, 430.0, 390.0, 38.0], "text": "Tracking mode: smart rejects out-of-range flip candidates before clipping. shortest_pan 1 = smart; use tracking_mode pan for old pan-only solver." } },
             { "box": { "id": "obj-44", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [540.0, 455.0, 130.0, 22.0], "text": "tracking_mode smart" } },
             { "box": { "id": "obj-45", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [680.0, 455.0, 120.0, 22.0], "text": "tracking_mode pan" } },
             { "box": { "id": "obj-46", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [810.0, 455.0, 115.0, 22.0], "text": "tracking_mode off" } },
@@ -127,7 +127,8 @@
             { "patchline": { "source": ["obj-46", 0], "destination": ["obj-7", 0] } },
             { "patchline": { "source": ["obj-48", 0], "destination": ["obj-7", 0] } },
             { "patchline": { "source": ["obj-49", 0], "destination": ["obj-7", 0] } },
-            { "patchline": { "source": ["obj-50", 0], "destination": ["obj-7", 0] } }
+            { "patchline": { "source": ["obj-50", 0], "destination": ["obj-7", 0] } },
+            { "patchline": { "source": ["obj-32", 0], "destination": ["obj-7", 0] } }
         ]
     }
 }
