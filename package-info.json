@@ -1,6 +1,7 @@
 {
     "title": "bbb.dmx",
     "description": "DMX utility external object suite for Max/MSP",
+    "version": "0.2.1",
     "author": "2bit",
     "website": "https://github.com/2bbb/bbb.dmx",
     "extends": "",
