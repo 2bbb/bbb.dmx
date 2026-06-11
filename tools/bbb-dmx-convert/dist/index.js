@@ -292,24 +292,26 @@ function profileFromGdtfXml(xml, source, prefix) {
         const modeKey = sanitizeKey(label, `mode${modeIndex + 1}`);
         const channelNodes = modeChannels(modeNode);
         const channelsByOffset = new Map();
+        const usedParameterKeys = new Set();
         const parameterChannels = new Map();
         for (const [channelIndex, channelNode] of channelNodes.entries()) {
             const offsets = parseOffsetList(attr(channelNode, ["Offset", "offset", "DMXOffset", "dmxOffset", "Address", "address"]));
             if (offsets.length === 0)
                 continue;
             const attributeName = attributeForChannel(channelNode);
-            const paramKey = normalizeAttributeName(attributeName, `channel${channelIndex + 1}`);
+            const baseParamKey = normalizeAttributeName(attributeName, `channel${channelIndex + 1}`);
+            const paramKey = uniqueKey(baseParamKey, usedParameterKeys);
             const fn = functionForChannel(channelNode);
             const range = physicalRangeDegrees(channelNode);
             const defaults = dmxBytesForChannel(channelNode, fn, offsets.length);
             const keys = [];
             offsets.forEach((offset, byteIndex) => {
                 const key = `${paramKey}${channelSuffix(byteIndex, offsets.length)}`;
-                keys.push(key);
                 const defaultValue = defaults[byteIndex] ?? 0;
                 const labelText = attributeName ?? paramKey;
                 const existing = channelsByOffset.get(offset);
                 if (!existing) {
+                    keys.push(key);
                     channelsByOffset.set(offset, { offset, key, default: defaultValue, label: labelText });
                 }
             });
@@ -345,7 +347,7 @@ function profileFromGdtfXml(xml, source, prefix) {
                 parameter.channels = uniqueKeys.slice(0, width);
                 parameter.byte_order = byteOrderForWidth(width);
             }
-            if ((paramKey === "pan" || paramKey === "tilt") && info.range !== undefined) {
+            if ((paramKey === "pan" || paramKey.startsWith("pan_") || paramKey === "tilt" || paramKey.startsWith("tilt_")) && info.range !== undefined) {
                 parameter.range_degrees = info.range;
             }
             parameters[paramKey] = parameter;
@@ -383,6 +385,75 @@ async function convertGdtfXmlFile(file, prefix) {
     const xml = await readFile(file, "utf8");
     return { profiles: [profileFromGdtfXml(xml, path.basename(file), prefix)], patch: undefined, warnings: [] };
 }
+function uniqueKey(base, used) {
+    if (!used.has(base)) {
+        used.add(base);
+        return base;
+    }
+    for (let index = 2;; index++) {
+        const candidate = `${base}_${index}`;
+        if (!used.has(candidate)) {
+            used.add(candidate);
+            return candidate;
+        }
+    }
+}
+function vectorLength(vector) {
+    return Math.hypot(vector[0], vector[1], vector[2]);
+}
+function normalizeVector(vector) {
+    const length = vectorLength(vector);
+    if (!Number.isFinite(length) || length <= 1.0e-9)
+        return undefined;
+    return [vector[0] / length, vector[1] / length, vector[2] / length];
+}
+function radiansToDegrees(radians) {
+    const degrees = radians * 180.0 / Math.PI;
+    return Math.abs(degrees) < 1.0e-9 ? 0 : degrees;
+}
+function parseMvrMatrix(node) {
+    const matrixText = textOf(child(node, "Matrix"));
+    if (!matrixText)
+        return undefined;
+    const groups = Array.from(matrixText.matchAll(/\{([^{}]+)\}/g)).map((match) => {
+        const values = (match[1] ?? "").split(/[,;\s]+/).filter(Boolean).map((value) => Number(value));
+        if (values.length < 3 || values.some((value) => !Number.isFinite(value)))
+            return undefined;
+        return [values[0], values[1], values[2]];
+    });
+    if (groups.length < 4 || groups.some((group) => group === undefined))
+        return undefined;
+    const u = normalizeVector(groups[0]);
+    const v = normalizeVector(groups[1]);
+    const w = normalizeVector(groups[2]);
+    const t = groups[3];
+    if (!u || !v || !w)
+        return undefined;
+    const m00 = u[0];
+    const m10 = u[1];
+    const m20 = u[2];
+    const m21 = v[2];
+    const m22 = w[2];
+    const vY = v[1];
+    const wY = w[1];
+    let rx;
+    let ry;
+    let rz;
+    if (Math.abs(m20) < 1.0 - 1.0e-9) {
+        ry = Math.asin(-m20);
+        rx = Math.atan2(m21, m22);
+        rz = Math.atan2(m10, m00);
+    }
+    else {
+        ry = m20 < 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+        rx = Math.atan2(-wY, vY);
+        rz = 0;
+    }
+    return {
+        position: [t[0] / 1000.0, t[1] / 1000.0, t[2] / 1000.0],
+        rotation: [radiansToDegrees(rx), radiansToDegrees(ry), radiansToDegrees(rz)],
+    };
+}
 function parseAddress(raw, rawUniverse) {
     if (!raw)
         return undefined;
@@ -404,6 +475,9 @@ function parseAddress(raw, rawUniverse) {
     return { universe: 1, address: number };
 }
 function fixturePosition(node) {
+    const matrix = parseMvrMatrix(node);
+    if (matrix)
+        return matrix.position;
     const x = floatAttr(node, ["X", "x", "PositionX", "PosX"]);
     const y = floatAttr(node, ["Y", "y", "PositionY", "PosY"]);
     const z = floatAttr(node, ["Z", "z", "PositionZ", "PosZ"]);
@@ -418,6 +492,9 @@ function fixturePosition(node) {
     return undefined;
 }
 function fixtureRotation(node) {
+    const matrix = parseMvrMatrix(node);
+    if (matrix)
+        return matrix.rotation;
     const rx = floatAttr(node, ["Rx", "RX", "RotationX", "RotX"]);
     const ry = floatAttr(node, ["Ry", "RY", "RotationY", "RotY"]);
     const rz = floatAttr(node, ["Rz", "RZ", "RotationZ", "RotZ"]);

@@ -45,9 +45,11 @@ The converter maps DMX channels into this project’s fixture profile schema:
 
 - DMX offsets become mode `channels[].offset`.
 - Known attributes are normalized to parameter keys such as `pan`, `tilt`, `dimmer`, `red`, `green`, `blue`, `white`, `amber`, `uv`, `zoom`, `focus`, `iris`, `gobo`, `color`, etc.
-- Multi-byte offsets become `u16` or `u24` parameters with `coarsefine` / `coarsemidfine` byte order.
+- Repeated attributes in one mode are uniquified (`dimmer`, `dimmer_2`, `dimmer_3`, ...). This prevents duplicate channel keys and keeps each independent DMX channel addressable.
+- Multi-byte offsets inside a single GDTF `DMXChannel` become `u16` or `u24` parameters with `coarsefine` / `coarsemidfine` byte order. Separate `DMXChannel` elements with the same attribute are not merged into one multi-byte parameter.
 - Pan/tilt physical ranges become `range_degrees` when present in the source XML.
 - MVR fixture addresses become `universe` + `address` entries when the scene XML exposes usable address data.
+- MVR `<Matrix>` transforms are converted to patch `position` and `rotation`: translation is converted from millimeters to meters, and rotation is decomposed to XYZ Euler degrees matching the `bbb.dmx.movertrack` rotation convention.
 
 ## Hard limitation
 

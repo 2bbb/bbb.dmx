@@ -324,13 +324,15 @@ function profileFromGdtfXml(xml: string, source: string, prefix: string): Conver
     const modeKey = sanitizeKey(label, `mode${modeIndex + 1}`);
     const channelNodes = modeChannels(modeNode);
     const channelsByOffset = new Map<number, FixtureChannel>();
+    const usedParameterKeys = new Set<string>();
     const parameterChannels = new Map<string, { keys: string[]; defaults: number[]; range: number | undefined }>();
 
     for(const [channelIndex, channelNode] of channelNodes.entries()) {
       const offsets = parseOffsetList(attr(channelNode, ["Offset", "offset", "DMXOffset", "dmxOffset", "Address", "address"]));
       if(offsets.length === 0) continue;
       const attributeName = attributeForChannel(channelNode);
-      const paramKey = normalizeAttributeName(attributeName, `channel${channelIndex + 1}`);
+      const baseParamKey = normalizeAttributeName(attributeName, `channel${channelIndex + 1}`);
+      const paramKey = uniqueKey(baseParamKey, usedParameterKeys);
       const fn = functionForChannel(channelNode);
       const range = physicalRangeDegrees(channelNode);
       const defaults = dmxBytesForChannel(channelNode, fn, offsets.length);
@@ -338,11 +340,11 @@ function profileFromGdtfXml(xml: string, source: string, prefix: string): Conver
 
       offsets.forEach((offset, byteIndex) => {
         const key = `${paramKey}${channelSuffix(byteIndex, offsets.length)}`;
-        keys.push(key);
         const defaultValue = defaults[byteIndex] ?? 0;
         const labelText = attributeName ?? paramKey;
         const existing = channelsByOffset.get(offset);
         if(!existing) {
+          keys.push(key);
           channelsByOffset.set(offset, { offset, key, default: defaultValue, label: labelText });
         }
       });
@@ -375,7 +377,7 @@ function profileFromGdtfXml(xml: string, source: string, prefix: string): Conver
         parameter.channels = uniqueKeys.slice(0, width);
         parameter.byte_order = byteOrderForWidth(width);
       }
-      if((paramKey === "pan" || paramKey === "tilt") && info.range !== undefined) {
+      if((paramKey === "pan" || paramKey.startsWith("pan_") || paramKey === "tilt" || paramKey.startsWith("tilt_")) && info.range !== undefined) {
         parameter.range_degrees = info.range;
       }
       parameters[paramKey] = parameter;
@@ -418,6 +420,81 @@ async function convertGdtfXmlFile(file: string, prefix: string): Promise<Convert
   return { profiles: [profileFromGdtfXml(xml, path.basename(file), prefix)], patch: undefined, warnings: [] };
 }
 
+
+type Vec3 = [number, number, number];
+type MvrTransform = { position: Vec3; rotation: Vec3 };
+
+function uniqueKey(base: string, used: Set<string>): string {
+  if(!used.has(base)) {
+    used.add(base);
+    return base;
+  }
+  for(let index = 2; ; index++) {
+    const candidate = `${base}_${index}`;
+    if(!used.has(candidate)) {
+      used.add(candidate);
+      return candidate;
+    }
+  }
+}
+
+function vectorLength(vector: Vec3): number {
+  return Math.hypot(vector[0], vector[1], vector[2]);
+}
+
+function normalizeVector(vector: Vec3): Vec3 | undefined {
+  const length = vectorLength(vector);
+  if(!Number.isFinite(length) || length <= 1.0e-9) return undefined;
+  return [vector[0] / length, vector[1] / length, vector[2] / length];
+}
+
+function radiansToDegrees(radians: number): number {
+  const degrees = radians * 180.0 / Math.PI;
+  return Math.abs(degrees) < 1.0e-9 ? 0 : degrees;
+}
+
+function parseMvrMatrix(node: unknown): MvrTransform | undefined {
+  const matrixText = textOf(child(node, "Matrix"));
+  if(!matrixText) return undefined;
+  const groups = Array.from(matrixText.matchAll(/\{([^{}]+)\}/g)).map((match) => {
+    const values = (match[1] ?? "").split(/[,;\s]+/).filter(Boolean).map((value) => Number(value));
+    if(values.length < 3 || values.some((value) => !Number.isFinite(value))) return undefined;
+    return [values[0], values[1], values[2]] as Vec3;
+  });
+  if(groups.length < 4 || groups.some((group) => group === undefined)) return undefined;
+  const u = normalizeVector(groups[0] as Vec3);
+  const v = normalizeVector(groups[1] as Vec3);
+  const w = normalizeVector(groups[2] as Vec3);
+  const t = groups[3] as Vec3;
+  if(!u || !v || !w) return undefined;
+
+  const m00 = u[0];
+  const m10 = u[1];
+  const m20 = u[2];
+  const m21 = v[2];
+  const m22 = w[2];
+  const vY = v[1];
+  const wY = w[1];
+
+  let rx: number;
+  let ry: number;
+  let rz: number;
+  if(Math.abs(m20) < 1.0 - 1.0e-9) {
+    ry = Math.asin(-m20);
+    rx = Math.atan2(m21, m22);
+    rz = Math.atan2(m10, m00);
+  } else {
+    ry = m20 < 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+    rx = Math.atan2(-wY, vY);
+    rz = 0;
+  }
+
+  return {
+    position: [t[0] / 1000.0, t[1] / 1000.0, t[2] / 1000.0],
+    rotation: [radiansToDegrees(rx), radiansToDegrees(ry), radiansToDegrees(rz)],
+  };
+}
+
 function parseAddress(raw: string | undefined, rawUniverse?: string): { universe: number; address: number } | undefined {
   if(!raw) return undefined;
   const universeText = rawUniverse?.trim();
@@ -438,6 +515,8 @@ function parseAddress(raw: string | undefined, rawUniverse?: string): { universe
 }
 
 function fixturePosition(node: unknown): [number, number, number] | undefined {
+  const matrix = parseMvrMatrix(node);
+  if(matrix) return matrix.position;
   const x = floatAttr(node, ["X", "x", "PositionX", "PosX"]);
   const y = floatAttr(node, ["Y", "y", "PositionY", "PosY"]);
   const z = floatAttr(node, ["Z", "z", "PositionZ", "PosZ"]);
@@ -451,6 +530,8 @@ function fixturePosition(node: unknown): [number, number, number] | undefined {
 }
 
 function fixtureRotation(node: unknown): [number, number, number] | undefined {
+  const matrix = parseMvrMatrix(node);
+  if(matrix) return matrix.rotation;
   const rx = floatAttr(node, ["Rx", "RX", "RotationX", "RotX"]);
   const ry = floatAttr(node, ["Ry", "RY", "RotationY", "RotY"]);
   const rz = floatAttr(node, ["Rz", "RZ", "RotationZ", "RotZ"]);
@@ -707,7 +788,7 @@ program.command("inspect")
     const result = await convertInput(input, options);
     console.log(JSON.stringify({
       profiles: result.profiles.map((entry) => ({ key: entry.profile.key, source: entry.source, modes: Object.keys(entry.profile.modes) })),
-        patchFixtures: result.patch?.fixtures.length ?? 0,
+      patchFixtures: result.patch?.fixtures.length ?? 0,
       warnings: result.warnings,
     }, null, 2));
   });
