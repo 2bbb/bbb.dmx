@@ -77,6 +77,17 @@
         "externals/bbb.dmx.mask.mxo": {},
         "externals/bbb.dmx.mask.mxe64": {},
         "help/bbb.dmx.mask.maxhelp": {},
-        "masks/example.json": {}
+        "masks/example.json": {},
+        "externals/bbb.dmx.palette.mxo": {},
+        "externals/bbb.dmx.palette.mxe64": {},
+        "help/bbb.dmx.palette.maxhelp": {},
+        "palettes/example.json": {},
+        "externals/bbb.dmx.scene.mxo": {},
+        "externals/bbb.dmx.scene.mxe64": {},
+        "help/bbb.dmx.scene.maxhelp": {},
+        "scenes/example.json": {},
+        "externals/bbb.dmx.fixtureview.mxo": {},
+        "externals/bbb.dmx.fixtureview.mxe64": {},
+        "help/bbb.dmx.fixtureview.maxhelp": {}
     }
 }

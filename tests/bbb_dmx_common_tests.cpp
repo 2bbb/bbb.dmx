@@ -38,6 +38,8 @@ int main() {
     require(bbb::dmx::normalized_to_u8(0.5) == 128, "normalized half maps to u8 128");
     require(bbb::dmx::normalized_to_u16(0.5) == 32768, "normalized half maps to u16 32768");
     require(bbb::dmx::normalized_to_u24(1.0) == 16777215, "normalized one maps to max u24");
+    require(bbb::dmx::combine_24(0x12, 0x34, 0x56, bbb::dmx::byte_order::coarse_mid_fine) == 0x123456, "combine u24 msb first");
+    require(bbb::dmx::combine_24(0x56, 0x34, 0x12, bbb::dmx::byte_order::fine_mid_coarse) == 0x123456, "combine u24 lsb first");
     require(bbb::dmx::wildcard_match("pixel_*", "pixel_001"), "wildcard star matches suffix");
     require(!bbb::dmx::wildcard_match("spot_*", "pixel_001"), "wildcard rejects wrong prefix");
 

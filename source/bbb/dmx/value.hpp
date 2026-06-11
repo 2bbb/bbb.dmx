@@ -92,6 +92,13 @@ inline std::uint16_t combine_16(std::uint8_t first, std::uint8_t second, byte_or
     return (std::uint16_t)(((std::uint16_t)first << 8) | second);
 }
 
+inline std::uint32_t combine_24(std::uint8_t first, std::uint8_t second, std::uint8_t third, byte_order order) {
+    if(order == byte_order::fine_mid_coarse) {
+        return ((std::uint32_t)third << 16) | ((std::uint32_t)second << 8) | first;
+    }
+    return ((std::uint32_t)first << 16) | ((std::uint32_t)second << 8) | third;
+}
+
 inline std::array<int, 4> pan_tilt_to_bytes(std::uint16_t pan_value, std::uint16_t tilt_value, byte_order order) {
     const split_u16 pan{split_16(pan_value)};
     const split_u16 tilt{split_16(tilt_value)};

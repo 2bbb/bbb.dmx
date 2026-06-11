@@ -106,6 +106,37 @@ Samples `char` or `float32` `jit.matrix` color data into fixture parameters thro
 
 `changed` mode outputs full universe frames for universes whose data changed. It is not a per-channel delta protocol.
 
+### `bbb.dmx.palette`
+
+Applies named normalized parameter palettes through fixture patch/profile metadata.
+
+- Input: `readpatch`, `readpalette`, `reload`, `apply`, `clear`, `bang`, `dump`
+- Output: `universe <id> <512 byte values>` for all universes used by the patch
+- Attributes: `@patch`, `@palette`, `@autobang`
+- Config file: `palettes/*.json` with `palettes` object.
+- `apply palette_name [fixture_pattern ...]` filters fixture ids with `*`/`?` wildcards.
+
+Palette values are normalized `0.0..1.0` and are written through fixture parameter depth (`u8`, `u16`, `u24`). Unknown parameters on a fixture are skipped so broad color palettes can target mixed fixture sets.
+
+### `bbb.dmx.scene`
+
+Recalls named fixture-pattern looks through fixture patch/profile metadata.
+
+- Input: `readpatch`, `readscene`, `reload`, `apply`, `bang`, `dump`
+- Output: `universe <id> <512 byte values>` for all universes used by the patch
+- Attributes: `@patch`, `@scene`, `@autobang`
+- Config file: `scenes/*.json` with `scenes` object.
+- `apply scene_name` resets patched fixture channels to defaults, then applies scene rules.
+
+### `bbb.dmx.fixtureview`
+
+Decodes current raw DMX frames through fixture patch/profile metadata.
+
+- Input: `list`, `universe`, `channel`, `channels`, `read`, `reload`, `bang`, `listfixtures`, `fixture`, `listparams`, `param`
+- Output selectors: `summary`, `fixture`, `param`, `error`
+- Attributes: `@patch`, `@universe`
+- `param fixture_id parameter_key` reports parameter type, universe, DMX addresses, raw bytes, combined raw value, and normalized value.
+
 ### `bbb.dmx.curve`
 
 Applies channel/range transfer curves to explicit multi-universe DMX frames.

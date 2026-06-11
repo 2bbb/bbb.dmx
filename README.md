@@ -19,6 +19,9 @@ This repository deliberately does **not** implement DMX network output. Art-Net 
 - `bbb.dmx.matrixmap` — samples `jit.matrix` color data into fixture parameters and outputs multi-universe DMX frames.
 - `bbb.dmx.curve` — applies gamma/invert/threshold/point curves to channel ranges across one or more universes.
 - `bbb.dmx.mask` — mutes, holds, allows, or forces channel ranges across one or more universes.
+- `bbb.dmx.palette` — applies named normalized parameter palettes to fixture patterns.
+- `bbb.dmx.scene` — recalls deterministic fixture-pattern scenes into multi-universe frames.
+- `bbb.dmx.fixtureview` — decodes current DMX frame bytes through fixture patch/profile metadata.
 
 ## Build
 
@@ -354,6 +357,86 @@ clear
 ```
 
 Recording stores snapshots of the full known frame set, so multiple universes are preserved per recorded frame.
+
+## Fixture semantic utilities
+
+### `bbb.dmx.palette`
+
+```max
+[bbb.dmx.palette @patch patches/rgb-grid.example.json @palette palettes/example.json]
+```
+
+`palette` applies a named set of normalized fixture parameters to the current fixture state and outputs explicit `universe <id> <512 values>` frames for all universes used by the patch. Fixture ids can be filtered with wildcard patterns:
+
+```max
+apply warm_white
+apply deep_blue pixel_*
+```
+
+Palette JSON:
+
+```json
+{
+  "schema": "bbb.dmx.palette.v1",
+  "palettes": {
+    "warm_white": { "red": 1.0, "green": 0.72, "blue": 0.42 },
+    "deep_blue": { "red": 0.0, "green": 0.05, "blue": 1.0 }
+  }
+}
+```
+
+This is intentionally normalized (`0.0..1.0`) so the same palette can target `u8`, `u16`, and `u24` fixture parameters. Unknown parameters on a fixture are ignored, not fatal. That makes broad palettes usable across mixed rigs, but it also means bad parameter names can silently do nothing; verify with `bbb.dmx.fixtureview` or `bbb.dmx.fixtureinfo`.
+
+### `bbb.dmx.scene`
+
+```max
+[bbb.dmx.scene @patch patches/rgb-grid.example.json @scene scenes/example.json]
+```
+
+`scene` recalls a full deterministic look. Each recall resets patched fixture channels to profile defaults, applies fixture-pattern rules in JSON order, then outputs all patched universes.
+
+```max
+apply blackout
+apply blue_grid
+```
+
+Scene JSON:
+
+```json
+{
+  "schema": "bbb.dmx.scene.v1",
+  "scenes": {
+    "blue_grid": {
+      "pixel_*": { "red": 0.0, "green": 0.05, "blue": 1.0, "dimmer": 1.0 }
+    }
+  }
+}
+```
+
+Use `palette` for additive color changes on the current state. Use `scene` for repeatable recalls. Confusing those two is how you get show states that depend on whatever random frame happened before.
+
+### `bbb.dmx.fixtureview`
+
+```max
+[bbb.dmx.fixtureview @patch patches/rgb-grid.example.json]
+```
+
+Feed it the same explicit frame stream used by the rest of the package:
+
+```max
+universe 1 <512 values>
+param pixel_001 red
+listparams pixel_001
+fixture pixel_001
+```
+
+Typical output:
+
+```text
+param pixel_001 red type u8 universe 1 addresses 1 bytes 255 raw 255 normalized 1.0
+```
+
+This object is a diagnostic decoder, not a renderer and not a sender. It exists because debugging raw channel 237 at 2am is a waste of your life when the patch already knows that channel is `pixel_079 blue`.
 
 ## Channel transform utilities
 
