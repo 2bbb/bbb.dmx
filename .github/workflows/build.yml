@@ -60,10 +60,22 @@ jobs:
           name: bbb.dmx-windows
           path: externals/
 
+  validate-json:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Validate package JSON files against schemas
+        run: scripts/validate-json-schemas.sh
+
   package:
     permissions:
       contents: write
-    needs: [build-macos, build-windows]
+    needs: [build-macos, build-windows, validate-json]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -95,6 +107,9 @@ jobs:
           cp -r masks dist/bbb.dmx/ 2>/dev/null || true
           cp -r palettes dist/bbb.dmx/ 2>/dev/null || true
           cp -r scenes dist/bbb.dmx/ 2>/dev/null || true
+          cp -r asserts dist/bbb.dmx/ 2>/dev/null || true
+          cp -r schemas dist/bbb.dmx/ 2>/dev/null || true
+          cp -r tools dist/bbb.dmx/ 2>/dev/null || true
 
       - name: Create archive
         run: |
