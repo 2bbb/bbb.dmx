@@ -488,3 +488,14 @@ npx ajv-cli validate -s schemas/bbb.dmx.patch.v1.schema.json -d patches/rgb-grid
 ```
 
 Schema validation catches shape errors. It cannot catch fixture-specific mistakes like a `profile` key that exists in another repository but not in your runtime package, or pan/tilt calibration that is physically wrong.
+
+## 10. CLI validation
+
+Use `bbb-dmx-lint` from `tools/bbb-dmx-convert` to validate files generated outside Max:
+
+```sh
+node tools/bbb-dmx-convert/dist/lint.js patches/show.json scenes/show.json --fixture-dir fixtures --strict
+```
+
+The linter performs JSON Schema validation and semantic checks that schemas cannot express cleanly: patch profile resolution, fixture id uniqueness, unknown profile/mode references, footprint overflow past channel 512, overlapping fixture footprints in the same universe, duplicate channel offsets/keys, and parameter references to missing channels. Treat linter failures as data bugs; do not rely on Max objects to discover these at show time.
+

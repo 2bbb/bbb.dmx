@@ -69,7 +69,7 @@ mvr.file('GeneralSceneDescription.xml', `<?xml version="1.0"?>
         <Addresses><Address Universe="2" Address="17" /></Addresses>
       </Fixture>
       <Fixture Name="Spot 1" UUID="00000000-0000-0000-0000-000000000002" GDTFSpec="Tiny RGB Mover.gdtf" GDTFMode="Basic">
-        <Addresses><Address Universe="2" Address="18" /></Addresses>
+        <Addresses><Address Universe="2" Address="30" /></Addresses>
       </Fixture>
     </Fixtures>
   </Scene>
@@ -81,7 +81,7 @@ run(['convert', join(temp, 'scene.mvr'), '--format', 'mvr', '--out-dir', join(te
 const patch = readJson(join(temp, 'mvr/patches/from-mvr.json'));
 const fixture = patch.fixtures?.[0];
 const duplicateNameFixture = patch.fixtures?.[1];
-if(fixture?.universe !== 2 || fixture?.address !== 17 || duplicateNameFixture?.universe !== 2 || duplicateNameFixture?.address !== 18) {
+if(fixture?.universe !== 2 || fixture?.address !== 17 || duplicateNameFixture?.universe !== 2 || duplicateNameFixture?.address !== 30) {
   throw new Error('MVR smoke patch did not preserve universe/address');
 }
 if(fixture.id !== 'spot_1' || duplicateNameFixture.id !== 'spot_1_2') {
@@ -93,3 +93,41 @@ assertClose(fixture.position[2], 4.0, 'MVR matrix position.z');
 assertClose(fixture.rotation[0], 180.0, 'MVR matrix rotation.x');
 assertClose(fixture.rotation[1], 0.0, 'MVR matrix rotation.y');
 assertClose(fixture.rotation[2], 0.0, 'MVR matrix rotation.z');
+
+function lint(args, options = {}) {
+  return execFileSync(process.execPath, [join(root, 'dist/lint.js'), ...args], { stdio: options.stdio ?? 'inherit' });
+}
+
+lint([
+  join(root, '../../fixtures/generic.mover.16bit.json'),
+  join(root, '../../patches/example.json'),
+  join(root, '../../maps/rgb-grid.example.json'),
+  join(root, '../../palettes/example.json'),
+  join(root, '../../scenes/example.json'),
+  join(root, '../../curves/example.json'),
+  join(root, '../../masks/example.json'),
+  join(root, '../../asserts/example.json')
+]);
+lint([join(temp, 'mvr/patches/from-mvr.json'), '--fixture-dir', join(temp, 'mvr/fixtures')]);
+
+const badPatch = {
+  schema: 'bbb.dmx.patch.v1',
+  fixtures: [
+    { id: 'spot_a', profile: 'generic.mover.16bit', mode: 'basic16', universe: 1, address: 1 },
+    { id: 'spot_b', profile: 'generic.mover.16bit', mode: 'basic16', universe: 1, address: 2 }
+  ]
+};
+writeFileSync(join(temp, 'bad-overlap.json'), JSON.stringify(badPatch, null, 2));
+let failedAsExpected = false;
+try {
+  lint([join(temp, 'bad-overlap.json'), '--fixture-dir', join(root, '../../fixtures')], { stdio: 'pipe' });
+} catch(error) {
+  failedAsExpected = true;
+  const stderr = error.stderr?.toString() ?? '';
+  if(!stderr.includes('overlaps')) {
+    throw new Error(`bbb-dmx-lint failed for the wrong reason: ${stderr}`);
+  }
+}
+if(!failedAsExpected) {
+  throw new Error('bbb-dmx-lint did not reject an overlapping patch');
+}
