@@ -37,6 +37,12 @@
         "patches/example.json": {},
         "externals/bbb.dmx.monitor.mxo": {},
         "externals/bbb.dmx.monitor.mxe64": {},
-        "help/bbb.dmx.monitor.maxhelp": {}
+        "help/bbb.dmx.monitor.maxhelp": {},
+        "externals/bbb.dmx.merge.mxo": {},
+        "externals/bbb.dmx.merge.mxe64": {},
+        "help/bbb.dmx.merge.maxhelp": {},
+        "externals/bbb.dmx.fade.mxo": {},
+        "externals/bbb.dmx.fade.mxe64": {},
+        "help/bbb.dmx.fade.maxhelp": {}
     }
 }
