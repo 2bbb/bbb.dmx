@@ -80,6 +80,84 @@ int main() {
     require(parsed_order == bbb::dmx::byte_order::fine_coarse, "parsed finecoarse value");
     require(!bbb::dmx::byte_order_from_string("bad", parsed_order), "reject bad byte order");
 
+
+
+    bbb::dmx::fixture_profile profile{};
+    profile.key = "generic.mover.16bit";
+    bbb::dmx::fixture_mode mode{};
+    mode.key = "basic16";
+    mode.footprint = 8;
+    mode.channels = {
+        bbb::dmx::fixture_channel{1, "pan.coarse", 128},
+        bbb::dmx::fixture_channel{2, "pan.fine", 0},
+        bbb::dmx::fixture_channel{3, "tilt.coarse", 128},
+        bbb::dmx::fixture_channel{4, "tilt.fine", 0},
+        bbb::dmx::fixture_channel{5, "dimmer", 0},
+        bbb::dmx::fixture_channel{6, "shutter", 0},
+        bbb::dmx::fixture_channel{7, "color", 0},
+        bbb::dmx::fixture_channel{8, "gobo", 0},
+    };
+    bbb::dmx::fixture_parameter pan_parameter{};
+    pan_parameter.key = "pan";
+    pan_parameter.type = bbb::dmx::fixture_parameter_type::u16;
+    pan_parameter.channels = {"pan.coarse", "pan.fine"};
+    pan_parameter.default_value = 32768;
+    bbb::dmx::fixture_parameter tilt_parameter{};
+    tilt_parameter.key = "tilt";
+    tilt_parameter.type = bbb::dmx::fixture_parameter_type::u16;
+    tilt_parameter.channels = {"tilt.coarse", "tilt.fine"};
+    tilt_parameter.default_value = 32768;
+    bbb::dmx::fixture_parameter dimmer_parameter{};
+    dimmer_parameter.key = "dimmer";
+    dimmer_parameter.type = bbb::dmx::fixture_parameter_type::u8;
+    dimmer_parameter.channels = {"dimmer"};
+    dimmer_parameter.default_value = 0;
+    mode.parameters = {pan_parameter, tilt_parameter, dimmer_parameter};
+    profile.modes = {mode};
+
+    bbb::dmx::fixture_patch patch{};
+    bbb::dmx::fixture_instance fixture{};
+    fixture.id = "spot_01";
+    fixture.profile = "generic.mover.16bit";
+    fixture.mode = "basic16";
+    fixture.universe = 1;
+    fixture.address = 10;
+    patch.fixtures = {fixture};
+
+    bbb::dmx::fixture_mapper mapper{};
+    auto map_result = mapper.add_profile(profile);
+    require(map_result.ok, "fixture mapper accepts profile");
+    map_result = mapper.set_patch(patch);
+    require(map_result.ok, "fixture mapper accepts patch");
+    require(mapper.universe(1).channel(10) == 128, "fixture mapper writes pan coarse default");
+    require(mapper.universe(1).channel(11) == 0, "fixture mapper writes pan fine default");
+    require(mapper.universe(1).channel(14) == 0, "fixture mapper writes dimmer default");
+
+    map_result = mapper.set_u8("spot_01", "dimmer", 255);
+    require(map_result.ok, "fixture mapper sets u8 parameter");
+    require(mapper.universe(1).channel(14) == 255, "fixture mapper maps dimmer to absolute address");
+
+    map_result = mapper.set_u16("spot_01", "pan", 0x1234);
+    require(map_result.ok, "fixture mapper sets u16 parameter");
+    require(mapper.universe(1).channel(10) == 0x12, "fixture mapper maps u16 coarse byte");
+    require(mapper.universe(1).channel(11) == 0x34, "fixture mapper maps u16 fine byte");
+
+    map_result = mapper.set_pan_tilt_bytes("spot_01", 1, 2, 3, 4);
+    require(map_result.ok, "fixture mapper accepts movertrack byte tuple");
+    require(mapper.universe(1).channel(10) == 1, "fixture mapper maps pan byte 1");
+    require(mapper.universe(1).channel(11) == 2, "fixture mapper maps pan byte 2");
+    require(mapper.universe(1).channel(12) == 3, "fixture mapper maps tilt byte 1");
+    require(mapper.universe(1).channel(13) == 4, "fixture mapper maps tilt byte 2");
+
+    bbb::dmx::fixture_patch overlap_patch{};
+    bbb::dmx::fixture_instance overlap_a{fixture};
+    bbb::dmx::fixture_instance overlap_b{fixture};
+    overlap_b.id = "spot_02";
+    overlap_b.address = 12;
+    overlap_patch.fixtures = {overlap_a, overlap_b};
+    map_result = mapper.set_patch(overlap_patch);
+    require(!map_result.ok, "fixture mapper rejects overlapping fixtures");
+
     std::cout << "bbb_dmx_common_tests passed" << std::endl;
     return 0;
 }
