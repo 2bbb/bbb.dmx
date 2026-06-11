@@ -34,6 +34,9 @@
         "externals/bbb.dmx.fixturemap.mxe64": {},
         "help/bbb.dmx.fixturemap.maxhelp": {},
         "fixtures/generic.mover.16bit.json": {},
-        "patches/example.json": {}
+        "patches/example.json": {},
+        "externals/bbb.dmx.monitor.mxo": {},
+        "externals/bbb.dmx.monitor.mxe64": {},
+        "help/bbb.dmx.monitor.maxhelp": {}
     }
 }
