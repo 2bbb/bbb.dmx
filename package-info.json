@@ -49,6 +49,15 @@
         "help/bbb.dmx.generator.maxhelp": {},
         "externals/bbb.dmx.safety.mxo": {},
         "externals/bbb.dmx.safety.mxe64": {},
-        "help/bbb.dmx.safety.maxhelp": {}
+        "help/bbb.dmx.safety.maxhelp": {},
+        "externals/bbb.dmx.patchcheck.mxo": {},
+        "externals/bbb.dmx.patchcheck.mxe64": {},
+        "help/bbb.dmx.patchcheck.maxhelp": {},
+        "externals/bbb.dmx.fixtureinfo.mxo": {},
+        "externals/bbb.dmx.fixtureinfo.mxe64": {},
+        "help/bbb.dmx.fixtureinfo.maxhelp": {},
+        "externals/bbb.dmx.record.mxo": {},
+        "externals/bbb.dmx.record.mxe64": {},
+        "help/bbb.dmx.record.maxhelp": {}
     }
 }
