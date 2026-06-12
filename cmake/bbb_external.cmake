@@ -113,6 +113,9 @@ macro(bbb_add_external)
 
     # --- include directories ---
     target_include_directories(${PROJECT_NAME} PRIVATE ${C74_INCLUDES})
+    if(DEFINED BBB_DMX_COMMON_INCLUDE_DIRS)
+        target_include_directories(${PROJECT_NAME} PRIVATE ${BBB_DMX_COMMON_INCLUDE_DIRS})
+    endif()
     if(BBB_ARG_INCLUDES)
         target_include_directories(${PROJECT_NAME} PRIVATE ${BBB_ARG_INCLUDES})
     endif()

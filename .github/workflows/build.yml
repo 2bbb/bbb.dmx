@@ -64,6 +64,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
       - uses: actions/setup-node@v6
         with:
@@ -79,6 +81,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
       - name: Download macOS externals
         uses: actions/download-artifact@v8
@@ -98,7 +102,7 @@ jobs:
           cp package-info.json dist/bbb.dmx/
           cp README.md dist/bbb.dmx/ 2>/dev/null || true
           cp LICENSE dist/bbb.dmx/ 2>/dev/null || true
-          cp -r docs dist/bbb.dmx/ 2>/dev/null || true
+          cp -r libs/bbb-dmx/docs dist/bbb.dmx/ 2>/dev/null || true
           cp -r help dist/bbb.dmx/
           cp -r fixtures dist/bbb.dmx/
           cp -r maps dist/bbb.dmx/
@@ -108,8 +112,7 @@ jobs:
           cp -r palettes dist/bbb.dmx/ 2>/dev/null || true
           cp -r scenes dist/bbb.dmx/ 2>/dev/null || true
           cp -r asserts dist/bbb.dmx/ 2>/dev/null || true
-          cp -r schemas dist/bbb.dmx/ 2>/dev/null || true
-          cp -r tools dist/bbb.dmx/ 2>/dev/null || true
+          cp -r libs/bbb-dmx/schemas dist/bbb.dmx/ 2>/dev/null || true
 
       - name: Create archive
         run: |

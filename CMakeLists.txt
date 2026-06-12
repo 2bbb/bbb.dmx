@@ -1,13 +1,23 @@
 cmake_minimum_required(VERSION 3.19)
-project(bbb.dmx VERSION 0.6.0 LANGUAGES CXX)
+project(bbb.dmx VERSION 0.7.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(BBB_DMX_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libs/bbb-dmx")
+if(NOT EXISTS "${BBB_DMX_CORE_DIR}/include/bbb/dmx/common.hpp")
+    message(FATAL_ERROR "bbb-dmx core submodule is missing. Run: git submodule update --init --recursive")
+endif()
+
+set(BBB_DMX_COMMON_INCLUDE_DIRS
+    "${BBB_DMX_CORE_DIR}/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/source"
+)
+
 add_library(bbb_dmx_common INTERFACE)
 target_include_directories(bbb_dmx_common INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/source
+    ${BBB_DMX_COMMON_INCLUDE_DIRS}
 )
 
 enable_testing()
