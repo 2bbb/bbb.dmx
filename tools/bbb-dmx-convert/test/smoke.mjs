@@ -28,6 +28,26 @@ const minimalProfile = readJson(join(temp, 'xml/fixtures/exampleco.tiny.rgb.move
 if(minimalProfile.photometry?.beam_angle_degrees !== 4.5 || minimalProfile.photometry?.field_angle_degrees !== 25.0 || minimalProfile.photometry?.beam_radius !== 0.052 || minimalProfile.photometry?.luminous_flux !== 1000 || minimalProfile.photometry?.color_temperature !== 6500) {
   throw new Error(`GDTF Beam photometry was not converted correctly: ${JSON.stringify(minimalProfile.photometry)}`);
 }
+const shutterRanges = minimalProfile.modes.basic?.parameters?.shutter?.ranges;
+if(!Array.isArray(shutterRanges) || shutterRanges.length !== 6) {
+  throw new Error(`GDTF shutter ChannelFunction/ChannelSet ranges were not converted: ${JSON.stringify(shutterRanges)}`);
+}
+const expectedShutterRanges = [
+  { from: 0, to: 31, function: 'closed', label: 'Closed' },
+  { from: 32, to: 63, function: 'open', label: 'Open' },
+  { from: 64, to: 127, function: 'strobe', label: 'Strobe', physical_from: 0.5, physical_to: 10 },
+  { from: 128, to: 191, function: 'pulse', label: 'Pulse' },
+  { from: 192, to: 223, function: 'random', label: 'Random' },
+  { from: 224, to: 255, function: 'open', label: 'Open' },
+];
+for(const [index, expected] of expectedShutterRanges.entries()) {
+  const actual = shutterRanges[index];
+  for(const [key, value] of Object.entries(expected)) {
+    if(actual?.[key] !== value) {
+      throw new Error(`GDTF shutter range ${index} ${key}: expected ${value}, got ${JSON.stringify(actual)}`);
+    }
+  }
+}
 
 const repeatedAttributeXml = `<?xml version="1.0" encoding="UTF-8"?>
 <GDTF>
@@ -138,4 +158,42 @@ try {
 }
 if(!failedAsExpected) {
   throw new Error('bbb-dmx-lint did not reject an overlapping patch');
+}
+
+const gapProfile = {
+  schema: 'bbb.dmx.fixture.profile.v1',
+  key: 'gap.profile',
+  manufacturer: 'ExampleCo',
+  model: 'Gap Profile',
+  modes: {
+    basic: {
+      label: 'Basic',
+      footprint: 1,
+      channels: [{ offset: 1, key: 'shutter' }],
+      parameters: {
+        shutter: {
+          type: 'u8',
+          channel: 'shutter',
+          ranges: [
+            { from: 0, to: 31, function: 'closed' },
+            { from: 64, to: 255, function: 'open' }
+          ]
+        }
+      }
+    }
+  }
+};
+writeFileSync(join(temp, 'gap-profile.json'), JSON.stringify(gapProfile, null, 2));
+failedAsExpected = false;
+try {
+  lint([join(temp, 'gap-profile.json'), '--strict'], { stdio: 'pipe' });
+} catch(error) {
+  failedAsExpected = true;
+  const stderr = error.stderr?.toString() ?? '';
+  if(!stderr.includes('gap 32..63')) {
+    throw new Error(`bbb-dmx-lint strict failed for the wrong range reason: ${stderr}`);
+  }
+}
+if(!failedAsExpected) {
+  throw new Error('bbb-dmx-lint --strict did not reject a parameter range gap warning');
 }

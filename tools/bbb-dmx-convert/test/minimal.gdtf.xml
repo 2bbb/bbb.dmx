@@ -39,6 +39,18 @@
               <ChannelFunction Attribute="ColorAdd_B" DMXFrom="0/1" />
             </LogicalChannel>
           </DMXChannel>
+          <DMXChannel Offset="9" Default="32/1">
+            <LogicalChannel Attribute="Shutter1">
+              <ChannelFunction Attribute="Shutter1" Name="Closed / Open" DMXFrom="0/1">
+                <ChannelSet Name="Closed" DMXFrom="0/1" />
+                <ChannelSet Name="Open" DMXFrom="32/1" />
+              </ChannelFunction>
+              <ChannelFunction Attribute="Shutter1Strobe" Name="Strobe" DMXFrom="64/1" PhysicalFrom="0.5" PhysicalTo="10.0" />
+              <ChannelFunction Attribute="Shutter1StrobePulse" Name="Pulse" DMXFrom="128/1" />
+              <ChannelFunction Attribute="Shutter1StrobeRandom" Name="Random" DMXFrom="192/1" />
+              <ChannelFunction Attribute="Shutter1" Name="Open" DMXFrom="224/1" />
+            </LogicalChannel>
+          </DMXChannel>
         </DMXChannels>
       </DMXMode>
     </DMXModes>

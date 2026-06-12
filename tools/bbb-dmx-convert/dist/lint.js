@@ -45,6 +45,15 @@ function schemaPathForId(schema, schemaDir) {
 function add(diags, severity, file, message) {
     diags.push({ severity, file, message });
 }
+function domainMaxForParameterType(type) {
+    if (type === "u16")
+        return 65535;
+    if (type === "u24")
+        return 16777215;
+    if (type === "u8" || type === "enum")
+        return 255;
+    return undefined;
+}
 function formatAjvPath(instancePath) {
     return instancePath.length > 0 ? instancePath : "/";
 }
@@ -99,6 +108,38 @@ function lintProfile(profile, file, diagnostics) {
             const expected = parameter.type === "u16" ? 2 : parameter.type === "u24" ? 3 : parameter.type === "u8" || parameter.type === "enum" ? 1 : undefined;
             if (expected !== undefined && refs.length !== expected) {
                 add(diagnostics, "error", file, `profile '${profile.key}' mode '${modeKey}' parameter '${paramKey}' type '${parameter.type}' has ${refs.length} channel reference(s), expected ${expected}`);
+            }
+            const domainMax = domainMaxForParameterType(parameter.type);
+            if (parameter.ranges && domainMax !== undefined) {
+                const sortedRanges = [...parameter.ranges].sort((a, b) => a.from - b.from || a.to - b.to);
+                for (const range of sortedRanges) {
+                    if (range.from > range.to) {
+                        add(diagnostics, "error", file, `profile '${profile.key}' mode '${modeKey}' parameter '${paramKey}' range ${range.function} has from ${range.from} greater than to ${range.to}`);
+                    }
+                    if (range.from < 0 || range.to > domainMax) {
+                        add(diagnostics, "error", file, `profile '${profile.key}' mode '${modeKey}' parameter '${paramKey}' range ${range.function} [${range.from}, ${range.to}] exceeds ${parameter.type} domain 0..${domainMax}`);
+                    }
+                }
+                if (sortedRanges.length > 0) {
+                    const firstRange = sortedRanges[0];
+                    if (firstRange.from > 0) {
+                        add(diagnostics, "warning", file, `profile '${profile.key}' mode '${modeKey}' parameter '${paramKey}' ranges start at ${firstRange.from}, leaving gap 0..${firstRange.from - 1}`);
+                    }
+                    for (let index = 1; index < sortedRanges.length; index++) {
+                        const previous = sortedRanges[index - 1];
+                        const current = sortedRanges[index];
+                        if (current.from <= previous.to) {
+                            add(diagnostics, "warning", file, `profile '${profile.key}' mode '${modeKey}' parameter '${paramKey}' ranges overlap at ${current.from} (${previous.function} -> ${current.function})`);
+                        }
+                        else if (previous.to + 1 < current.from) {
+                            add(diagnostics, "warning", file, `profile '${profile.key}' mode '${modeKey}' parameter '${paramKey}' ranges have gap ${previous.to + 1}..${current.from - 1}`);
+                        }
+                    }
+                    const lastRange = sortedRanges[sortedRanges.length - 1];
+                    if (lastRange.to < domainMax) {
+                        add(diagnostics, "warning", file, `profile '${profile.key}' mode '${modeKey}' parameter '${paramKey}' ranges end at ${lastRange.to}, leaving gap ${lastRange.to + 1}..${domainMax}`);
+                    }
+                }
             }
         }
     }

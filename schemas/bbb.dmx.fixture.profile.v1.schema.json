@@ -143,6 +143,44 @@
                   "type": "number",
                   "exclusiveMinimum": 0
                 },
+                "ranges": {
+                  "type": "array",
+                  "minItems": 2,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "from",
+                      "to",
+                      "function"
+                    ],
+                    "properties": {
+                      "from": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 16777215
+                      },
+                      "to": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 16777215
+                      },
+                      "function": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "physical_from": {
+                        "type": "number"
+                      },
+                      "physical_to": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                },
                 "default": {
                   "type": "integer",
                   "minimum": 0,

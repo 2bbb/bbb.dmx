@@ -42,7 +42,7 @@ The canonical interchange spec for external apps is [`docs/SPEC.json.md`](docs/S
 
 ## Converter CLI
 
-`tools/bbb-dmx-convert` is a TypeScript/Node.js converter for existing fixture datasets. It converts `.gdtf`, `.mvr`, direct GDTF `description.xml`, and compatible MA3 fixture XML into `bbb.dmx` JSON profiles and, for MVR scenes, patch JSON.
+`tools/bbb-dmx-convert` is a TypeScript/Node.js converter for existing fixture datasets. It converts `.gdtf`, `.mvr`, direct GDTF `description.xml`, and compatible MA3 fixture XML into `bbb.dmx` JSON profiles and, for MVR scenes, patch JSON. GDTF-style `ChannelFunction` / `ChannelSet` tables are preserved as fixture parameter `ranges`, so shutter modes, strobe rates, color/gobo wheel slots, prism/frost/iris modes, and similar stepped channels are not flattened into one useless byte.
 
 ```sh
 cd tools/bbb-dmx-convert

@@ -14,6 +14,15 @@ const photometrySchema = z.object({
   color_temperature: z.number().positive().optional(),
 }).optional();
 
+const parameterRangeSchema = z.object({
+  from: z.number().int().min(0).max(16777215),
+  to: z.number().int().min(0).max(16777215),
+  function: z.string().min(1),
+  label: z.string().optional(),
+  physical_from: z.number().optional(),
+  physical_to: z.number().optional(),
+});
+
 const fixtureProfileSchema = z.object({
   schema: z.literal("bbb.dmx.fixture.profile.v1"),
   key: z.string().min(1),
@@ -36,6 +45,7 @@ const fixtureProfileSchema = z.object({
       channels: z.array(z.string()).optional(),
       byte_order: z.enum(["coarsefine", "finecoarse", "coarsemidfine", "finemidcoarse"]).optional(),
       range_degrees: z.number().optional(),
+      ranges: z.array(parameterRangeSchema).min(2).optional(),
       default: z.number().int().min(0).optional(),
     })).optional(),
   })).refine((modes) => Object.keys(modes).length > 0, "at least one mode is required"),
@@ -267,6 +277,23 @@ function parseDmxValueParts(text: string | undefined): { value: number; bytes: n
   return { value: Math.round(value), bytes };
 }
 
+function domainMaxForWidth(width: number): number {
+  const byteWidth = Math.max(1, Math.min(Math.round(width), 3));
+  return Math.pow(256, byteWidth) - 1;
+}
+
+function dmxValueForWidth(text: string | undefined, width: number): number | undefined {
+  const parts = parseDmxValueParts(text);
+  if(!parts) return undefined;
+  const targetMax = domainMaxForWidth(width);
+  const sourceBytes = Math.max(1, Math.min(parts.bytes ?? width, 4));
+  const sourceMax = Math.pow(256, sourceBytes) - 1;
+  const scaled = sourceBytes === Math.max(1, Math.min(width, 4))
+    ? parts.value
+    : Math.round((parts.value / sourceMax) * targetMax);
+  return Math.max(0, Math.min(targetMax, scaled));
+}
+
 function expandDmxBytes(text: string | undefined, width: number): number[] | undefined {
   const parts = parseDmxValueParts(text);
   if(!parts) return undefined;
@@ -287,12 +314,22 @@ function dmxBytesForChannel(channelNode: unknown, functionNode: unknown, width: 
   return values.map((value) => Math.max(0, Math.min(255, value)));
 }
 
-function functionForChannel(channelNode: unknown): unknown {
-  const logical = asArray(child(channelNode, "LogicalChannel"))[0];
+function logicalChannelForChannel(channelNode: unknown): unknown | undefined {
+  return asArray(child(channelNode, "LogicalChannel"))[0];
+}
+
+function channelFunctionsForChannel(channelNode: unknown): unknown[] {
+  const logical = logicalChannelForChannel(channelNode);
   const logicalFunctions = logical ? asArray(child(logical, "ChannelFunction")) : [];
-  if(logicalFunctions[0]) return logicalFunctions[0];
+  if(logicalFunctions.length > 0) return logicalFunctions;
   const directFunctions = asArray(child(channelNode, "ChannelFunction"));
-  return directFunctions[0] ?? logical ?? channelNode;
+  return directFunctions;
+}
+
+function functionForChannel(channelNode: unknown): unknown {
+  const logical = logicalChannelForChannel(channelNode);
+  const functions = channelFunctionsForChannel(channelNode);
+  return functions[0] ?? logical ?? channelNode;
 }
 
 function attributeForChannel(channelNode: unknown): string | undefined {
@@ -310,6 +347,119 @@ function physicalRangeDegrees(channelNode: unknown): number | undefined {
   if(from === undefined || to === undefined) return undefined;
   const range = Math.abs(to - from);
   return Number.isFinite(range) && range > 0 ? range : undefined;
+}
+
+function channelSetsForFunction(functionNode: unknown): unknown[] {
+  const direct = asArray(child(functionNode, "ChannelSet"));
+  const wrapped = asArray(child(child(functionNode, "ChannelSets"), "ChannelSet"));
+  return [...direct, ...wrapped];
+}
+
+function nodeName(node: unknown): string | undefined {
+  return attr(node, ["Name", "name", "LongName", "longName", "Label", "label"]) ?? textOf(node);
+}
+
+function channelFunctionAttribute(functionNode: unknown, fallback: string | undefined): string | undefined {
+  return attr(functionNode, ["Attribute", "attribute", "Name", "name"]) ?? fallback;
+}
+
+function rangeFunctionSlug(attributeName: string | undefined, label: string | undefined, functionName: string | undefined): string {
+  const combined = [attributeName, functionName, label].filter(Boolean).join(" ").toLowerCase();
+  const labelLower = (label ?? "").toLowerCase();
+  const nameLower = (functionName ?? "").toLowerCase();
+  if(/closed|close|blackout|black out|shut/.test(labelLower)) return "closed";
+  if(/\bopen\b/.test(labelLower)) return "open";
+  if(/random|rnd/.test(combined) && /shutter|strobe/.test(combined)) return "random";
+  if(/pulse/.test(combined) && /shutter|strobe/.test(combined)) return "pulse";
+  if(/strobe/.test(combined)) return "strobe";
+  if(/closed|close|blackout/.test(nameLower)) return "closed";
+  if(/\bopen\b/.test(nameLower)) return "open";
+  if(/shutter/.test(combined)) return "open";
+  return slug(label ?? functionName ?? attributeName ?? "range", "range");
+}
+
+function rangePhysical(node: unknown, fallbackNode: unknown): Pick<NonNullable<FixtureParameter["ranges"]>[number], "physical_from" | "physical_to"> {
+  const physicalFrom = floatAttr(node, ["PhysicalFrom", "physicalFrom"]) ?? floatAttr(fallbackNode, ["PhysicalFrom", "physicalFrom"]);
+  const physicalTo = floatAttr(node, ["PhysicalTo", "physicalTo"]) ?? floatAttr(fallbackNode, ["PhysicalTo", "physicalTo"]);
+  const out: Pick<NonNullable<FixtureParameter["ranges"]>[number], "physical_from" | "physical_to"> = {};
+  if(physicalFrom !== undefined && Number.isFinite(physicalFrom)) out.physical_from = physicalFrom;
+  if(physicalTo !== undefined && Number.isFinite(physicalTo)) out.physical_to = physicalTo;
+  return out;
+}
+
+function parameterRangesForChannel(channelNode: unknown, width: number): FixtureParameter["ranges"] | undefined {
+  const logical = logicalChannelForChannel(channelNode);
+  const logicalAttribute = attr(logical, ["Attribute", "attribute", "Name", "name"]);
+  const functionNodes = channelFunctionsForChannel(channelNode);
+  if(functionNodes.length === 0) return undefined;
+
+  const functionStarts = functionNodes
+    .map((node, index) => ({
+      node,
+      index,
+      from: dmxValueForWidth(attr(node, ["DMXFrom", "dmxFrom", "DmxFrom", "From", "from"]), width) ?? (index === 0 ? 0 : undefined),
+    }))
+    .filter((entry): entry is { node: unknown; index: number; from: number } => entry.from !== undefined)
+    .sort((a, b) => a.from - b.from || a.index - b.index);
+
+  if(functionStarts.length === 0) return undefined;
+  const domainMax = domainMaxForWidth(width);
+  const ranges: NonNullable<FixtureParameter["ranges"]> = [];
+  let hasSubdivision = false;
+
+  for(let index = 0; index < functionStarts.length; index++) {
+    const entry = functionStarts[index]!;
+    const next = functionStarts[index + 1];
+    const functionFrom = Math.max(0, Math.min(domainMax, entry.from));
+    const functionTo = Math.max(functionFrom, Math.min(domainMax, (next?.from ?? (domainMax + 1)) - 1));
+    const functionName = nodeName(entry.node);
+    const attributeName = channelFunctionAttribute(entry.node, logicalAttribute);
+    const setStarts = channelSetsForFunction(entry.node)
+      .map((node, setIndex) => ({
+        node,
+        index: setIndex,
+        label: nodeName(node),
+        from: dmxValueForWidth(attr(node, ["DMXFrom", "dmxFrom", "DmxFrom", "From", "from"]), width) ?? (setIndex === 0 ? functionFrom : undefined),
+      }))
+      .filter((set): set is { node: unknown; index: number; label: string | undefined; from: number } => set.from !== undefined)
+      .sort((a, b) => a.from - b.from || a.index - b.index);
+
+    if(1 < setStarts.length) {
+      hasSubdivision = true;
+      for(let setIndex = 0; setIndex < setStarts.length; setIndex++) {
+        const setEntry = setStarts[setIndex]!;
+        const nextSet = setStarts[setIndex + 1];
+        const from = Math.max(functionFrom, Math.min(functionTo, setEntry.from));
+        const to = Math.max(from, Math.min(functionTo, (nextSet?.from ?? (functionTo + 1)) - 1));
+        ranges.push({
+          from,
+          to,
+          function: rangeFunctionSlug(attributeName, setEntry.label, functionName),
+          ...(setEntry.label ? { label: setEntry.label } : {}),
+          ...rangePhysical(setEntry.node, entry.node),
+        });
+      }
+    } else {
+      ranges.push({
+        from: functionFrom,
+        to: functionTo,
+        function: rangeFunctionSlug(attributeName, setStarts[0]?.label, functionName),
+        ...(setStarts[0]?.label ?? functionName ? { label: setStarts[0]?.label ?? functionName } : {}),
+        ...rangePhysical(entry.node, entry.node),
+      });
+    }
+  }
+
+  if(functionStarts.length <= 1 && !hasSubdivision) return undefined;
+  const normalized = ranges
+    .filter((range) => range.from <= range.to)
+    .sort((a, b) => a.from - b.from || a.to - b.to)
+    .map((range) => ({
+      ...range,
+      from: Math.max(0, Math.min(domainMax, range.from)),
+      to: Math.max(0, Math.min(domainMax, range.to)),
+    }));
+  return normalized.length >= 2 ? normalized : undefined;
 }
 
 function modeChannels(modeNode: unknown): unknown[] {
@@ -361,7 +511,7 @@ function profileFromGdtfXml(xml: string, source: string, prefix: string): Conver
     const channelNodes = modeChannels(modeNode);
     const channelsByOffset = new Map<number, FixtureChannel>();
     const usedParameterKeys = new Set<string>();
-    const parameterChannels = new Map<string, { keys: string[]; defaults: number[]; range: number | undefined }>();
+    const parameterChannels = new Map<string, { keys: string[]; defaults: number[]; range: number | undefined; ranges: FixtureParameter["ranges"] | undefined }>();
 
     for(const [channelIndex, channelNode] of channelNodes.entries()) {
       const offsets = parseOffsetList(attr(channelNode, ["Offset", "offset", "DMXOffset", "dmxOffset", "Address", "address"]));
@@ -372,6 +522,7 @@ function profileFromGdtfXml(xml: string, source: string, prefix: string): Conver
       const fn = functionForChannel(channelNode);
       const range = physicalRangeDegrees(channelNode);
       const defaults = dmxBytesForChannel(channelNode, fn, offsets.length);
+      const ranges = parameterRangesForChannel(channelNode, offsets.length);
       const keys: string[] = [];
 
       offsets.forEach((offset, byteIndex) => {
@@ -391,8 +542,9 @@ function profileFromGdtfXml(xml: string, source: string, prefix: string): Conver
           existing.keys.push(...keys);
           existing.defaults.push(...defaults);
           if(existing.range === undefined && range !== undefined) existing.range = range;
+          if(existing.ranges === undefined && ranges !== undefined) existing.ranges = ranges;
         } else {
-          parameterChannels.set(paramKey, { keys, defaults, range });
+          parameterChannels.set(paramKey, { keys, defaults, range, ranges });
         }
       }
     }
@@ -415,6 +567,9 @@ function profileFromGdtfXml(xml: string, source: string, prefix: string): Conver
       }
       if((paramKey === "pan" || paramKey.startsWith("pan_") || paramKey === "tilt" || paramKey.startsWith("tilt_")) && info.range !== undefined) {
         parameter.range_degrees = info.range;
+      }
+      if(info.ranges && info.ranges.length >= 2) {
+        parameter.ranges = info.ranges;
       }
       parameters[paramKey] = parameter;
     }

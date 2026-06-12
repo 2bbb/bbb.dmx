@@ -167,6 +167,36 @@ inline mapper_result fixture_profile_from_json(const json_value &root, fixture_p
                     return mapper_result::failure("unknown byte_order: " + order_text);
                 }
 
+                const json_value *ranges{parameter_pair.second.find("ranges")};
+                if(ranges) {
+                    if(ranges->type != json_type::array) {
+                        return mapper_result::failure("parameter ranges must be array: " + parameter.key);
+                    }
+                    for(const auto &range_value : ranges->array_value) {
+                        if(range_value.type != json_type::object) {
+                            return mapper_result::failure("parameter range must be object: " + parameter.key);
+                        }
+                        fixture_parameter_range range{};
+                        if(!json_int(range_value, "from", range.from, true, error)) {
+                            return mapper_result::failure(error);
+                        }
+                        if(!json_int(range_value, "to", range.to, true, error)) {
+                            return mapper_result::failure(error);
+                        }
+                        if(!json_string(range_value, "function", range.function, true, error)) {
+                            return mapper_result::failure(error);
+                        }
+                        json_string(range_value, "label", range.label, false, error);
+                        if(!json_optional_double_present(range_value, "physical_from", range.physical_from, range.has_physical_from, error)) {
+                            return mapper_result::failure(error);
+                        }
+                        if(!json_optional_double_present(range_value, "physical_to", range.physical_to, range.has_physical_to, error)) {
+                            return mapper_result::failure(error);
+                        }
+                        parameter.ranges.push_back(range);
+                    }
+                }
+
                 const json_value *channel{parameter_pair.second.find("channel")};
                 if(channel) {
                     if(channel->type != json_type::string) {

@@ -196,6 +196,7 @@ A parameter maps one semantic control value to one or more channel keys.
 | `byte_order` | string | no | `coarsefine` | Byte order for `u16`/`u24`. |
 | `default` | integer | no | `0` | Semantic default before splitting. For `u8` max is `255`; for `u16` max is `65535`; for `u24` max is `16777215`. |
 | `range_degrees` | number | pan/tilt recommended | `0` | Physical movement range used by mover tracking. |
+| `ranges` | array | no | absent | Inclusive raw-value lookup table for shutter modes, strobe ranges, color/gobo wheel slots, prism/frost/iris modes, and similar stepped DMX parameters. |
 
 Canonical channel counts:
 
@@ -206,7 +207,36 @@ Canonical channel counts:
 | `u16` | 2 |
 | `u24` | 3 |
 
-`enum` is currently stored as an 8-bit value. Enumeration labels are not part of v1 yet.
+`enum` is currently stored as an 8-bit value. For most fixture metadata, prefer `ranges` over inventing a separate enum-label table: it works for `u8`, `u16`, and `u24`, preserves GDTF `ChannelFunction` / `ChannelSet` value domains, and lets consumers ignore unknown function slugs safely.
+
+#### `ranges`
+
+`ranges` is an optional static map from raw parameter values to semantic functions. Bounds are inclusive and use the same domain as the parameter default: `u8`/`enum` is `0..255`, `u16` is `0..65535`, and `u24` is `0..16777215`. The array should contain at least two entries; omit it for plain dimmer/RGB channels that have one continuous meaning.
+
+```json
+"shutter": {
+  "type": "u8",
+  "channel": "shutter",
+  "default": 32,
+  "ranges": [
+    { "from": 0, "to": 31, "function": "closed", "label": "Closed" },
+    { "from": 32, "to": 63, "function": "open", "label": "Open" },
+    { "from": 64, "to": 127, "function": "strobe", "label": "Strobe", "physical_from": 0.5, "physical_to": 10.0 },
+    { "from": 128, "to": 191, "function": "pulse", "label": "Pulse" },
+    { "from": 192, "to": 223, "function": "random", "label": "Random" },
+    { "from": 224, "to": 255, "function": "open", "label": "Open" }
+  ]
+}
+```
+
+| Field | Type | Required | Meaning |
+|---|---:|---:|---|
+| `from` / `to` | integer | yes | Inclusive raw-value bounds in the parameter domain. |
+| `function` | string | yes | Semantic slug. Recommended shutter vocabulary is `closed`, `open`, `strobe`, `pulse`, `random`; wheel slots and other fixture-specific modes may use freeform slugs such as `red`, `gobo.1`, `rainbow`, `prism.3facet`, or `frost.heavy`. |
+| `label` | string | no | Human-readable label, usually a GDTF `ChannelSet` or `ChannelFunction` name. |
+| `physical_from` / `physical_to` | number | no | Physical values interpolated across the range when meaningful, e.g. strobe frequency in Hz. |
+
+Consumers must not assume `function` is exhaustive. Unknown slugs are valid and should be ignored, displayed as labels, or treated as generic slots. `bbb-dmx-lint` reports schema errors for impossible bounds and warnings for gaps/overlaps, but JSON Schema cannot fully express value-domain coverage.
 
 ## 3. Fixture patch: `bbb.dmx.patch.v2`
 

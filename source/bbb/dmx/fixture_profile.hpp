@@ -24,6 +24,18 @@ public:
     bool hold{false};
 };
 
+struct fixture_parameter_range {
+public:
+    int from{0};
+    int to{0};
+    std::string function{};
+    std::string label{};
+    bool has_physical_from{false};
+    double physical_from{0.0};
+    bool has_physical_to{false};
+    double physical_to{0.0};
+};
+
 struct fixture_parameter {
 public:
     std::string key{};
@@ -32,6 +44,7 @@ public:
     byte_order order{byte_order::coarse_fine};
     int default_value{0};
     double range_degrees{0.0};
+    std::vector<fixture_parameter_range> ranges{};
 };
 
 struct fixture_photometry {

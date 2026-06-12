@@ -311,18 +311,29 @@ int main() {
         },
         "modes": {
             "basic16": {
-                "footprint": 5,
+                "footprint": 6,
                 "channels": [
                     { "offset": 1, "key": "pan.coarse", "default": 128 },
                     { "offset": 2, "key": "pan.fine", "default": 0 },
                     { "offset": 3, "key": "tilt.coarse", "default": 128 },
                     { "offset": 4, "key": "tilt.fine", "default": 0 },
-                    { "offset": 5, "key": "dimmer", "default": 0 }
+                    { "offset": 5, "key": "dimmer", "default": 0 },
+                    { "offset": 6, "key": "shutter", "default": 32 }
                 ],
                 "parameters": {
                     "pan": { "type": "u16", "channels": ["pan.coarse", "pan.fine"], "byte_order": "coarsefine", "default": 32768 },
                     "tilt": { "type": "u16", "channels": ["tilt.coarse", "tilt.fine"], "byte_order": "coarsefine", "default": 32768 },
                     "color24": { "type": "u24", "channels": ["pan.coarse", "pan.fine", "tilt.coarse"], "byte_order": "coarsemidfine", "default": 8388608 },
+                    "shutter": {
+                        "type": "u8",
+                        "channel": "shutter",
+                        "default": 32,
+                        "ranges": [
+                            { "from": 0, "to": 31, "function": "closed", "label": "Closed" },
+                            { "from": 32, "to": 63, "function": "open", "label": "Open" },
+                            { "from": 64, "to": 127, "function": "strobe", "label": "Strobe", "physical_from": 0.5, "physical_to": 10.0 }
+                        ]
+                    },
                     "dimmer": { "type": "u8", "channel": "dimmer", "default": 0 }
                 }
             }
@@ -343,11 +354,19 @@ int main() {
     require(nearly_equal(parsed_profile.photometry.luminous_flux, 1000.0), "fixture JSON photometry luminous flux value");
     require(parsed_profile.photometry.has_color_temperature, "fixture JSON photometry color temperature present");
     require(nearly_equal(parsed_profile.photometry.color_temperature, 6500.0), "fixture JSON photometry color temperature value");
-    require(parsed_profile.modes[0].channels.size() == 5, "fixture JSON channel count");
+    require(parsed_profile.modes[0].channels.size() == 6, "fixture JSON channel count");
     const bbb::dmx::fixture_parameter *parsed_color24{parsed_profile.modes[0].find_parameter("color24")};
     require(parsed_color24 != nullptr, "fixture JSON u24 parameter exists");
     require(parsed_color24->type == bbb::dmx::fixture_parameter_type::u24, "fixture JSON u24 parameter type");
     require(parsed_color24->order == bbb::dmx::byte_order::coarse_mid_fine, "fixture JSON u24 byte order");
+    const bbb::dmx::fixture_parameter *parsed_shutter{parsed_profile.modes[0].find_parameter("shutter")};
+    require(parsed_shutter != nullptr, "fixture JSON shutter parameter exists");
+    require(parsed_shutter->ranges.size() == 3, "fixture JSON shutter ranges count");
+    require(parsed_shutter->ranges[0].function == "closed", "fixture JSON shutter range function");
+    require(parsed_shutter->ranges[1].from == 32 && parsed_shutter->ranges[1].to == 63, "fixture JSON shutter open range bounds");
+    require(parsed_shutter->ranges[2].has_physical_from && parsed_shutter->ranges[2].has_physical_to, "fixture JSON shutter physical range present");
+    require(nearly_equal(parsed_shutter->ranges[2].physical_from, 0.5), "fixture JSON shutter physical from");
+    require(nearly_equal(parsed_shutter->ranges[2].physical_to, 10.0), "fixture JSON shutter physical to");
 
     const std::string patch_json{R"json({
         "schema": "bbb.dmx.patch.v2",
