@@ -118,25 +118,24 @@ tracking_mode off
 - `pan` keeps the legacy pan-only shortest-path behavior. It can still choose an out-of-range equivalent pan and then clip, so use it only if you explicitly want that old behavior.
 - `off` disables tracking and outputs the direct pan/tilt solution. This avoids history-induced wrong turns, but it can spin through atan2 wrap points.
 
-Coordinate convention:
+Coordinate convention is GDTF/DIN SPEC 15800, not the old Max-upright approximation:
 
 ```text
-+X = stage right / local right
-+Y = forward / pan center
-+Z = up
+World: right-handed, +Z up, positions in project units (meters for MVR conversion).
+Device rest: hanging/front-view fixture frame.
+Beam rest: device-local -Z.
+Pan: right-hand rotation about device +Z.
+Tilt: right-hand rotation about device +X.
+Beam direction: Rz(pan) * Rx(tilt) * (0, 0, -1).
 ```
 
-For a ceiling-hung fixture mounted upside down with pan center facing the `y = 0` side of the room/stage, use:
+For an MVR/grandMA3 ceiling-hung fixture, use the exported `rotation` as-is. Do **not** add the old manual correction `@rot 180. 0. 0. @tilt_offset -90.` unless you are intentionally compensating for a non-GDTF patch. A typical ceiling-hung fixture at `x=0, y=3.84, z=2.55` is simply:
 
 ```max
-[bbb.dmx.movertrack 0. 3.84 2.55 @rot 180. 0. 0. @tilt_invert 0 @tilt_offset -90.]
+[bbb.dmx.movertrack 0. 3.84 2.55 @rot 0. 0. 0. @tilt_invert 0 @tilt_offset 0.]
 ```
 
-This separates the two corrections:
-
-- `@rot 180. 0. 0.` describes the physical upside-down orientation.
-- `@tilt_offset -90.` calibrates the fixture-specific tilt horizontal point.
-- Keep `@tilt_invert 0` for this installation; `@rot` already accounts for the world up/down reversal.
+`smart` tracking may choose an equivalent pan/tilt-flipped solution to avoid unnecessary rotation, but the underlying coordinate model remains GDTF.
 
 You can also derive offsets from a known target and a DMX value instead of hand-tuning degrees:
 
@@ -163,8 +162,8 @@ Attributes:
 
 - `@fixture_x`, `@fixture_y`, `@fixture_z` — fixture world position.
 - `@pan_range`, `@tilt_range` — addressable movement ranges in degrees. Values map to `-range/2 ... +range/2`.
-- `@rot rx ry rz` — fixture-local to world rotation in degrees. Rotation order is `Rz * Ry * Rx`.
-- `@pan_offset`, `@tilt_offset` — degree offsets applied after raw angle calculation and before inversion.
+- `@rot rx ry rz` — GDTF device-frame to world rotation in degrees. Rotation order is `Rz * Ry * Rx`.
+- `@pan_offset`, `@tilt_offset` — degree offsets applied after GDTF raw angle calculation and before inversion.
 - `@pan_invert`, `@tilt_invert` — invert the calibrated pan/tilt angle.
 - `@byte_order coarsefine|finecoarse` — byte order inside each 16-bit pan/tilt value.
 - `@tracking_mode smart|pan|off` — current tracking solver. Default is `smart`.

@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 const schemaById = {
     "bbb.dmx.fixture.profile.v1": "bbb.dmx.fixture.profile.v1.schema.json",
-    "bbb.dmx.patch.v1": "bbb.dmx.patch.v1.schema.json",
+    "bbb.dmx.patch.v2": "bbb.dmx.patch.v2.schema.json",
     "bbb.dmx.matrixmap.v1": "bbb.dmx.matrixmap.v1.schema.json",
     "bbb.dmx.palette.v1": "bbb.dmx.palette.v1.schema.json",
     "bbb.dmx.scene.v1": "bbb.dmx.scene.v1.schema.json",
@@ -216,7 +216,7 @@ async function lintFile(file, ajv, options, diagnostics) {
     const id = schemaId(data);
     if (id === "bbb.dmx.fixture.profile.v1")
         lintProfile(data, file, diagnostics);
-    if (id === "bbb.dmx.patch.v1")
+    if (id === "bbb.dmx.patch.v2")
         await lintPatch(data, file, ajv, options, diagnostics);
 }
 function printDiagnostics(diagnostics, json) {

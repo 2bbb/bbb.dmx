@@ -83,6 +83,9 @@ writeFileSync(join(temp, 'scene.mvr'), await mvr.generateAsync({ type: 'nodebuff
 
 run(['convert', join(temp, 'scene.mvr'), '--format', 'mvr', '--out-dir', join(temp, 'mvr'), '--patch', 'patches/from-mvr.json', '--overwrite']);
 const patch = readJson(join(temp, 'mvr/patches/from-mvr.json'));
+if(patch.schema !== 'bbb.dmx.patch.v2' || patch.coordinates !== 'gdtf') {
+  throw new Error(`MVR patch should declare v2/gdtf, got ${patch.schema}/${patch.coordinates}`);
+}
 const fixture = patch.fixtures?.[0];
 const duplicateNameFixture = patch.fixtures?.[1];
 if(fixture?.universe !== 2 || fixture?.address !== 17 || duplicateNameFixture?.universe !== 2 || duplicateNameFixture?.address !== 30) {
@@ -115,7 +118,8 @@ lint([
 lint([join(temp, 'mvr/patches/from-mvr.json'), '--fixture-dir', join(temp, 'mvr/fixtures')]);
 
 const badPatch = {
-  schema: 'bbb.dmx.patch.v1',
+  schema: 'bbb.dmx.patch.v2',
+  coordinates: 'gdtf',
   fixtures: [
     { id: 'spot_a', profile: 'generic.mover.16bit', mode: 'basic16', universe: 1, address: 1 },
     { id: 'spot_b', profile: 'generic.mover.16bit', mode: 'basic16', universe: 1, address: 2 }

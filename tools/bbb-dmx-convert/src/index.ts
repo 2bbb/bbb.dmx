@@ -47,7 +47,8 @@ type FixtureChannel = FixtureMode["channels"][number];
 type FixtureParameter = NonNullable<FixtureMode["parameters"]>[string];
 
 type PatchFile = {
-  schema: "bbb.dmx.patch.v1";
+  schema: "bbb.dmx.patch.v2";
+  coordinates: "gdtf";
   profiles: string[];
   fixtures: Array<{
     id: string;
@@ -664,7 +665,8 @@ function buildPatchFromMvrScene(xml: string, profiles: ConvertedProfile[], warni
   }
   if(fixtures.length === 0) return undefined;
   return {
-    schema: "bbb.dmx.patch.v1",
+    schema: "bbb.dmx.patch.v2",
+    coordinates: "gdtf",
     profiles: [],
     fixtures,
   };

@@ -5,7 +5,7 @@
 ## Supported inputs
 
 - `.gdtf`: ZIP container; reads `description.xml` and converts fixture type DMX modes/channels into `bbb.dmx.fixture.profile.v1`.
-- `.mvr`: ZIP container; converts embedded `.gdtf` files and tries to create a `bbb.dmx.patch.v1` from the scene XML.
+- `.mvr`: ZIP container; converts embedded `.gdtf` files and tries to create a `bbb.dmx.patch.v2` from the scene XML.
 - GDTF XML: direct `description.xml` input via `--format gdtf-xml`.
 - MA3 XML: best-effort fixture XML conversion via `--format ma3`; this only supports exports that expose DMXMode/DMXChannel-like XML nodes.
 
@@ -51,7 +51,7 @@ The converter maps DMX channels into this project’s fixture profile schema:
 - The first GDTF `<Beam>` geometry node becomes optional profile-level `photometry` metadata (`BeamAngle`, `FieldAngle`, `BeamRadius`, `LuminousFlux`, `ColorTemperature`) when present.
 - MVR fixture addresses become `universe` + `address` entries when the scene XML exposes usable address data.
 - MVR fixture ids prefer `FixtureID` / `UnitNumber`, then human-readable `Name`, and only fall back to `UUID`; duplicate ids are uniquified with `_2`, `_3`, ... suffixes.
-- MVR `<Matrix>` transforms are converted to patch `position` and `rotation`: translation is converted from millimeters to meters, and rotation is decomposed to XYZ Euler degrees matching the `bbb.dmx.movertrack` rotation convention.
+- MVR `<Matrix>` transforms are converted to `bbb.dmx.patch.v2` `position` and `rotation`: translation is converted from millimeters to meters, `coordinates` is emitted as `gdtf`, and rotation is decomposed to XYZ Euler degrees for the GDTF device-frame-to-world convention used by `bbb.dmx.movertrack`. Numeric MVR rotations are not pre-corrected with the old `rot 180 / tilt_offset -90` hack.
 
 ## Hard limitation
 

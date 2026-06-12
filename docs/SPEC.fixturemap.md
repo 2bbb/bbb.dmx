@@ -208,7 +208,8 @@ Trying to model every fixture's physical units immediately is fake precision. It
 
 ```json
 {
-  "schema": "bbb.dmx.patch.v1",
+  "schema": "bbb.dmx.patch.v2",
+  "coordinates": "gdtf",
   "profiles": [
     "../fixtures/generic.mover.16bit.json"
   ],

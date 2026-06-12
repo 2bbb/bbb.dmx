@@ -79,16 +79,20 @@ int main() {
     require(nearly_equal(bbb::dmx::choose_shortest_pan(-179.0, 179.0), 181.0), "shortest pan crosses atan2 wrap");
 
     const bbb::dmx::pan_tilt_degrees forward{bbb::dmx::vector_to_pan_tilt(bbb::dmx::vec3{0.0, 10.0, 0.0})};
-    require(nearly_equal(forward.pan, 0.0), "forward pan is zero");
-    require(nearly_equal(forward.tilt, 0.0), "forward tilt is zero");
+    require(nearly_equal(forward.pan, 0.0), "GDTF forward pan is zero");
+    require(nearly_equal(forward.tilt, 90.0), "GDTF forward tilt is horizontal +90 from hanging rest");
 
     const bbb::dmx::pan_tilt_degrees right{bbb::dmx::vector_to_pan_tilt(bbb::dmx::vec3{10.0, 0.0, 0.0})};
-    require(nearly_equal(right.pan, 90.0), "right pan is +90");
-    require(nearly_equal(right.tilt, 0.0), "right tilt is zero");
+    require(nearly_equal(right.pan, -90.0), "GDTF right pan is -90 around +Z");
+    require(nearly_equal(right.tilt, 90.0), "GDTF right tilt is horizontal");
 
-    const bbb::dmx::pan_tilt_degrees upward{bbb::dmx::vector_to_pan_tilt(bbb::dmx::vec3{0.0, 10.0, 10.0})};
-    require(nearly_equal(upward.pan, 0.0), "upward pan is zero");
-    require(nearly_equal(upward.tilt, 45.0), "upward tilt is +45");
+    const bbb::dmx::pan_tilt_degrees downward{bbb::dmx::vector_to_pan_tilt(bbb::dmx::vec3{0.0, 0.0, -10.0})};
+    require(nearly_equal(downward.pan, 0.0), "GDTF rest pan is zero when target is on tilt axis");
+    require(nearly_equal(downward.tilt, 0.0), "GDTF rest tilt points device-local -Z");
+
+    const bbb::dmx::pan_tilt_degrees upward{bbb::dmx::vector_to_pan_tilt(bbb::dmx::vec3{0.0, 0.0, 10.0})};
+    require(nearly_equal(upward.pan, 0.0), "GDTF upward pan is zero when target is on tilt axis");
+    require(nearly_equal(upward.tilt, 180.0), "GDTF upward tilt is 180 from hanging rest");
 
     const bbb::dmx::vec3 world_forward{0.0, 10.0, 0.0};
     const bbb::dmx::vec3 local{bbb::dmx::world_to_fixture_local(world_forward, 0.0, 0.0, 90.0)};
@@ -97,67 +101,65 @@ int main() {
 
     bbb::dmx::movertrack_engine engine{};
     auto output = engine.compute(bbb::dmx::vec3{0.0, 10.0, 0.0});
-    require(nearly_equal(output.pan_degrees, 0.0), "movertrack forward pan degrees");
-    require(nearly_equal(output.tilt_degrees, 0.0), "movertrack forward tilt degrees");
-    require(output.pan == 32768, "movertrack forward pan value");
-    require(output.tilt == 32768, "movertrack forward tilt value");
+    require(nearly_equal(output.pan_degrees, 0.0), "movertrack GDTF forward pan degrees");
+    require(nearly_equal(output.tilt_degrees, 90.0), "movertrack GDTF horizontal tilt degrees");
+    require(output.pan == bbb::dmx::angle_to_u16(0.0, 540.0), "movertrack GDTF forward pan value");
+    require(output.tilt == bbb::dmx::angle_to_u16(90.0, 270.0), "movertrack GDTF forward tilt value");
 
     output = engine.compute(bbb::dmx::vec3{10.0, 0.0, 0.0});
-    require(nearly_equal(output.pan_degrees, 90.0), "movertrack right pan degrees");
+    require(nearly_equal(output.pan_degrees, -90.0), "movertrack GDTF right pan degrees");
 
     bbb::dmx::movertrack_engine tracking_engine{};
-    output = tracking_engine.compute(bbb::dmx::vec3{0.0174524064, -0.999847695, 0.0});
-    require(nearly_equal(output.pan_degrees, 179.0, 1.0e-6), "movertrack initializes near +179");
+    tracking_engine.set_tracking_mode(bbb::dmx::tracking_mode::pan);
     output = tracking_engine.compute(bbb::dmx::vec3{-0.0174524064, -0.999847695, 0.0});
+    require(nearly_equal(output.pan_degrees, 179.0, 1.0e-6), "movertrack initializes near +179");
+    output = tracking_engine.compute(bbb::dmx::vec3{0.0174524064, -0.999847695, 0.0});
     require(nearly_equal(output.pan_degrees, 181.0, 1.0e-6), "movertrack tracks shortest pan to +181");
 
     bbb::dmx::movertrack_engine clamp_engine{};
+    clamp_engine.set_tracking_mode(bbb::dmx::tracking_mode::off);
     clamp_engine.set_ranges(180.0, 270.0);
     output = clamp_engine.compute(bbb::dmx::vec3{10.0, 0.0, 0.0});
-    require(nearly_equal(output.pan_degrees, 90.0), "movertrack pan at clamp boundary");
+    require(nearly_equal(output.pan_degrees, -90.0), "movertrack pan at clamp boundary");
     output = clamp_engine.compute(bbb::dmx::vec3{0.0174524064, -0.999847695, 0.0});
-    require(nearly_equal(output.pan_degrees, 90.0), "movertrack clamps pan above range");
+    require(nearly_equal(output.pan_degrees, -90.0), "movertrack clamps pan below range");
 
     bbb::dmx::movertrack_engine smart_engine{};
     smart_engine.set_ranges(180.0, 270.0);
-    smart_engine.set_tilt_offset(-90.0);
     output = smart_engine.compute(bbb::dmx::vec3{1.0, 0.1, 0.0});
-    require(nearly_equal(output.pan_degrees, 84.28940686250036), "smart tracking initializes direct candidate");
+    require(nearly_equal(output.pan_degrees, -84.28940686250036), "smart tracking initializes direct GDTF candidate");
+    require(nearly_equal(output.tilt_degrees, 90.0), "smart tracking initializes horizontal GDTF tilt");
     output = smart_engine.compute(bbb::dmx::vec3{-0.1, -1.0, 0.0});
-    require(nearly_equal(output.pan_degrees, 5.710593137499643), "smart tracking chooses valid pan-flip candidate");
-    require(nearly_equal(output.tilt_degrees, 90.0), "smart tracking chooses flipped tilt candidate");
+    require(nearly_equal(output.pan_degrees, -5.710593137499643), "smart tracking chooses valid GDTF pan-flip candidate");
+    require(nearly_equal(output.tilt_degrees, -90.0), "smart tracking chooses equivalent negative GDTF tilt candidate");
 
     bbb::dmx::movertrack_engine pan_only_engine{};
     pan_only_engine.set_ranges(180.0, 270.0);
-    pan_only_engine.set_tilt_offset(-90.0);
     pan_only_engine.set_tracking_mode(bbb::dmx::tracking_mode::pan);
     output = pan_only_engine.compute(bbb::dmx::vec3{1.0, 0.1, 0.0});
     output = pan_only_engine.compute(bbb::dmx::vec3{-0.1, -1.0, 0.0});
-    require(nearly_equal(output.pan_degrees, 90.0), "pan-only tracking still clamps invalid pan candidate");
+    require(nearly_equal(output.pan_degrees, -90.0), "pan-only tracking still clamps invalid pan candidate");
 
     bbb::dmx::movertrack_engine calibration_engine{};
     require(calibration_engine.calibrate_tilt_offset(
         bbb::dmx::vec3{0.0, 10.0, 0.0},
-        bbb::dmx::angle_to_u16(-90.0, 270.0)
+        bbb::dmx::angle_to_u16(0.0, 270.0)
     ), "calibrate tilt offset from target and u16");
-    require(nearly_equal(calibration_engine.settings().tilt_offset_degrees, -90.0, 0.01), "calibrated tilt offset reflects u16 quantization");
+    require(nearly_equal(calibration_engine.settings().tilt_offset_degrees, -90.0, 0.01), "calibrated tilt offset reflects GDTF horizontal zero correction");
     require(calibration_engine.calibrate_pan_offset(
         bbb::dmx::vec3{10.0, 0.0, 0.0},
         bbb::dmx::angle_to_u16(0.0, 540.0)
     ), "calibrate pan offset from target and u16");
-    require(nearly_equal(calibration_engine.settings().pan_offset_degrees, -90.0, 0.01), "calibrated pan offset reflects u16 quantization");
+    require(nearly_equal(calibration_engine.settings().pan_offset_degrees, 90.0, 0.01), "calibrated pan offset reflects GDTF right-hand pan sign");
 
-    bbb::dmx::movertrack_engine inverted_hang_engine{};
-    inverted_hang_engine.set_fixture_position(bbb::dmx::vec3{0.0, 3.84, 2.55});
-    inverted_hang_engine.set_rotation_degrees(bbb::dmx::vec3{180.0, 0.0, 0.0});
-    inverted_hang_engine.set_tilt_invert(false);
-    inverted_hang_engine.set_tilt_offset(-90.0);
-    const bbb::dmx::movertrack_output inverted_horizontal{inverted_hang_engine.compute(bbb::dmx::vec3{0.0, 0.0, 2.55})};
-    const bbb::dmx::movertrack_output inverted_floor{inverted_hang_engine.compute(bbb::dmx::vec3{0.0, 0.0, 0.0})};
-    const bbb::dmx::movertrack_output inverted_ceiling{inverted_hang_engine.compute(bbb::dmx::vec3{0.0, 0.0, 4.0})};
-    require(nearly_equal(inverted_horizontal.pan_degrees, 0.0), "inverted hang faces y=0 at pan center");
-    require(inverted_horizontal.tilt < inverted_floor.tilt, "inverted hang floor target increases tilt DMX");
-    require(inverted_ceiling.tilt < inverted_horizontal.tilt, "inverted hang ceiling target decreases tilt DMX");
+    bbb::dmx::movertrack_engine gdtf_hang_engine{};
+    gdtf_hang_engine.set_fixture_position(bbb::dmx::vec3{0.0, 3.84, 2.55});
+    const bbb::dmx::movertrack_output gdtf_horizontal{gdtf_hang_engine.compute(bbb::dmx::vec3{0.0, 0.0, 2.55})};
+    const bbb::dmx::movertrack_output gdtf_floor{gdtf_hang_engine.compute(bbb::dmx::vec3{0.0, 0.0, 0.0})};
+    const bbb::dmx::movertrack_output gdtf_ceiling{gdtf_hang_engine.compute(bbb::dmx::vec3{0.0, 0.0, 4.0})};
+    require(nearly_equal(gdtf_horizontal.pan_degrees, 0.0), "GDTF smart tracking uses the equivalent pan-center solution for world y=0");
+    require(gdtf_horizontal.tilt < gdtf_floor.tilt, "GDTF smart tracking floor target increases tilt from horizontal in this rig");
+    require(gdtf_ceiling.tilt < gdtf_horizontal.tilt, "GDTF smart tracking ceiling target decreases tilt from horizontal in this rig");
 
     bbb::dmx::byte_order parsed_order{bbb::dmx::byte_order::coarse_fine};
     require(bbb::dmx::byte_order_from_string("finecoarse", parsed_order), "parse finecoarse");
@@ -348,7 +350,8 @@ int main() {
     require(parsed_color24->order == bbb::dmx::byte_order::coarse_mid_fine, "fixture JSON u24 byte order");
 
     const std::string patch_json{R"json({
-        "schema": "bbb.dmx.patch.v1",
+        "schema": "bbb.dmx.patch.v2",
+        "coordinates": "gdtf",
         "profiles": ["fixtures/generic.json.mover.json"],
         "fixtures": [
             {
@@ -366,6 +369,8 @@ int main() {
     bbb::dmx::fixture_patch parsed_patch{};
     map_result = bbb::dmx::parse_fixture_patch_text(patch_json, parsed_patch);
     require(map_result.ok, "fixture JSON patch parses");
+    require(parsed_patch.schema == "bbb.dmx.patch.v2", "fixture JSON patch schema");
+    require(parsed_patch.coordinates == "gdtf", "fixture JSON patch coordinates");
     require(parsed_patch.profile_paths.size() == 1, "fixture JSON patch profile path count");
     require(parsed_patch.fixtures.size() == 1, "fixture JSON patch fixture count");
     require(parsed_patch.fixtures[0].address == 21, "fixture JSON patch address");

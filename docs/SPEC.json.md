@@ -27,7 +27,7 @@ Current schema ids:
 | File kind | `schema` value | JSON Schema |
 |---|---|---|
 | Fixture profile | `bbb.dmx.fixture.profile.v1` | `schemas/bbb.dmx.fixture.profile.v1.schema.json` |
-| Fixture patch | `bbb.dmx.patch.v1` | `schemas/bbb.dmx.patch.v1.schema.json` |
+| Fixture patch | `bbb.dmx.patch.v2` | `schemas/bbb.dmx.patch.v2.schema.json` |
 | Matrix map | `bbb.dmx.matrixmap.v1` | `schemas/bbb.dmx.matrixmap.v1.schema.json` |
 | Palette set | `bbb.dmx.palette.v1` | `schemas/bbb.dmx.palette.v1.schema.json` |
 | Scene set | `bbb.dmx.scene.v1` | `schemas/bbb.dmx.scene.v1.schema.json` |
@@ -51,9 +51,25 @@ Rules for future versions:
 | Normalized parameter value | Number, canonical range `0.0..1.0`. Runtime clamps values before writing fixture parameters. Producers should emit clamped values. |
 | 16-bit value | Integer, `0..65535`, split according to `byte_order`. |
 | 24-bit value | Integer, `0..16777215`, split according to `byte_order`. |
-| Position/rotation | 3-number arrays. Units are project-defined; rotations are degrees. |
+| Position/rotation | 3-number arrays. World is right-handed Z-up. MVR conversion emits meters. Rotations are degrees. |
 
-### 1.4 Names and ids
+
+### 1.4 Coordinate conventions
+
+`bbb.dmx` spatial data uses the lighting-industry GDTF/DIN SPEC 15800 convention. The relevant GDTF rule is: the device is drawn hanging in front view, which makes the pan axis Z-aligned and the tilt axis X-aligned.
+
+Operationally:
+
+- World/project coordinates are right-handed and Z-up. MVR positions are converted from millimeters to meters.
+- Patch `rotation` maps the GDTF device frame to world. Rotation order is `Rz * Ry * Rx` for the stored `[rx, ry, rz]` degrees.
+- Device rest pose is hanging. Beam rest direction is device-local `(0, 0, -1)`.
+- Pan is right-hand rotation about device `+Z`; tilt is right-hand rotation about device `+X`.
+- The modeled beam vector is `Rz(pan) * Rx(tilt) * (0, 0, -1)`, i.e. `(-sin(pan) * sin(tilt), cos(pan) * sin(tilt), -cos(tilt))`.
+- `tilt = 0` is the hanging rest direction, not horizontal. Horizontal is `tilt = ±90` depending on the equivalent pan/tilt solution selected by tracking.
+
+There is no legacy Max-upright coordinate mode in v2. Existing hand-authored patches that depended on `@rot 180 @tilt_offset -90` should be re-authored as GDTF patches instead of carrying that correction forward.
+
+### 1.5 Names and ids
 
 Use stable ASCII-ish identifiers where possible:
 
@@ -64,7 +80,7 @@ Use stable ASCII-ish identifiers where possible:
 
 The implementation stores keys as strings and does not require a regex, but external applications should avoid spaces and punctuation other than `.`, `_`, and `-`.
 
-### 1.5 Channel byte order strings
+### 1.6 Channel byte order strings
 
 Accepted byte-order strings:
 
@@ -192,9 +208,9 @@ Canonical channel counts:
 
 `enum` is currently stored as an 8-bit value. Enumeration labels are not part of v1 yet.
 
-## 3. Fixture patch: `bbb.dmx.patch.v1`
+## 3. Fixture patch: `bbb.dmx.patch.v2`
 
-A patch describes fixture instances in a show: profile, mode, universe, address, and optional placement/calibration.
+A patch describes fixture instances in a show: profile, mode, universe, address, GDTF coordinate convention, and optional placement/calibration.
 
 Typical path: `patches/*.json`.
 
@@ -202,7 +218,8 @@ Typical path: `patches/*.json`.
 
 ```json
 {
-  "schema": "bbb.dmx.patch.v1",
+  "schema": "bbb.dmx.patch.v2",
+  "coordinates": "gdtf",
   "profiles": ["../fixtures/generic.mover.16bit.json"],
   "fixtures": [
     {
@@ -212,10 +229,10 @@ Typical path: `patches/*.json`.
       "universe": 1,
       "address": 1,
       "position": [0.0, 0.0, 3.0],
-      "rotation": [180.0, 0.0, 0.0],
+      "rotation": [0.0, 0.0, 0.0],
       "calibration": {
         "pan_offset": 0.0,
-        "tilt_offset": -90.0,
+        "tilt_offset": 0.0,
         "pan_invert": false,
         "tilt_invert": false
       }
@@ -228,7 +245,8 @@ Typical path: `patches/*.json`.
 
 | Field | Type | Required | Default | Meaning |
 |---|---:|---:|---:|---|
-| `schema` | string | yes | — | Must be `bbb.dmx.patch.v1`. |
+| `schema` | string | yes | — | Must be `bbb.dmx.patch.v2`. |
+| `coordinates` | string | yes | — | Must be `gdtf`. It declares that fixture `position`/`rotation` use the convention in §1.4. |
 | `profiles` | array of strings | no | empty | Profile JSON paths. Paths are resolved relative to the patch file by Max utilities. |
 | `fixtures` | array | yes | — | Fixture instances. |
 
@@ -242,8 +260,8 @@ Typical path: `patches/*.json`.
 | `universe` | integer | yes | — | 1-based DMX universe id. |
 | `address` | integer | yes | — | 1-based start address, `1..512`. |
 | `position` | `[x,y,z]` | no | `[0,0,0]` | Fixture origin in project/world coordinates. |
-| `rotation` | `[rx,ry,rz]` | no | `[0,0,0]` | Fixture rotation in degrees. Current mover math composes X/Y/Z rotations. |
-| `calibration` | object | no | all zero/false | Fixture-specific mover calibration. |
+| `rotation` | `[rx,ry,rz]` | no | `[0,0,0]` | GDTF device-frame to world rotation in degrees. `Rz * Ry * Rx`. MVR `<Matrix>` rotation is used as-is after Euler decomposition. |
+| `calibration` | object | no | all zero/false | Fixture-specific mover calibration after the GDTF solve. |
 
 `address + footprint - 1` should be `<= 512`. Current `patchcheck` reports overlap/range problems; producers should avoid generating invalid patches.
 
@@ -252,11 +270,11 @@ Typical path: `patches/*.json`.
 | Field | Type | Default | Meaning |
 |---|---:|---:|---|
 | `pan_offset` | number | `0.0` | Added to computed pan angle in degrees. |
-| `tilt_offset` | number | `0.0` | Added to computed tilt angle in degrees. |
+| `tilt_offset` | number | `0.0` | Added to computed GDTF tilt angle in degrees. Do not use the old `-90` horizontal correction in GDTF-authored patches. |
 | `pan_invert` | boolean | `false` | Invert pan direction. |
 | `tilt_invert` | boolean | `false` | Invert tilt direction. |
 
-Your current inverted hanging setup, for example, is represented by fixture `rotation` plus calibration; do not bake that correction into fixture profiles.
+`bbb.dmx.patch.v1` is legacy/ambiguous and should not be produced by new tools. v2 intentionally breaks the old Max-upright interpretation to keep the coordinate model single-source.
 
 ## 4. Matrix map: `bbb.dmx.matrixmap.v1`
 
@@ -506,7 +524,7 @@ Example with `ajv-cli`:
 
 ```sh
 npx ajv-cli validate -s schemas/bbb.dmx.fixture.profile.v1.schema.json -d fixtures/generic.rgb.3ch.json
-npx ajv-cli validate -s schemas/bbb.dmx.patch.v1.schema.json -d patches/rgb-grid.example.json
+npx ajv-cli validate -s schemas/bbb.dmx.patch.v2.schema.json -d patches/rgb-grid.example.json
 ```
 
 Schema validation catches shape errors. It cannot catch fixture-specific mistakes like a `profile` key that exists in another repository but not in your runtime package, or pan/tilt calibration that is physically wrong.

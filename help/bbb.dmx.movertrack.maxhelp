@@ -33,12 +33,12 @@
         "subpatcher_template": "",
         "assistshowspatchername": 0,
         "boxes": [
-            { "box": { "id": "obj-1", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 25.0, 500.0, 24.0], "text": "bbb.dmx.movertrack — 3D target position to 16-bit DMX pan/tilt bytes" } },
-            { "box": { "id": "obj-2", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 55.0, 650.0, 20.0], "text": "+X stage right, +Y stage forward, +Z up. Constructor args are fixture x y z." } },
+            { "box": { "id": "obj-1", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 25.0, 500.0, 24.0], "text": "bbb.dmx.movertrack — GDTF/Z-up target position to 16-bit DMX pan/tilt bytes" } },
+            { "box": { "id": "obj-2", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 55.0, 650.0, 20.0], "text": "World is right-handed +Z up. Device rest is GDTF hanging; beam rest is local -Z." } },
 
             { "box": { "id": "obj-3", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [40.0, 115.0, 70.0, 22.0], "text": "0. 10. 0." } },
             { "box": { "id": "obj-4", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [120.0, 115.0, 70.0, 22.0], "text": "10. 0. 0." } },
-            { "box": { "id": "obj-5", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [200.0, 115.0, 85.0, 22.0], "text": "0. 10. 10." } },
+            { "box": { "id": "obj-5", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [200.0, 115.0, 85.0, 22.0], "text": "0. 0. -10." } },
             { "box": { "id": "obj-6", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 90.0, 300.0, 20.0], "text": "Basic target input: x y z" } },
 
             { "box": { "id": "obj-7", "maxclass": "newobj", "numinlets": 1, "numoutlets": 1, "outlettype": [""], "patching_rect": [40.0, 170.0, 425.0, 22.0], "text": "bbb.dmx.movertrack 0. 0. 3. @pan_range 540. @tilt_range 270. @rot 0. 0. 0." } },
@@ -74,15 +74,15 @@
             { "box": { "id": "obj-32", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [40.0, 405.0, 55.0, 22.0], "text": "bang" } },
             { "box": { "id": "obj-33", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 380.0, 520.0, 20.0], "text": "bang recomputes the last target; before any target it outputs neutral center bytes." } },
 
-            { "box": { "id": "obj-34", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 455.0, 620.0, 20.0], "text": "Upside-down ceiling hang: pan center faces the y = 0 side" } },
+            { "box": { "id": "obj-34", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 455.0, 620.0, 20.0], "text": "GDTF ceiling hang: use MVR/grandMA3 rotation as-is" } },
             { "box": { "id": "obj-35", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [40.0, 485.0, 120.0, 22.0], "text": "pos 0. 3.84 2.55" } },
-            { "box": { "id": "obj-36", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [170.0, 485.0, 110.0, 22.0], "text": "rot 180. 0. 0." } },
+            { "box": { "id": "obj-36", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [170.0, 485.0, 110.0, 22.0], "text": "rot 0. 0. 0." } },
             { "box": { "id": "obj-37", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [290.0, 485.0, 90.0, 22.0], "text": "tilt_invert 0" } },
-            { "box": { "id": "obj-38", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [390.0, 485.0, 115.0, 22.0], "text": "tilt_offset -90." } },
-            { "box": { "id": "obj-39", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 525.0, 660.0, 20.0], "text": "Same-height y = 0 target is horizontal; floor target should not require tilt_invert." } },
+            { "box": { "id": "obj-38", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [390.0, 485.0, 115.0, 22.0], "text": "tilt_offset 0." } },
+            { "box": { "id": "obj-39", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 525.0, 660.0, 20.0], "text": "Same-height y = 0 target is horizontal; smart tracking may choose the pan/tilt-flipped equivalent." } },
             { "box": { "id": "obj-40", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [40.0, 555.0, 125.0, 22.0], "text": "target 0. 0. 2.55" } },
             { "box": { "id": "obj-41", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [175.0, 555.0, 110.0, 22.0], "text": "target 0. 0. 0." } },
-            { "box": { "id": "obj-42", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [300.0, 555.0, 440.0, 20.0], "text": "If floor/ceiling are swapped, fix rot/tilt_offset before touching tilt_invert." } },
+            { "box": { "id": "obj-42", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [300.0, 555.0, 440.0, 20.0], "text": "Do not carry the old rot 180 / tilt_offset -90 correction into GDTF-authored patches." } },
 
             { "box": { "id": "obj-43", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [540.0, 430.0, 390.0, 38.0], "text": "Tracking mode: smart rejects out-of-range flip candidates before clipping. shortest_pan 1 = smart; use tracking_mode pan for old pan-only solver." } },
             { "box": { "id": "obj-44", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [540.0, 455.0, 130.0, 22.0], "text": "tracking_mode smart" } },

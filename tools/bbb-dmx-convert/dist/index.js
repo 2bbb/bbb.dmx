@@ -637,7 +637,8 @@ function buildPatchFromMvrScene(xml, profiles, warnings, source) {
     if (fixtures.length === 0)
         return undefined;
     return {
-        schema: "bbb.dmx.patch.v1",
+        schema: "bbb.dmx.patch.v2",
+        coordinates: "gdtf",
         profiles: [],
         fixtures,
     };

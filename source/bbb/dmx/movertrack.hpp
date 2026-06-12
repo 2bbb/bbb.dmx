@@ -301,13 +301,7 @@ private:
                 best_score
             );
             consider_candidate(
-                pan_tilt_degrees{raw_angles.pan + 180.0 + pan_turn, 180.0 - raw_angles.tilt},
-                hold_previous_pan,
-                best_candidate,
-                best_score
-            );
-            consider_candidate(
-                pan_tilt_degrees{raw_angles.pan + 180.0 + pan_turn, -180.0 - raw_angles.tilt},
+                pan_tilt_degrees{raw_angles.pan + 180.0 + pan_turn, -raw_angles.tilt},
                 hold_previous_pan,
                 best_candidate,
                 best_score

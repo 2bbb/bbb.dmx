@@ -29,6 +29,8 @@ public:
 
 struct fixture_patch {
 public:
+    std::string schema{"bbb.dmx.patch.v2"};
+    std::string coordinates{"gdtf"};
     std::vector<std::string> profile_paths{};
     std::vector<fixture_instance> fixtures{};
 };

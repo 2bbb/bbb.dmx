@@ -199,6 +199,21 @@ inline mapper_result fixture_patch_from_json(const json_value &root, fixture_pat
         return mapper_result::failure("patch root must be object");
     }
     patch = fixture_patch{};
+
+    std::string error{};
+    if(!json_string(root, "schema", patch.schema, true, error)) {
+        return mapper_result::failure(error);
+    }
+    if(patch.schema != "bbb.dmx.patch.v2") {
+        return mapper_result::failure("unsupported patch schema: " + patch.schema);
+    }
+    if(!json_string(root, "coordinates", patch.coordinates, true, error)) {
+        return mapper_result::failure(error);
+    }
+    if(patch.coordinates != "gdtf") {
+        return mapper_result::failure("unsupported patch coordinates: " + patch.coordinates);
+    }
+
     const json_value *profiles{root.find("profiles")};
     if(profiles) {
         if(profiles->type != json_type::array) {
@@ -217,7 +232,6 @@ inline mapper_result fixture_patch_from_json(const json_value &root, fixture_pat
         return mapper_result::failure("patch fixtures must be array");
     }
 
-    std::string error{};
     for(const auto &fixture_value : fixtures->array_value) {
         if(fixture_value.type != json_type::object) {
             return mapper_result::failure("fixture must be object");

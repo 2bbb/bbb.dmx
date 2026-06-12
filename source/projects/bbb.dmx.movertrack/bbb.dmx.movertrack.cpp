@@ -28,7 +28,7 @@ private:
     bool warn_invalid_tracking_mode_{false};
 
 public:
-    MIN_DESCRIPTION{"Convert a 3D target position to 16-bit moving-light DMX pan/tilt bytes."};
+    MIN_DESCRIPTION{"Convert a GDTF/Z-up 3D target position to 16-bit moving-light DMX pan/tilt bytes."};
     MIN_TAGS{"dmx, lighting, mover, pan, tilt, tracking"};
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx"};
@@ -123,7 +123,7 @@ public:
     };
 
     c74::min::attribute<c74::min::numbers> rot{this, "rot", c74::min::numbers{0.0, 0.0, 0.0},
-        c74::min::description{"Fixture rotation rx ry rz in degrees. Rotation order is Rz * Ry * Rx."},
+        c74::min::description{"GDTF device-to-world rotation rx ry rz in degrees. Rotation order is Rz * Ry * Rx."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             if(args.size() < 3 || !finite_atoms(args, 3)) {
                 warn_once(warn_invalid_numeric_, "invalid rot ignored");
@@ -151,7 +151,7 @@ public:
     };
 
     c74::min::attribute<double> tilt_offset{this, "tilt_offset", 0.0,
-        c74::min::description{"Tilt offset in degrees, applied before inversion."},
+        c74::min::description{"Tilt offset in degrees from the GDTF hanging rest model, applied before inversion."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             if(args.empty() || !finite_atom(args[0])) {
                 warn_once(warn_invalid_numeric_, "invalid tilt_offset ignored");

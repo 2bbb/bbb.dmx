@@ -19,7 +19,8 @@ type FixtureProfile = {
   }>;
 };
 type PatchFile = {
-  schema: "bbb.dmx.patch.v1";
+  schema: "bbb.dmx.patch.v2";
+  coordinates?: "gdtf";
   profiles?: string[];
   fixtures: Array<{ id: string; profile: string; mode: string; universe: number; address: number }>;
 };
@@ -33,7 +34,7 @@ type Options = {
 
 const schemaById: Record<string, string> = {
   "bbb.dmx.fixture.profile.v1": "bbb.dmx.fixture.profile.v1.schema.json",
-  "bbb.dmx.patch.v1": "bbb.dmx.patch.v1.schema.json",
+  "bbb.dmx.patch.v2": "bbb.dmx.patch.v2.schema.json",
   "bbb.dmx.matrixmap.v1": "bbb.dmx.matrixmap.v1.schema.json",
   "bbb.dmx.palette.v1": "bbb.dmx.palette.v1.schema.json",
   "bbb.dmx.scene.v1": "bbb.dmx.scene.v1.schema.json",
@@ -244,7 +245,7 @@ async function lintFile(file: string, ajv: Ajv2020, options: Options, diagnostic
   if(!validateSchema(ajv, file, data, diagnostics, options.schemaDir)) return;
   const id = schemaId(data);
   if(id === "bbb.dmx.fixture.profile.v1") lintProfile(data as FixtureProfile, file, diagnostics);
-  if(id === "bbb.dmx.patch.v1") await lintPatch(data as PatchFile, file, ajv, options, diagnostics);
+  if(id === "bbb.dmx.patch.v2") await lintPatch(data as PatchFile, file, ajv, options, diagnostics);
 }
 
 function printDiagnostics(diagnostics: Diagnostic[], json: boolean): void {

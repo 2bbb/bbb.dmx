@@ -1,16 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.patch.v1.schema.json",
-  "title": "bbb.dmx fixture patch v1",
+  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.patch.v2.schema.json",
+  "title": "bbb.dmx fixture patch v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema",
+    "coordinates",
     "fixtures"
   ],
   "properties": {
     "schema": {
-      "const": "bbb.dmx.patch.v1"
+      "const": "bbb.dmx.patch.v2"
     },
     "profiles": {
       "type": "array",
@@ -107,6 +108,10 @@
         }
       },
       "minItems": 1
+    },
+    "coordinates": {
+      "const": "gdtf",
+      "description": "Coordinate convention for fixture position/rotation. v2 is always GDTF/DIN SPEC 15800: Z-up world, hanging device rest, beam rest along device-local -Z."
     }
   }
 }
