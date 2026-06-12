@@ -91,6 +91,13 @@ Typical path: `fixtures/*.json`.
   "key": "generic.mover.16bit",
   "manufacturer": "Generic",
   "model": "16-bit Pan/Tilt Mover",
+  "photometry": {
+    "beam_angle_degrees": 4.5,
+    "field_angle_degrees": 25.0,
+    "beam_radius": 0.052,
+    "luminous_flux": 1000.0,
+    "color_temperature": 6500.0
+  },
   "modes": {
     "basic16": {
       "label": "Basic 16-bit",
@@ -121,9 +128,24 @@ Typical path: `fixtures/*.json`.
 | `key` | string | yes | Stable profile identifier used by patches. |
 | `manufacturer` | string | recommended | Human-readable manufacturer. Current runtime allows omission and treats it as empty. |
 | `model` | string | recommended | Human-readable model. Current runtime allows omission and treats it as empty. |
+| `photometry` | object | no | Optional physical beam/optics metadata. Consumers must tolerate absence and use their own fallback defaults. |
 | `modes` | object | yes | Map of `mode_key -> mode object`. |
 
-### 2.3 Mode object
+### 2.3 Photometry object
+
+`photometry` describes physical beam metadata shared by the fixture profile. It is intentionally profile-level in v1; per-emitter, per-mode, and zoom-dependent photometry are out of scope. Importers should emit the object only when they have source data. Consumers must treat every field as optional.
+
+| Field | Type | Unit | GDTF source | Meaning |
+|---|---:|---|---|---|
+| `beam_angle_degrees` | number | degrees | `<Beam BeamAngle>` | Full beam angle at roughly 50% intensity. Must be greater than `0` when present. |
+| `field_angle_degrees` | number | degrees | `<Beam FieldAngle>` | Full field angle at roughly 10% intensity. Must be greater than `0` when present. |
+| `beam_radius` | number | meters | `<Beam BeamRadius>` | Lens/exit beam radius. Must be `>= 0` when present. |
+| `luminous_flux` | number | lumen | `<Beam LuminousFlux>` | Fixture luminous flux. Must be `>= 0` when present. |
+| `color_temperature` | number | kelvin | `<Beam ColorTemperature>` | Nominal white color temperature. Must be greater than `0` when present. |
+
+For GDTF/MVR conversion, `bbb-dmx-convert` reads the first `<Beam>` node it finds in the geometry tree. Multi-emitter fixtures need a future schema version instead of overloading v1.
+
+### 2.4 Mode object
 
 | Field | Type | Required | Default | Meaning |
 |---|---:|---:|---:|---|
@@ -134,7 +156,7 @@ Typical path: `fixtures/*.json`.
 
 `channels[].offset` values are relative to the fixture start address and are 1-based. A fixture patched at address `17` with a channel offset `3` writes absolute DMX address `19`.
 
-### 2.4 Channel object
+### 2.5 Channel object
 
 | Field | Type | Required | Default | Meaning |
 |---|---:|---:|---:|---|
@@ -146,7 +168,7 @@ Typical path: `fixtures/*.json`.
 
 Do not define duplicate `offset` values or duplicate `key` values inside one mode. The current JSON loader does not fully police this, but fixture writers will behave ambiguously.
 
-### 2.5 Parameter object
+### 2.6 Parameter object
 
 A parameter maps one semantic control value to one or more channel keys.
 
@@ -498,4 +520,3 @@ node tools/bbb-dmx-convert/dist/lint.js patches/show.json scenes/show.json --fix
 ```
 
 The linter performs JSON Schema validation and semantic checks that schemas cannot express cleanly: patch profile resolution, fixture id uniqueness, unknown profile/mode references, footprint overflow past channel 512, overlapping fixture footprints in the same universe, duplicate channel offsets/keys, and parameter references to missing channels. Treat linter failures as data bugs; do not rely on Max objects to discover these at show time.
-

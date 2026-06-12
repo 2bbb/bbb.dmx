@@ -34,6 +34,20 @@ public:
     double range_degrees{0.0};
 };
 
+struct fixture_photometry {
+public:
+    bool has_beam_angle_degrees{false};
+    double beam_angle_degrees{0.0};
+    bool has_field_angle_degrees{false};
+    double field_angle_degrees{0.0};
+    bool has_beam_radius{false};
+    double beam_radius{0.0};
+    bool has_luminous_flux{false};
+    double luminous_flux{0.0};
+    bool has_color_temperature{false};
+    double color_temperature{0.0};
+};
+
 struct fixture_mode {
 public:
     std::string key{};
@@ -66,6 +80,7 @@ public:
     std::string key{};
     std::string manufacturer{};
     std::string model{};
+    fixture_photometry photometry{};
     std::vector<fixture_mode> modes{};
 
     const fixture_mode *find_mode(const std::string &mode_key) const {

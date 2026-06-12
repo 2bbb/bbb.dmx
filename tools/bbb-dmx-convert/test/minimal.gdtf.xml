@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <GDTF>
   <FixtureType Name="Tiny RGB Mover" LongName="Tiny RGB Mover" Manufacturer="ExampleCo">
+    <Geometries>
+      <Geometry Name="Body">
+        <Beam BeamAngle="4.5" FieldAngle="25.0" BeamRadius="0.052" LuminousFlux="1000" ColorTemperature="6500" />
+      </Geometry>
+    </Geometries>
     <DMXModes>
       <DMXMode Name="Basic">
         <DMXChannels>

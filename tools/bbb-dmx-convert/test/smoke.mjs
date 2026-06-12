@@ -24,6 +24,10 @@ function assertClose(actual, expected, label, epsilon = 1.0e-6) {
 }
 
 run(['convert', join(root, 'test/minimal.gdtf.xml'), '--format', 'gdtf-xml', '--out-dir', join(temp, 'xml'), '--overwrite']);
+const minimalProfile = readJson(join(temp, 'xml/fixtures/exampleco.tiny.rgb.mover.json'));
+if(minimalProfile.photometry?.beam_angle_degrees !== 4.5 || minimalProfile.photometry?.field_angle_degrees !== 25.0 || minimalProfile.photometry?.beam_radius !== 0.052 || minimalProfile.photometry?.luminous_flux !== 1000 || minimalProfile.photometry?.color_temperature !== 6500) {
+  throw new Error(`GDTF Beam photometry was not converted correctly: ${JSON.stringify(minimalProfile.photometry)}`);
+}
 
 const repeatedAttributeXml = `<?xml version="1.0" encoding="UTF-8"?>
 <GDTF>

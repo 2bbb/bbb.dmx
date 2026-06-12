@@ -23,6 +23,32 @@
     "model": {
       "type": "string"
     },
+    "photometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "beam_angle_degrees": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "field_angle_degrees": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "beam_radius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "luminous_flux": {
+          "type": "number",
+          "minimum": 0
+        },
+        "color_temperature": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
     "modes": {
       "type": "object",
       "minProperties": 1,

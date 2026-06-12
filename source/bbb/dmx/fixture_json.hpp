@@ -33,6 +33,21 @@ inline bool json_vec3(const json_value &object, const std::string &key, vec3 &va
     return true;
 }
 
+inline bool json_optional_double_present(const json_value &object, const std::string &key, double &value, bool &present, std::string &error) {
+    const json_value *child{object.find(key)};
+    if(!child) {
+        present = false;
+        return true;
+    }
+    if(child->type != json_type::number) {
+        error = "expected number: " + key;
+        return false;
+    }
+    value = child->number_value;
+    present = true;
+    return true;
+}
+
 inline bool parse_byte_order_string(const std::string &text, byte_order &order) {
     return byte_order_from_string(text, order);
 }
@@ -61,12 +76,35 @@ inline mapper_result fixture_profile_from_json(const json_value &root, fixture_p
     if(root.type != json_type::object) {
         return mapper_result::failure("profile root must be object");
     }
+    profile = fixture_profile{};
     std::string error{};
     if(!json_string(root, "key", profile.key, true, error)) {
         return mapper_result::failure(error);
     }
     json_string(root, "manufacturer", profile.manufacturer, false, error);
     json_string(root, "model", profile.model, false, error);
+
+    const json_value *photometry{root.find("photometry")};
+    if(photometry) {
+        if(photometry->type != json_type::object) {
+            return mapper_result::failure("profile photometry must be object");
+        }
+        if(!json_optional_double_present(*photometry, "beam_angle_degrees", profile.photometry.beam_angle_degrees, profile.photometry.has_beam_angle_degrees, error)) {
+            return mapper_result::failure(error);
+        }
+        if(!json_optional_double_present(*photometry, "field_angle_degrees", profile.photometry.field_angle_degrees, profile.photometry.has_field_angle_degrees, error)) {
+            return mapper_result::failure(error);
+        }
+        if(!json_optional_double_present(*photometry, "beam_radius", profile.photometry.beam_radius, profile.photometry.has_beam_radius, error)) {
+            return mapper_result::failure(error);
+        }
+        if(!json_optional_double_present(*photometry, "luminous_flux", profile.photometry.luminous_flux, profile.photometry.has_luminous_flux, error)) {
+            return mapper_result::failure(error);
+        }
+        if(!json_optional_double_present(*photometry, "color_temperature", profile.photometry.color_temperature, profile.photometry.has_color_temperature, error)) {
+            return mapper_result::failure(error);
+        }
+    }
 
     const json_value *modes{root.find("modes")};
     if(!modes || modes->type != json_type::object) {

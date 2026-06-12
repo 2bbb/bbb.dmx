@@ -300,6 +300,13 @@ int main() {
         "key": "generic.json.mover",
         "manufacturer": "Generic",
         "model": "JSON Mover",
+        "photometry": {
+            "beam_angle_degrees": 4.5,
+            "field_angle_degrees": 25.0,
+            "beam_radius": 0.052,
+            "luminous_flux": 1000.0,
+            "color_temperature": 6500.0
+        },
         "modes": {
             "basic16": {
                 "footprint": 5,
@@ -324,6 +331,16 @@ int main() {
     require(map_result.ok, "fixture JSON profile parses");
     require(parsed_profile.key == "generic.json.mover", "fixture JSON profile key");
     require(parsed_profile.modes.size() == 1, "fixture JSON profile mode count");
+    require(parsed_profile.photometry.has_beam_angle_degrees, "fixture JSON photometry beam angle present");
+    require(nearly_equal(parsed_profile.photometry.beam_angle_degrees, 4.5), "fixture JSON photometry beam angle value");
+    require(parsed_profile.photometry.has_field_angle_degrees, "fixture JSON photometry field angle present");
+    require(nearly_equal(parsed_profile.photometry.field_angle_degrees, 25.0), "fixture JSON photometry field angle value");
+    require(parsed_profile.photometry.has_beam_radius, "fixture JSON photometry beam radius present");
+    require(nearly_equal(parsed_profile.photometry.beam_radius, 0.052), "fixture JSON photometry beam radius value");
+    require(parsed_profile.photometry.has_luminous_flux, "fixture JSON photometry luminous flux present");
+    require(nearly_equal(parsed_profile.photometry.luminous_flux, 1000.0), "fixture JSON photometry luminous flux value");
+    require(parsed_profile.photometry.has_color_temperature, "fixture JSON photometry color temperature present");
+    require(nearly_equal(parsed_profile.photometry.color_temperature, 6500.0), "fixture JSON photometry color temperature value");
     require(parsed_profile.modes[0].channels.size() == 5, "fixture JSON channel count");
     const bbb::dmx::fixture_parameter *parsed_color24{parsed_profile.modes[0].find_parameter("color24")};
     require(parsed_color24 != nullptr, "fixture JSON u24 parameter exists");

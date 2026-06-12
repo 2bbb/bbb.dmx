@@ -6,11 +6,20 @@ import { z } from "zod";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+const photometrySchema = z.object({
+  beam_angle_degrees: z.number().positive().optional(),
+  field_angle_degrees: z.number().positive().optional(),
+  beam_radius: z.number().min(0).optional(),
+  luminous_flux: z.number().min(0).optional(),
+  color_temperature: z.number().positive().optional(),
+}).optional();
+
 const fixtureProfileSchema = z.object({
   schema: z.literal("bbb.dmx.fixture.profile.v1"),
   key: z.string().min(1),
   manufacturer: z.string(),
   model: z.string(),
+  photometry: photometrySchema,
   modes: z.record(z.object({
     label: z.string(),
     footprint: z.number().int().min(1),
@@ -309,6 +318,32 @@ function modeChannels(modeNode: unknown): unknown[] {
   return findNodes(modeNode, "DMXChannel");
 }
 
+function firstFiniteNumber(...values: Array<string | undefined>): number | undefined {
+  for(const value of values) {
+    if(value === undefined) continue;
+    const number = Number(value.replace(",", "."));
+    if(Number.isFinite(number)) return number;
+  }
+  return undefined;
+}
+
+function photometryFromGdtf(fixtureType: unknown): FixtureProfile["photometry"] {
+  const beam = firstNode(fixtureType, "Beam");
+  if(!beam) return undefined;
+  const photometry: NonNullable<FixtureProfile["photometry"]> = {};
+  const beamAngle = firstFiniteNumber(attr(beam, ["BeamAngle", "beamAngle"]));
+  const fieldAngle = firstFiniteNumber(attr(beam, ["FieldAngle", "fieldAngle"]));
+  const beamRadius = firstFiniteNumber(attr(beam, ["BeamRadius", "beamRadius"]));
+  const luminousFlux = firstFiniteNumber(attr(beam, ["LuminousFlux", "luminousFlux"]));
+  const colorTemperature = firstFiniteNumber(attr(beam, ["ColorTemperature", "colorTemperature"]));
+  if(beamAngle !== undefined && 0 < beamAngle) photometry.beam_angle_degrees = beamAngle;
+  if(fieldAngle !== undefined && 0 < fieldAngle) photometry.field_angle_degrees = fieldAngle;
+  if(beamRadius !== undefined && 0 <= beamRadius) photometry.beam_radius = beamRadius;
+  if(luminousFlux !== undefined && 0 <= luminousFlux) photometry.luminous_flux = luminousFlux;
+  if(colorTemperature !== undefined && 0 < colorTemperature) photometry.color_temperature = colorTemperature;
+  return Object.keys(photometry).length > 0 ? photometry : undefined;
+}
+
 function profileFromGdtfXml(xml: string, source: string, prefix: string): ConvertedProfile {
   const doc = parser.parse(xml) as unknown;
   const fixtureType = firstNode(doc, "FixtureType") ?? doc;
@@ -398,6 +433,8 @@ function profileFromGdtfXml(xml: string, source: string, prefix: string): Conver
     model,
     modes,
   };
+  const photometry = photometryFromGdtf(fixtureType);
+  if(photometry) profile.photometry = photometry;
   fixtureProfileSchema.parse(profile);
   return { profile, source, suggestedFile: `${profile.key}.json` };
 }
