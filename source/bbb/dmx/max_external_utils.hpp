@@ -167,10 +167,39 @@ inline bool path_is_absolute(const std::string &path) {
     return 1 < path.size() && path[1] == ':';
 }
 
+inline std::string max_path_to_system_path(const std::string &path) {
+    if(path.empty()) {
+        return {};
+    }
+
+    short path_id{0};
+    char filename[c74::max::MAX_FILENAME_CHARS]{};
+    const short pathname_error{c74::max::path_frompathname(path.c_str(), &path_id, filename)};
+    if(pathname_error != 0) {
+        return {};
+    }
+
+    char system_path[c74::max::MAX_PATH_CHARS]{};
+    const c74::max::t_max_err system_path_error{c74::max::path_toabsolutesystempath(path_id, filename, system_path)};
+    if(system_path_error != 0 || system_path[0] == '\0') {
+        return {};
+    }
+    return system_path;
+}
+
 inline std::string resolve_file_path(const std::string &path) {
-    if(path.empty() || path_is_absolute(path)) {
+    if(path.empty()) {
         return path;
     }
+
+    if(path_is_absolute(path)) {
+        const std::string system_path{max_path_to_system_path(path)};
+        if(!system_path.empty()) {
+            return system_path;
+        }
+        return path;
+    }
+
     c74::max::t_symbol *resolved_symbol{nullptr};
     const c74::max::t_max_err error{c74::max::path_absolutepath(
         &resolved_symbol,
@@ -179,17 +208,12 @@ inline std::string resolve_file_path(const std::string &path) {
         0
     )};
     if(error == 0 && resolved_symbol && resolved_symbol->s_name) {
-        char native_path[c74::max::MAX_PATH_CHARS]{};
-        const short conform_error{c74::max::path_nameconform(
-            resolved_symbol->s_name,
-            native_path,
-            c74::max::PATH_STYLE_NATIVE,
-            c74::max::PATH_TYPE_ABSOLUTE
-        )};
-        if(conform_error == 0 && native_path[0] != '\0') {
-            return native_path;
+        const std::string resolved_path{resolved_symbol->s_name};
+        const std::string system_path{max_path_to_system_path(resolved_path)};
+        if(!system_path.empty()) {
+            return system_path;
         }
-        return resolved_symbol->s_name;
+        return resolved_path;
     }
     return path;
 }
