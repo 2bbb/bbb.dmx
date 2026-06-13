@@ -102,7 +102,9 @@ jobs:
           cp package-info.json dist/bbb.dmx/
           cp README.md dist/bbb.dmx/ 2>/dev/null || true
           cp LICENSE dist/bbb.dmx/ 2>/dev/null || true
-          cp -r libs/bbb-dmx/docs dist/bbb.dmx/ 2>/dev/null || true
+          mkdir -p dist/bbb.dmx/docs
+          cp -r libs/bbb-dmx/docs/. dist/bbb.dmx/docs/ 2>/dev/null || true
+          cp -r docs/. dist/bbb.dmx/docs/ 2>/dev/null || true
           cp -r help dist/bbb.dmx/
           cp -r fixtures dist/bbb.dmx/
           cp -r maps dist/bbb.dmx/

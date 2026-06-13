@@ -39,7 +39,8 @@
             { "box": { "id": "obj-3", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [40.0, 115.0, 70.0, 22.0], "text": "0. 10. 0." } },
             { "box": { "id": "obj-4", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [120.0, 115.0, 70.0, 22.0], "text": "10. 0. 0." } },
             { "box": { "id": "obj-5", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [200.0, 115.0, 85.0, 22.0], "text": "0. 0. -10." } },
-            { "box": { "id": "obj-6", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 90.0, 300.0, 20.0], "text": "Basic target input: x y z" } },
+            { "box": { "id": "obj-51", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [295.0, 115.0, 125.0, 22.0], "text": "relative 0. 10. 0." } },
+            { "box": { "id": "obj-6", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 90.0, 360.0, 20.0], "text": "Basic target input: x y z, or relative x y z" } },
 
             { "box": { "id": "obj-7", "maxclass": "newobj", "numinlets": 1, "numoutlets": 1, "outlettype": [""], "patching_rect": [40.0, 170.0, 425.0, 22.0], "text": "bbb.dmx.movertrack 0. 0. 3. @pan_range 540. @tilt_range 270. @rot 0. 0. 0." } },
             { "box": { "id": "obj-8", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 145.0, 480.0, 20.0], "text": "Fixture at 0 0 3, pan range 540°, tilt range 270°, no rotation" } },
@@ -50,6 +51,7 @@
             { "box": { "id": "obj-12", "maxclass": "number", "numinlets": 1, "numoutlets": 2, "outlettype": ["", "bang"], "patching_rect": [160.0, 260.0, 50.0, 22.0] } },
             { "box": { "id": "obj-13", "maxclass": "number", "numinlets": 1, "numoutlets": 2, "outlettype": ["", "bang"], "patching_rect": [220.0, 260.0, 50.0, 22.0] } },
             { "box": { "id": "obj-14", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 290.0, 280.0, 20.0], "text": "pan byte 1, pan byte 2, tilt byte 1, tilt byte 2" } },
+            { "box": { "id": "obj-52", "maxclass": "comment", "numinlets": 1, "numoutlets": 0, "patching_rect": [40.0, 315.0, 500.0, 20.0], "text": "relative/rel tracks a vector from the fixture origin; bang preserves it as relative." } },
 
             { "box": { "id": "obj-15", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [540.0, 115.0, 105.0, 22.0], "text": "pos 0. 0. 3." } },
             { "box": { "id": "obj-16", "maxclass": "message", "numinlets": 2, "numoutlets": 1, "outlettype": [""], "patching_rect": [540.0, 145.0, 105.0, 22.0], "text": "rot 0. 0. 90." } },
@@ -97,6 +99,7 @@
             { "patchline": { "source": ["obj-3", 0], "destination": ["obj-7", 0] } },
             { "patchline": { "source": ["obj-4", 0], "destination": ["obj-7", 0] } },
             { "patchline": { "source": ["obj-5", 0], "destination": ["obj-7", 0] } },
+            { "patchline": { "source": ["obj-51", 0], "destination": ["obj-7", 0] } },
             { "patchline": { "source": ["obj-7", 0], "destination": ["obj-9", 0] } },
             { "patchline": { "source": ["obj-7", 0], "destination": ["obj-30", 0] } },
             { "patchline": { "source": ["obj-9", 0], "destination": ["obj-10", 0] } },

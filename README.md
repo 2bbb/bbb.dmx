@@ -93,10 +93,17 @@ This is not cosmetic. A 512-value bare list is ambiguous once a show uses more t
 [bbb.dmx.movertrack 0. 0. 3. @pan_range 540. @tilt_range 270. @rot 0. 0. 0.]
 ```
 
-Input a target position list:
+Input an absolute world target position list:
 
 ```max
 0. 5. 1.5
+```
+
+Or track a vector relative to the fixture origin:
+
+```max
+relative 0. 5. 0.
+rel 0. 5. 0.
 ```
 
 Output:
@@ -173,7 +180,9 @@ Attributes:
 Messages:
 
 ```max
-target x y z      // same as a plain x y z list
+target x y z      // same as a plain x y z list; absolute world position
+relative x y z    // track a vector from the fixture origin, using current rotation/calibration
+rel x y z         // alias for relative
 pos x y z         // update fixture position
 range pan tilt    // update ranges
 calibrate_pan target_x target_y target_z pan_u16
@@ -182,6 +191,8 @@ calibrate_tilt target_x target_y target_z tilt_byte_1 tilt_byte_2
 reset             // clears tracking history only
 bang              // recomputes the last target, or outputs neutral center before any target
 ```
+
+`relative`/`rel` does not add `@fixture_x/y/z` to the stored target. The last target is remembered as relative, so `bang` recomputes it from the current fixture origin after a later `pos` update.
 
 `reset` does not reset attributes or fixture position. It only clears the previous pan/tilt tracking state.
 

@@ -33,7 +33,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx"};
 
-    c74::min::inlet<> input{this, "(list/target/pos/rot/range/bang) target and control input"};
+    c74::min::inlet<> input{this, "(list/target/relative/pos/rot/range/bang) target and control input"};
     c74::min::outlet<> output{this, "(list) pan coarse/fine and tilt coarse/fine bytes"};
 
     c74::min::argument<double> fixture_x_arg{this, "fixture_x", "Fixture absolute X position.",
@@ -251,6 +251,28 @@ public:
         }
     };
 
+    c74::min::message<> relative_message{this, "relative", "relative target_x target_y target_z",
+        MIN_FUNCTION {
+            if(args.size() < 3 || !finite_atoms(args, 3)) {
+                warn_once(warn_invalid_numeric_, "invalid relative target ignored");
+                return {};
+            }
+            compute_relative_and_output((double)args[0], (double)args[1], (double)args[2]);
+            return {};
+        }
+    };
+
+    c74::min::message<> rel_message{this, "rel", "rel target_x target_y target_z",
+        MIN_FUNCTION {
+            if(args.size() < 3 || !finite_atoms(args, 3)) {
+                warn_once(warn_invalid_numeric_, "invalid rel target ignored");
+                return {};
+            }
+            compute_relative_and_output((double)args[0], (double)args[1], (double)args[2]);
+            return {};
+        }
+    };
+
     c74::min::message<> pos_message{this, "pos", "pos fixture_x fixture_y fixture_z",
         MIN_FUNCTION {
             if(args.size() < 3 || !finite_atoms(args, 3)) {
@@ -399,6 +421,10 @@ private:
 
     void compute_and_output(double target_x, double target_y, double target_z) {
         output_dmx(engine_.compute(bbb::dmx::vec3{target_x, target_y, target_z}));
+    }
+
+    void compute_relative_and_output(double target_x, double target_y, double target_z) {
+        output_dmx(engine_.compute_relative(bbb::dmx::vec3{target_x, target_y, target_z}));
     }
 
     void output_dmx(const bbb::dmx::movertrack_output &result) {

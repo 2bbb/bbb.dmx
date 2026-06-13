@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<c74object name="bbb.dmx.fixturemap" category="bbb.dmx">
+    <digest>Map fixture parameters into one or more DMX universes.</digest>
+    <description>Loads a bbb.dmx patch JSON file, accepts fixture parameter messages, and outputs 512-channel DMX universe lists. It can output one selected universe or all known universes.</description>
+    <metadatalist>
+        <metadata name="author">2bit</metadata>
+        <metadata name="tag">dmx</metadata>
+        <metadata name="tag">fixture</metadata>
+        <metadata name="tag">mapping</metadata>
+    </metadatalist>
+    <inlets>
+        <inlet id="0" type="anything">Patch loading and fixture parameter input.</inlet>
+    </inlets>
+    <outlets>
+        <outlet id="0" type="list">DMX data. In single-universe mode this is a 512-value list. In all-universe mode this is universe id followed by 512 values.</outlet>
+        <outlet id="1" type="anything">Status and diagnostic messages.</outlet>
+    </outlets>
+    <methodlist>
+        <method name="read">
+            <arglist>
+                <arg name="path" type="symbol" optional="0" />
+            </arglist>
+            <description>Read a bbb.dmx patch JSON file. Relative paths are resolved by Max against the patch/search path.</description>
+        </method>
+        <method name="bang">
+            <description>Output the current DMX frame.</description>
+        </method>
+        <method name="clear">
+            <description>Clear the current output frame to defaults.</description>
+        </method>
+        <method name="reload">
+            <description>Reload the current patch JSON file.</description>
+        </method>
+        <method name="reset">
+            <description>Reset loaded fixture channels to profile defaults.</description>
+        </method>
+        <method name="bangall">
+            <description>Output all known universes as universe id followed by 512 DMX values.</description>
+        </method>
+        <method name="set">
+            <arglist>
+                <arg name="fixture_id" type="symbol" optional="0" />
+                <arg name="parameter" type="symbol" optional="0" />
+                <arg name="value" type="int" optional="0" />
+            </arglist>
+            <description>Set an 8-bit, 16-bit, or 24-bit fixture parameter value. Use parameter pan_tilt with pan and tilt u16 values for paired movement.</description>
+        </method>
+        <method name="nset">
+            <arglist>
+                <arg name="fixture_id" type="symbol" optional="0" />
+                <arg name="parameter" type="symbol" optional="0" />
+                <arg name="normalized" type="float" optional="0" />
+            </arglist>
+            <description>Set a normalized 0..1 fixture parameter value.</description>
+        </method>
+        <method name="ptbytes">
+            <arglist>
+                <arg name="fixture_key" type="symbol" optional="0" />
+                <arg name="pan_byte_1" type="int" optional="0" />
+                <arg name="pan_byte_2" type="int" optional="0" />
+                <arg name="tilt_byte_1" type="int" optional="0" />
+                <arg name="tilt_byte_2" type="int" optional="0" />
+            </arglist>
+            <description>Patch movertrack pan/tilt byte output into a fixture using that fixture profile's byte order.</description>
+        </method>
+    </methodlist>
+    <attributelist>
+        <attribute name="patch" get="1" set="1" type="symbol">
+            <description>Patch JSON path to read.</description>
+        </attribute>
+        <attribute name="universe" get="1" set="1" type="int">
+            <description>Selected output universe for single-universe output.</description>
+        </attribute>
+        <attribute name="universe_mode" get="1" set="1" type="symbol">
+            <description>Output mode: selected outputs a bare 512-value list; all outputs universe id plus 512 values.</description>
+        </attribute>
+        <attribute name="autobang" get="1" set="1" type="int">
+            <description>When non-zero, output automatically after parameter changes.</description>
+        </attribute>
+    </attributelist>
+    <seealsolist>
+        <seealso name="bbb.dmx.movertrack" />
+        <seealso name="bbb.dmx.fixtureinfo" />
+        <seealso name="bbb.dmx.patchcheck" />
+    </seealsolist>
+</c74object>
