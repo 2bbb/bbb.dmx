@@ -18,7 +18,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.fixturemap, bbb.dmx.patchcheck"};
 
-    c74::min::inlet<> input{this, "(read/bang/listfixtures/fixture/listparams/param) fixture info input"};
+    c74::min::inlet<> input{this, "(read/bang/listfixtures/fixture/listparams/modeparams/param) fixture info input"};
     c74::min::outlet<> output{this, "(anything) fixture metadata and errors"};
 
     c74::min::attribute<c74::min::symbol> patch{this, "patch", "",
@@ -106,30 +106,56 @@ public:
         }
     };
 
-    c74::min::message<> listparams_message{this, "listparams", "listparams fixture_id",
+    c74::min::message<> listparams_message{this, "listparams", "listparams fixture_id OR listparams profile_key mode_key",
         MIN_FUNCTION {
             if(args.empty()) {
-                send_error("listparams requires fixture_id");
+                send_error("listparams requires fixture_id or profile_key mode_key");
                 return {};
             }
             if(!ensure_loaded()) {
                 return {};
             }
-            output_parameters(bbb::dmx::maxutil::symbol_arg(args[0]));
+            if(args.size() == 1) {
+                output_parameters(bbb::dmx::maxutil::symbol_arg(args[0]));
+                return {};
+            }
+            output_mode_parameters(bbb::dmx::maxutil::symbol_arg(args[0]), bbb::dmx::maxutil::symbol_arg(args[1]));
             return {};
         }
     };
 
-    c74::min::message<> param_message{this, "param", "param fixture_id parameter_key",
+    c74::min::message<> modeparams_message{this, "modeparams", "modeparams profile_key mode_key",
         MIN_FUNCTION {
             if(args.size() < 2) {
-                send_error("param requires fixture_id parameter_key");
+                send_error("modeparams requires profile_key mode_key");
                 return {};
             }
             if(!ensure_loaded()) {
                 return {};
             }
-            output_parameter(bbb::dmx::maxutil::symbol_arg(args[0]), bbb::dmx::maxutil::symbol_arg(args[1]));
+            output_mode_parameters(bbb::dmx::maxutil::symbol_arg(args[0]), bbb::dmx::maxutil::symbol_arg(args[1]));
+            return {};
+        }
+    };
+
+    c74::min::message<> param_message{this, "param", "param fixture_id parameter_key OR param profile_key mode_key parameter_key",
+        MIN_FUNCTION {
+            if(args.size() < 2) {
+                send_error("param requires fixture_id parameter_key or profile_key mode_key parameter_key");
+                return {};
+            }
+            if(!ensure_loaded()) {
+                return {};
+            }
+            if(args.size() == 2) {
+                output_parameter(bbb::dmx::maxutil::symbol_arg(args[0]), bbb::dmx::maxutil::symbol_arg(args[1]));
+                return {};
+            }
+            output_mode_parameter(
+                bbb::dmx::maxutil::symbol_arg(args[0]),
+                bbb::dmx::maxutil::symbol_arg(args[1]),
+                bbb::dmx::maxutil::symbol_arg(args[2])
+            );
             return {};
         }
     };
@@ -234,11 +260,49 @@ private:
         output_parameter_atoms(fixture_id, *parameter);
     }
 
+    void output_mode_parameters(const std::string &profile_key, const std::string &mode_key) {
+        const bbb::dmx::fixture_mode *mode{mode_for_profile(profile_key, mode_key)};
+        if(!mode) {
+            return;
+        }
+        for(const auto &parameter : mode->parameters) {
+            output_mode_parameter_atoms(profile_key, mode_key, parameter);
+        }
+    }
+
+    void output_mode_parameter(const std::string &profile_key, const std::string &mode_key, const std::string &parameter_key) {
+        const bbb::dmx::fixture_mode *mode{mode_for_profile(profile_key, mode_key)};
+        if(!mode) {
+            return;
+        }
+        const bbb::dmx::fixture_parameter *parameter{mode->find_parameter(parameter_key)};
+        if(!parameter) {
+            send_error(("unknown parameter: " + profile_key + ":" + mode_key + ":" + parameter_key).c_str());
+            return;
+        }
+        output_mode_parameter_atoms(profile_key, mode_key, *parameter);
+    }
+
     void output_parameter_atoms(const std::string &fixture_id, const bbb::dmx::fixture_parameter &parameter) {
         c74::min::atoms atoms;
         atoms.push_back(c74::min::symbol("param"));
         atoms.push_back(c74::min::symbol(fixture_id.c_str()));
         atoms.push_back(c74::min::symbol(parameter.key.c_str()));
+        append_parameter_detail_atoms(atoms, parameter);
+        output.send(atoms);
+    }
+
+    void output_mode_parameter_atoms(const std::string &profile_key, const std::string &mode_key, const bbb::dmx::fixture_parameter &parameter) {
+        c74::min::atoms atoms;
+        atoms.push_back(c74::min::symbol("param"));
+        atoms.push_back(c74::min::symbol(profile_key.c_str()));
+        atoms.push_back(c74::min::symbol(mode_key.c_str()));
+        atoms.push_back(c74::min::symbol(parameter.key.c_str()));
+        append_parameter_detail_atoms(atoms, parameter);
+        output.send(atoms);
+    }
+
+    void append_parameter_detail_atoms(c74::min::atoms &atoms, const bbb::dmx::fixture_parameter &parameter) {
         atoms.push_back(c74::min::symbol("type"));
         atoms.push_back(c74::min::symbol(parameter_type_to_string(parameter.type)));
         atoms.push_back(c74::min::symbol("channels"));
@@ -251,7 +315,6 @@ private:
         atoms.push_back(parameter.default_value);
         atoms.push_back(c74::min::symbol("range_degrees"));
         atoms.push_back(parameter.range_degrees);
-        output.send(atoms);
     }
 
     const bbb::dmx::fixture_instance *find_fixture(const std::string &fixture_id) const {
@@ -277,6 +340,20 @@ private:
         const bbb::dmx::fixture_mode *mode{profile->find_mode(fixture->mode)};
         if(!mode) {
             send_error(("missing mode: " + fixture->mode).c_str());
+            return nullptr;
+        }
+        return mode;
+    }
+
+    const bbb::dmx::fixture_mode *mode_for_profile(const std::string &profile_key, const std::string &mode_key) {
+        const bbb::dmx::fixture_profile *profile{mapper_.find_profile(profile_key)};
+        if(!profile) {
+            send_error(("unknown profile: " + profile_key).c_str());
+            return nullptr;
+        }
+        const bbb::dmx::fixture_mode *mode{profile->find_mode(mode_key)};
+        if(!mode) {
+            send_error(("missing mode: " + profile_key + ":" + mode_key).c_str());
             return nullptr;
         }
         return mode;

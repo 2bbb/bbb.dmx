@@ -77,7 +77,7 @@
             700,
             40
           ],
-          "text": "Multi-universe convention: universe <id> followed by 512 DMX byte values. Bare list uses the object default universe when supported."
+          "text": "Inspect loaded patch fixtures, or inspect a profile/mode directly: listparams profile_key mode_key."
         }
       },
       {
@@ -179,7 +179,7 @@
             520,
             22
           ],
-          "text": "fixture mover1",
+          "text": "fixture spot_01",
           "outlettype": [
             ""
           ]
@@ -197,7 +197,7 @@
             520,
             22
           ],
-          "text": "listparams mover1",
+          "text": "listparams spot_01",
           "outlettype": [
             ""
           ]
@@ -215,7 +215,7 @@
             520,
             22
           ],
-          "text": "param mover1 pan",
+          "text": "param spot_01 pan",
           "outlettype": [
             ""
           ]
@@ -229,11 +229,47 @@
           "numoutlets": 1,
           "patching_rect": [
             50,
-            454,
+            488,
             520,
             22
           ],
           "text": "dump",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-12",
+          "maxclass": "message",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            50,
+            420,
+            520,
+            22
+          ],
+          "text": "listparams generic.mover.16bit basic16",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "obj-13",
+          "maxclass": "message",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            50,
+            454,
+            520,
+            22
+          ],
+          "text": "modeparams generic.mover.16bit basic16",
           "outlettype": [
             ""
           ]
@@ -329,6 +365,30 @@
         "patchline": {
           "source": [
             "obj-11",
+            0
+          ],
+          "destination": [
+            "obj-3",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-12",
+            0
+          ],
+          "destination": [
+            "obj-3",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-13",
             0
           ],
           "destination": [

@@ -698,7 +698,15 @@ listfixtures
 fixture spot_01
 listparams spot_01
 param spot_01 pan
+listparams generic.mover.16bit basic16
+modeparams generic.mover.16bit basic16
+param generic.mover.16bit basic16 pan
 dump
 ```
+
+`listparams fixture_id` / `param fixture_id parameter_key` inspect a fixture instance in the loaded patch.
+`listparams profile_key mode_key`, `modeparams profile_key mode_key`, and
+`param profile_key mode_key parameter_key` inspect a loaded fixture profile/mode directly without needing a patched fixture id.
+Profile/mode inspection still requires the profile to be loaded through the patch JSON `profiles` list.
 
 Typical output selectors are `summary`, `fixture`, `param`, and `error`.
