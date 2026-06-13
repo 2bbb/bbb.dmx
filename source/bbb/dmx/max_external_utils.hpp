@@ -179,6 +179,16 @@ inline std::string resolve_file_path(const std::string &path) {
         0
     )};
     if(error == 0 && resolved_symbol && resolved_symbol->s_name) {
+        char native_path[c74::max::MAX_PATH_CHARS]{};
+        const short conform_error{c74::max::path_nameconform(
+            resolved_symbol->s_name,
+            native_path,
+            c74::max::PATH_STYLE_NATIVE,
+            c74::max::PATH_TYPE_ABSOLUTE
+        )};
+        if(conform_error == 0 && native_path[0] != '\0') {
+            return native_path;
+        }
         return resolved_symbol->s_name;
     }
     return path;
