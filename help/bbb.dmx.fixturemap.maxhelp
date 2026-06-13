@@ -64,7 +64,7 @@
             620,
             24
           ],
-          "text": "bbb.dmx.fixturemap — map fixture parameters into a 512-channel DMX universe"
+          "text": "bbb.dmx.fixturemap — map fixture parameters into one or more DMX universes"
         }
       },
       {
@@ -77,9 +77,9 @@
             30,
             50,
             760,
-            38
+            52
           ],
-          "text": "Load a patch JSON file, then send semantic fixture updates. Output is a 512 integer list: DMX channel 1 first, channel 512 last."
+          "text": "Load a patch JSON file, then send semantic fixture updates. Default output is a selected 512 integer list; bangall / @universe_mode all outputs universe id plus 512 values for each known universe."
         }
       },
       {
@@ -303,7 +303,7 @@
             260,
             36
           ],
-          "text": "Left outlet: full 512-byte universe. Right outlet: status/error messages."
+          "text": "Left outlet: selected bare 512-byte list, or universe id + 512 bytes in all mode. Right outlet: status/error messages."
         }
       },
       {
@@ -318,7 +318,7 @@
             720,
             45
           ],
-          "text": "Patch files reference fixture profile JSON files relative to the patch file. The included sample patch maps spot_01 at address 1 and spot_02 at address 17 in universe 1."
+          "text": "Patch files reference fixture profile JSON files relative to the patch file. A patch may contain fixtures across multiple universes; use @universe for selected output or bangall for all universes."
         }
       },
       {
@@ -409,7 +409,7 @@
             760,
             36
           ],
-          "text": "Current API: read/reload/dump/clear/reset/bang, set/nset/ptbytes, raw channel/channels, and @autobang."
+          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/nset/ptbytes, raw channel/channels, @autobang, and @universe_mode selected|all."
         }
       },
       {
@@ -423,6 +423,42 @@
             22
           ],
           "text": "ptbytes consumes movertrack byte output and uses the fixture profile byte_order for pan/tilt mapping."
+        }
+      },
+      {
+        "box": {
+          "id": "obj-25",
+          "maxclass": "message",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "outlettype": [
+            ""
+          ],
+          "patching_rect": [
+            350,
+            110,
+            60,
+            22
+          ],
+          "text": "bangall"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-26",
+          "maxclass": "message",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "outlettype": [
+            ""
+          ],
+          "patching_rect": [
+            420,
+            110,
+            125,
+            22
+          ],
+          "text": "universe_mode all"
         }
       }
     ],
@@ -611,6 +647,30 @@
         "patchline": {
           "source": [
             "obj-22",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-25",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-26",
             0
           ],
           "destination": [

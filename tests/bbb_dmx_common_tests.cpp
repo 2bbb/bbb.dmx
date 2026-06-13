@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <vector>
 
 #include "bbb/dmx/common.hpp"
 #include "bbb/dmx/curve.hpp"
@@ -294,6 +295,10 @@ int main() {
     require(rgb24_mapper.universe(2).channel(100) == 128, "fixture mapper maps u24 coarse byte");
     require(rgb24_mapper.universe(2).channel(101) == 0, "fixture mapper maps u24 middle byte");
     require(rgb24_mapper.universe(2).channel(102) == 0, "fixture mapper maps u24 fine byte");
+    require(rgb24_mapper.universe_ids() == std::vector<int>{2}, "fixture mapper reports fixture universe id");
+    map_result = rgb24_mapper.set_channel(4, 1, 99);
+    require(map_result.ok, "fixture mapper accepts raw channel in another universe");
+    require(rgb24_mapper.universe_ids() == std::vector<int>{2, 4}, "fixture mapper reports raw-written universe id");
 
 
 

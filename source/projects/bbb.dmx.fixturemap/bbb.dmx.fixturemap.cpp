@@ -3,8 +3,11 @@
 #include <bbb/dmx/fixture_json.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 
+#include <algorithm>
+
 #include <cstdint>
 #include <string>
+#include <vector>
 
 class bbb_dmx_fixturemap : public c74::min::object<bbb_dmx_fixturemap> {
 private:
@@ -12,17 +15,19 @@ private:
     std::string patch_path_value_{};
     int universe_value_{1};
     bool autobang_value_{true};
+    bool output_all_universes_{false};
     bool warn_invalid_numeric_{false};
+    bool warn_invalid_universe_mode_{false};
     bool warn_runtime_error_{false};
 
 public:
-    MIN_DESCRIPTION{"Map semantic fixture parameters into a 512-channel DMX universe list."};
+    MIN_DESCRIPTION{"Map semantic fixture parameters into one or more 512-channel DMX universe lists."};
     MIN_TAGS{"dmx, lighting, fixture, patch, universe, mapping"};
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(read/set/nset/ptbytes/channel/bang) fixture mapping control"};
-    c74::min::outlet<> universe_output{this, "(list) 512 DMX byte values for the selected universe"};
+    c74::min::inlet<> input{this, "(read/set/nset/ptbytes/channel/bang/bangall) fixture mapping control"};
+    c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
     c74::min::timer<c74::min::timer_options::defer_delivery> init_timer{this,
@@ -71,6 +76,27 @@ public:
         }}
     };
 
+    c74::min::attribute<c74::min::symbol> universe_mode{this, "universe_mode", "selected",
+        c74::min::description{"Autobang and bang output mode: selected or all. selected outputs a bare 512-byte list; all outputs universe id 512-byte messages."},
+        c74::min::enum_map{"selected", "all"},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                return {c74::min::symbol(output_all_universes_ ? "all" : "selected")};
+            }
+            const std::string text{symbol_arg(args[0])};
+            if(text == "all") {
+                output_all_universes_ = true;
+                return {c74::min::symbol("all")};
+            }
+            if(text == "selected") {
+                output_all_universes_ = false;
+                return {c74::min::symbol("selected")};
+            }
+            warn_once(warn_invalid_universe_mode_, "invalid universe_mode ignored");
+            return {c74::min::symbol(output_all_universes_ ? "all" : "selected")};
+        }}
+    };
+
     c74::min::message<> read_message{this, "read", "read patch_json_path",
         MIN_FUNCTION {
             if(args.empty()) {
@@ -116,9 +142,16 @@ public:
         }
     };
 
-    c74::min::message<> bang_message{this, "bang", "Output the selected 512-channel universe list.",
+    c74::min::message<> bang_message{this, "bang", "Output according to @universe_mode.",
         MIN_FUNCTION {
-            output_universe();
+            output_current_mode();
+            return {};
+        }
+    };
+
+    c74::min::message<> bangall_message{this, "bangall", "Output all known universes as universe id 512-byte messages.",
+        MIN_FUNCTION {
+            output_all_universes();
             return {};
         }
     };
@@ -242,6 +275,12 @@ public:
             status_atoms.push_back(c74::min::symbol(mapper_.validated() ? "loaded" : "empty"));
             status_atoms.push_back(c74::min::symbol("universe"));
             status_atoms.push_back(universe_value_);
+            status_atoms.push_back(c74::min::symbol("universe_mode"));
+            status_atoms.push_back(c74::min::symbol(output_all_universes_ ? "all" : "selected"));
+            status_atoms.push_back(c74::min::symbol("universes"));
+            for(const int universe_id : mapper_.universe_ids()) {
+                status_atoms.push_back(universe_id);
+            }
             status_output.send(status_atoms);
             return {};
         }
@@ -263,11 +302,19 @@ private:
 
     void output_if_autobang() {
         if(autobang_value_) {
-            output_universe();
+            output_current_mode();
         }
     }
 
-    void output_universe() {
+    void output_current_mode() {
+        if(output_all_universes_) {
+            output_all_universes();
+            return;
+        }
+        output_selected_universe();
+    }
+
+    void output_selected_universe() {
         const auto values = mapper_.universe(universe_value_).to_int_vector();
         c74::min::atoms output_atoms;
         output_atoms.reserve(values.size());
@@ -275,6 +322,22 @@ private:
             output_atoms.push_back(value);
         }
         universe_output.send(output_atoms);
+    }
+
+    void output_all_universes() {
+        std::vector<int> universe_ids{mapper_.universe_ids()};
+        if(universe_ids.empty()) {
+            output_universe_message(universe_value_);
+            return;
+        }
+        for(const int universe_id : universe_ids) {
+            output_universe_message(universe_id);
+        }
+    }
+
+    void output_universe_message(int universe_id) {
+        const int sanitized_universe{std::max(1, universe_id)};
+        universe_output.send(bbb::dmx::maxutil::universe_atoms(sanitized_universe, mapper_.universe(sanitized_universe)));
     }
 
     bool handle_result(const bbb::dmx::mapper_result &result) {
