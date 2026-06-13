@@ -202,13 +202,13 @@ bang              // recomputes the last target, or outputs neutral center befor
 [bbb.dmx.fixturemap @patch patches/example.json @universe 1 @autobang 1]
 ```
 
-The left outlet outputs a 512-integer list for the selected universe: DMX channel 1 first, channel 512 last. The right outlet outputs status/error messages such as load failures and `dump` status. Fixture profiles live in `fixtures/`; show patch files live in `patches/`. Profile paths inside patch JSON are resolved relative to the patch file.
+The left outlet outputs a 512-integer list for the selected universe: DMX channel 1 first, channel 512 last. The right outlet outputs status/error messages such as load failures and `dump` status. Fixture profiles live in `fixtures/`; show patch files live in `patches/`. Profile paths inside patch JSON are resolved relative to the patch file. Patch paths passed to `read` or `@patch` are resolved through Max's file/path system, so patcher-relative paths work when the patcher is saved.
 
 `fixturemap` can load patches containing multiple universes, but each object instance outputs one selected universe. If you need a fully explicit multi-universe stream, run one `fixturemap` per universe or pass its output through `prepend universe <id>` before the rest of the chain.
 
 Attributes:
 
-- `@patch` — patch JSON path. Loaded on object initialization.
+- `@patch` — patch JSON path. Loaded after object initialization and when the attribute changes; use `patch path.json`/attrui for deferred attribute loading or `read path.json` for immediate explicit loading.
 - `@universe` — selected universe, starting at `1`.
 - `@autobang` — if non-zero, successful updates immediately output the full 512-channel universe. Default is `1`.
 

@@ -79,7 +79,7 @@
             760,
             52
           ],
-          "text": "Load a patch JSON file, then send semantic fixture updates. Default output is a selected 512 integer list; bangall / @universe_mode all outputs universe id plus 512 values for each known universe."
+          "text": "Load a patch JSON file with read or @patch, then send semantic fixture updates. Default output is a selected 512 integer list; bangall / @universe_mode all outputs universe id plus 512 values for each known universe."
         }
       },
       {
@@ -220,7 +220,7 @@
             260,
             22
           ],
-          "text": "bbb.dmx.fixturemap @universe 1",
+          "text": "bbb.dmx.fixturemap @patch patches/example.json @universe 1",
           "outlettype": [
             "list",
             ""
@@ -409,7 +409,7 @@
             760,
             36
           ],
-          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/nset/ptbytes, raw channel/channels, @autobang, and @universe_mode selected|all."
+          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/nset/ptbytes, raw channel/channels, @patch, @autobang, and @universe_mode selected|all."
         }
       },
       {

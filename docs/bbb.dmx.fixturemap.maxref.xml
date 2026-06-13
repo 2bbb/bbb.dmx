@@ -20,7 +20,7 @@
             <arglist>
                 <arg name="path" type="symbol" optional="0" />
             </arglist>
-            <description>Read a bbb.dmx patch JSON file. Relative paths are resolved by Max against the patch/search path.</description>
+            <description>Read a bbb.dmx patch JSON file immediately. Relative paths are resolved by Max against the patch/search path.</description>
         </method>
         <method name="bang">
             <description>Output the current DMX frame.</description>
@@ -66,7 +66,7 @@
     </methodlist>
     <attributelist>
         <attribute name="patch" get="1" set="1" type="symbol">
-            <description>Patch JSON path to read.</description>
+            <description>Patch JSON path to read after object initialization and whenever the attribute changes. Attribute loading is deferred; use the read message for immediate explicit loading.</description>
         </attribute>
         <attribute name="universe" get="1" set="1" type="int">
             <description>Selected output universe for single-universe output.</description>

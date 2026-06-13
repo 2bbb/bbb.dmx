@@ -19,6 +19,8 @@ private:
     bool warn_invalid_numeric_{false};
     bool warn_invalid_universe_mode_{false};
     bool warn_runtime_error_{false};
+    bool patch_load_pending_{false};
+    bool suppress_patch_attribute_load_{false};
 
 public:
     MIN_DESCRIPTION{"Map semantic fixture parameters into one or more 512-channel DMX universe lists."};
@@ -30,28 +32,31 @@ public:
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
-    c74::min::timer<c74::min::timer_options::defer_delivery> init_timer{this,
+    c74::min::timer<c74::min::timer_options::defer_delivery> patch_load_timer{this,
         MIN_FUNCTION {
-            if(!patch_path_value_.empty()) {
+            if(patch_load_pending_ && !patch_path_value_.empty()) {
+                patch_load_pending_ = false;
                 load_patch_file(patch_path_value_);
             }
             return {};
         }
     };
 
-    bbb_dmx_fixturemap() {
-        init_timer.delay(0);
-    }
+    bbb_dmx_fixturemap() = default;
 
     c74::min::attribute<c74::min::symbol> patch{this, "patch", "",
         c74::min::description{"Patch JSON file path to load on object initialization."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             if(args.empty()) {
                 patch_path_value_.clear();
+                patch_load_pending_ = false;
                 return {c74::min::symbol("")};
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             patch_path_value_ = symbol_value.c_str();
+            if(!suppress_patch_attribute_load_) {
+                schedule_patch_load();
+            }
             return {symbol_value};
         }}
     };
@@ -105,7 +110,10 @@ public:
             }
             const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
             patch_path_value_ = path_symbol.c_str();
+            suppress_patch_attribute_load_ = true;
             patch = path_symbol;
+            suppress_patch_attribute_load_ = false;
+            patch_load_pending_ = false;
             load_patch_file(patch_path_value_);
             return {};
         }
@@ -287,6 +295,15 @@ public:
     };
 
 private:
+    void schedule_patch_load() {
+        if(patch_path_value_.empty()) {
+            patch_load_pending_ = false;
+            return;
+        }
+        patch_load_pending_ = true;
+        patch_load_timer.delay(0);
+    }
+
     void load_patch_file(const std::string &path) {
         const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
         bbb::dmx::fixture_mapper loaded_mapper{};
