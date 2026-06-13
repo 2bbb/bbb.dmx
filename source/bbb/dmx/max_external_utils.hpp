@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -30,6 +32,20 @@ inline int clamp_int(int value, int minimum, int maximum) {
 }
 
 inline std::string symbol_arg(const c74::min::atom &atom) {
+    if(atom.a_type == c74::max::A_LONG) {
+        return std::to_string(atom.a_w.w_long);
+    }
+    if(atom.a_type == c74::max::A_FLOAT) {
+        const double value{atom.a_w.w_float};
+        if(std::isfinite(value) && std::floor(value) == value) {
+            std::ostringstream stream{};
+            stream << std::fixed << std::setprecision(0) << value;
+            return stream.str();
+        }
+        std::ostringstream stream{};
+        stream << std::setprecision(15) << value;
+        return stream.str();
+    }
     const c74::min::symbol symbol_value{(c74::min::symbol)atom};
     return symbol_value.c_str();
 }

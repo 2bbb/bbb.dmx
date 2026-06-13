@@ -400,8 +400,7 @@ private:
     }
 
     static std::string symbol_arg(const c74::min::atom &atom) {
-        const c74::min::symbol symbol_value{(c74::min::symbol)atom};
-        return symbol_value.c_str();
+        return bbb::dmx::maxutil::symbol_arg(atom);
     }
 
     void warn_once(bool &flag, const char *message) {

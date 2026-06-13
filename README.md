@@ -233,6 +233,8 @@ nset spot_01 dimmer 1.0
 ptbytes spot_01 127 255 127 255
 ```
 
+The first argument of `set`, `nset`, and `ptbytes` is the patch fixture `id` from `fixtures[].id`, not the profile key. Numeric fixture ids from MVR/MA-style JSON are accepted by the parser and canonicalized to strings, so a JSON id `12` is addressed in Max as `set 12 dimmer 255`.
+
 Raw channel messages for testing or emergency overrides:
 
 ```max
