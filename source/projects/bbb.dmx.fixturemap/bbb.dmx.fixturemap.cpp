@@ -172,7 +172,7 @@ public:
             }
             const std::string fixture_id{symbol_arg(args[0])};
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
-            const bbb::dmx::mapper_result result{set_parameter_args(fixture_id, args, 1)};
+            const bbb::dmx::mapper_result result{set_parameter_args(fixture_id, args, 1, false)};
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 return {};
@@ -403,7 +403,7 @@ private:
             return bbb::dmx::mapper_result::failure("setall requires a loaded patch with fixtures");
         }
         for(const auto &fixture : mapper_.patch().fixtures) {
-            const bbb::dmx::mapper_result result{set_parameter_args(fixture.id, args, 0)};
+            const bbb::dmx::mapper_result result{set_parameter_args(fixture.id, args, 0, true)};
             if(!result.ok) {
                 return bbb::dmx::mapper_result::failure("setall fixture " + fixture.id + ": " + result.message);
             }
@@ -411,7 +411,7 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
-    bbb::dmx::mapper_result set_parameter_args(const std::string &fixture_id, const c74::min::atoms &args, std::size_t start_index) {
+    bbb::dmx::mapper_result set_parameter_args(const std::string &fixture_id, const c74::min::atoms &args, std::size_t start_index, bool ignore_unknown_parameters) {
         std::size_t index{start_index};
         while(index < args.size()) {
             const std::string parameter{symbol_arg(args[index])};
@@ -419,10 +419,12 @@ private:
                 if(args.size() <= index + 2 || !finite_atom(args[index + 1]) || !finite_atom(args[index + 2])) {
                     return bbb::dmx::mapper_result::failure("set pan_tilt requires two numeric u16 values");
                 }
-                bbb::dmx::mapper_result result{mapper_.set_u16(fixture_id, "pan", (std::uint16_t)clamp_int((int)args[index + 1], 0, 65535))};
-                if(result.ok) {
-                    result = mapper_.set_u16(fixture_id, "tilt", (std::uint16_t)clamp_int((int)args[index + 2], 0, 65535));
-                }
+                const bbb::dmx::mapper_result result{set_pan_tilt_values(
+                    fixture_id,
+                    clamp_int((int)args[index + 1], 0, 65535),
+                    clamp_int((int)args[index + 2], 0, 65535),
+                    ignore_unknown_parameters
+                )};
                 if(!result.ok) {
                     return result;
                 }
@@ -438,10 +440,30 @@ private:
             const int value{(int)args[index + 1]};
             const bbb::dmx::mapper_result result{set_parameter_value(fixture_id, parameter, value)};
             if(!result.ok) {
+                if(ignore_unknown_parameters && is_unknown_parameter_result(result)) {
+                    index += 2;
+                    continue;
+                }
                 return result;
             }
             index += 2;
         }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result set_pan_tilt_values(const std::string &fixture_id, int pan_value, int tilt_value, bool ignore_unknown_parameters) {
+        bbb::dmx::fixture_mapper trial_mapper{mapper_};
+        bbb::dmx::mapper_result result{trial_mapper.set_u16(fixture_id, "pan", (std::uint16_t)pan_value)};
+        if(result.ok) {
+            result = trial_mapper.set_u16(fixture_id, "tilt", (std::uint16_t)tilt_value);
+        }
+        if(!result.ok) {
+            if(ignore_unknown_parameters && is_unknown_parameter_result(result)) {
+                return bbb::dmx::mapper_result::success();
+            }
+            return result;
+        }
+        mapper_ = trial_mapper;
         return bbb::dmx::mapper_result::success();
     }
 
@@ -454,6 +476,11 @@ private:
             result = mapper_.set_u8(fixture_id, parameter, value);
         }
         return result;
+    }
+
+    static bool is_unknown_parameter_result(const bbb::dmx::mapper_result &result) {
+        const std::string prefix{"unknown parameter: "};
+        return !result.ok && result.message.rfind(prefix, 0) == 0;
     }
 
     void warn_once(bool &flag, const char *message) {

@@ -50,7 +50,7 @@
                 <arg name="parameter" type="symbol" optional="0" />
                 <arg name="value" type="int" optional="0" />
             </arglist>
-            <description>Apply one or more parameter/value pairs to every fixture in the loaded patch. The message fails on the first fixture that does not support a requested parameter.</description>
+            <description>Apply one or more parameter/value pairs to every fixture in the loaded patch. Fixtures that do not expose a requested parameter are silently skipped.</description>
         </method>
         <method name="nset">
             <arglist>
