@@ -227,13 +227,15 @@ Parameter messages:
 
 ```max
 set spot_01 dimmer 255
+set spot_01 dimmer 255 red 255 green 255 blue 0
+setall dimmer 255 red 255 green 255 blue 0
 set spot_01 pan 32768
 set spot_01 pan_tilt 32768 32768
 nset spot_01 dimmer 1.0
 ptbytes spot_01 127 255 127 255
 ```
 
-The first argument of `set`, `nset`, and `ptbytes` is the patch fixture `id` from `fixtures[].id`, not the profile key. Numeric fixture ids from MVR/MA-style JSON are accepted by the parser and canonicalized to strings, so a JSON id `12` is addressed in Max as `set 12 dimmer 255`.
+The first argument of `set`, `nset`, and `ptbytes` is the patch fixture `id` from `fixtures[].id`, not the profile key. Numeric fixture ids from MVR/MA-style JSON are accepted by the parser and canonicalized to strings, so a JSON id `12` is addressed in Max as `set 12 dimmer 255`. `set` accepts multiple `parameter value` pairs for one fixture. `setall` applies the same parameter/value pairs to every fixture in the loaded patch and fails on the first fixture that does not support a requested parameter.
 
 Raw channel messages for testing or emergency overrides:
 

@@ -145,10 +145,10 @@
           "patching_rect": [
             30,
             150,
-            150,
+            310,
             22
           ],
-          "text": "set spot_01 dimmer 255",
+          "text": "set spot_01 dimmer 255 red 255 green 255 blue 0",
           "outlettype": [
             ""
           ]
@@ -161,7 +161,7 @@
           "numinlets": 2,
           "numoutlets": 1,
           "patching_rect": [
-            190,
+            350,
             150,
             150,
             22
@@ -174,13 +174,31 @@
       },
       {
         "box": {
+          "id": "obj-27",
+          "maxclass": "message",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            510,
+            150,
+            280,
+            22
+          ],
+          "text": "setall dimmer 255 red 255 green 255 blue 0",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
           "id": "obj-8",
           "maxclass": "message",
           "numinlets": 2,
           "numoutlets": 1,
           "patching_rect": [
-            350,
-            150,
+            30,
+            180,
             190,
             22
           ],
@@ -197,8 +215,8 @@
           "numinlets": 2,
           "numoutlets": 1,
           "patching_rect": [
-            550,
-            150,
+            230,
+            180,
             110,
             22
           ],
@@ -216,7 +234,7 @@
           "numoutlets": 2,
           "patching_rect": [
             250,
-            220,
+            260,
             260,
             22
           ],
@@ -235,7 +253,7 @@
           "numoutlets": 2,
           "patching_rect": [
             250,
-            275,
+            315,
             85,
             22
           ],
@@ -254,7 +272,7 @@
           "numoutlets": 0,
           "patching_rect": [
             250,
-            330,
+            370,
             145,
             22
           ],
@@ -269,7 +287,7 @@
           "numoutlets": 0,
           "patching_rect": [
             535,
-            275,
+            315,
             135,
             22
           ],
@@ -284,7 +302,7 @@
           "numoutlets": 0,
           "patching_rect": [
             30,
-            190,
+            240,
             170,
             22
           ],
@@ -299,7 +317,7 @@
           "numoutlets": 0,
           "patching_rect": [
             520,
-            220,
+            260,
             260,
             36
           ],
@@ -314,7 +332,7 @@
           "numoutlets": 0,
           "patching_rect": [
             30,
-            385,
+            425,
             720,
             45
           ],
@@ -326,7 +344,7 @@
           "id": "obj-17",
           "maxclass": "message",
           "patching_rect": [
-            30,
+            350,
             180,
             220,
             22
@@ -339,8 +357,8 @@
           "id": "obj-18",
           "maxclass": "message",
           "patching_rect": [
-            260,
-            180,
+            30,
+            210,
             190,
             22
           ],
@@ -352,8 +370,8 @@
           "id": "obj-19",
           "maxclass": "message",
           "patching_rect": [
-            460,
-            180,
+            230,
+            210,
             55,
             22
           ],
@@ -365,8 +383,8 @@
           "id": "obj-20",
           "maxclass": "message",
           "patching_rect": [
-            525,
-            180,
+            295,
+            210,
             55,
             22
           ],
@@ -378,8 +396,8 @@
           "id": "obj-21",
           "maxclass": "message",
           "patching_rect": [
-            590,
-            180,
+            360,
+            210,
             50,
             22
           ],
@@ -391,8 +409,8 @@
           "id": "obj-22",
           "maxclass": "message",
           "patching_rect": [
-            650,
-            180,
+            420,
+            210,
             85,
             22
           ],
@@ -405,11 +423,11 @@
           "maxclass": "comment",
           "patching_rect": [
             30,
-            415,
+            455,
             760,
             36
           ],
-          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/nset/ptbytes, raw channel/channels, @patch, @autobang, and @universe_mode selected|all."
+          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/setall/nset/ptbytes, raw channel/channels, @patch, @autobang, and @universe_mode selected|all."
         }
       },
       {
@@ -418,7 +436,7 @@
           "maxclass": "comment",
           "patching_rect": [
             30,
-            455,
+            495,
             760,
             22
           ],
@@ -671,6 +689,18 @@
         "patchline": {
           "source": [
             "obj-26",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-27",
             0
           ],
           "destination": [

@@ -28,7 +28,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(read/set/nset/ptbytes/channel/bang/bangall) fixture mapping control"};
+    c74::min::inlet<> input{this, "(read/set/setall/nset/ptbytes/channel/bang/bangall) fixture mapping control"};
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -164,39 +164,34 @@ public:
         }
     };
 
-    c74::min::message<> set_message{this, "set", "set fixture_id parameter value OR set fixture_id pan_tilt pan_u16 tilt_u16",
+    c74::min::message<> set_message{this, "set", "set fixture_id parameter value [parameter value ...] OR set fixture_id pan_tilt pan_u16 tilt_u16",
         MIN_FUNCTION {
             if(args.size() < 3) {
                 report_error("set requires fixture_id parameter value");
                 return {};
             }
             const std::string fixture_id{symbol_arg(args[0])};
-            const std::string parameter{symbol_arg(args[1])};
-            bbb::dmx::mapper_result result{};
-            if(parameter == "pan_tilt") {
-                if(args.size() < 4 || !finite_atom(args[2]) || !finite_atom(args[3])) {
-                    report_error("set fixture pan_tilt requires two numeric u16 values");
-                    return {};
-                }
-                result = mapper_.set_u16(fixture_id, "pan", (std::uint16_t)clamp_int((int)args[2], 0, 65535));
-                if(result.ok) {
-                    result = mapper_.set_u16(fixture_id, "tilt", (std::uint16_t)clamp_int((int)args[3], 0, 65535));
-                }
-            } else {
-                if(!finite_atom(args[2])) {
-                    report_error("set value must be numeric");
-                    return {};
-                }
-                const int value{(int)args[2]};
-                result = mapper_.set_u24(fixture_id, parameter, (std::uint32_t)clamp_int(value, 0, 16777215));
-                if(!result.ok) {
-                    result = mapper_.set_u16(fixture_id, parameter, (std::uint16_t)clamp_int(value, 0, 65535));
-                }
-                if(!result.ok) {
-                    result = mapper_.set_u8(fixture_id, parameter, value);
-                }
-            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{set_parameter_args(fixture_id, args, 1)};
             if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> setall_message{this, "setall", "setall parameter value [parameter value ...]",
+        MIN_FUNCTION {
+            if(args.size() < 2) {
+                report_error("setall requires parameter value");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{set_all_parameter_args(args)};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
                 return {};
             }
             output_if_autobang();
@@ -401,6 +396,64 @@ private:
 
     static std::string symbol_arg(const c74::min::atom &atom) {
         return bbb::dmx::maxutil::symbol_arg(atom);
+    }
+
+    bbb::dmx::mapper_result set_all_parameter_args(const c74::min::atoms &args) {
+        if(mapper_.patch().fixtures.empty()) {
+            return bbb::dmx::mapper_result::failure("setall requires a loaded patch with fixtures");
+        }
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            const bbb::dmx::mapper_result result{set_parameter_args(fixture.id, args, 0)};
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("setall fixture " + fixture.id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result set_parameter_args(const std::string &fixture_id, const c74::min::atoms &args, std::size_t start_index) {
+        std::size_t index{start_index};
+        while(index < args.size()) {
+            const std::string parameter{symbol_arg(args[index])};
+            if(parameter == "pan_tilt") {
+                if(args.size() <= index + 2 || !finite_atom(args[index + 1]) || !finite_atom(args[index + 2])) {
+                    return bbb::dmx::mapper_result::failure("set pan_tilt requires two numeric u16 values");
+                }
+                bbb::dmx::mapper_result result{mapper_.set_u16(fixture_id, "pan", (std::uint16_t)clamp_int((int)args[index + 1], 0, 65535))};
+                if(result.ok) {
+                    result = mapper_.set_u16(fixture_id, "tilt", (std::uint16_t)clamp_int((int)args[index + 2], 0, 65535));
+                }
+                if(!result.ok) {
+                    return result;
+                }
+                index += 3;
+                continue;
+            }
+            if(args.size() <= index + 1) {
+                return bbb::dmx::mapper_result::failure("set requires parameter/value pairs");
+            }
+            if(!finite_atom(args[index + 1])) {
+                return bbb::dmx::mapper_result::failure("set value must be numeric: " + parameter);
+            }
+            const int value{(int)args[index + 1]};
+            const bbb::dmx::mapper_result result{set_parameter_value(fixture_id, parameter, value)};
+            if(!result.ok) {
+                return result;
+            }
+            index += 2;
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result set_parameter_value(const std::string &fixture_id, const std::string &parameter, int value) {
+        bbb::dmx::mapper_result result{mapper_.set_u24(fixture_id, parameter, (std::uint32_t)clamp_int(value, 0, 16777215))};
+        if(!result.ok) {
+            result = mapper_.set_u16(fixture_id, parameter, (std::uint16_t)clamp_int(value, 0, 65535));
+        }
+        if(!result.ok) {
+            result = mapper_.set_u8(fixture_id, parameter, value);
+        }
+        return result;
     }
 
     void warn_once(bool &flag, const char *message) {
