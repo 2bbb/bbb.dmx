@@ -228,6 +228,24 @@
       },
       {
         "box": {
+          "id": "obj-28",
+          "maxclass": "message",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "patching_rect": [
+            510,
+            180,
+            280,
+            22
+          ],
+          "text": "nsetall red 1. green 1. blue 0.",
+          "outlettype": [
+            ""
+          ]
+        }
+      },
+      {
+        "box": {
           "id": "obj-10",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -427,7 +445,7 @@
             760,
             36
           ],
-          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/setall/nset/ptbytes, raw channel/channels, @patch, @autobang, and @universe_mode selected|all."
+          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/setall/nset/nsetall/ptbytes, raw channel/channels, @patch, @autobang, and @universe_mode selected|all."
         }
       },
       {
@@ -701,6 +719,18 @@
         "patchline": {
           "source": [
             "obj-27",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-28",
             0
           ],
           "destination": [

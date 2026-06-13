@@ -28,7 +28,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(read/set/setall/nset/ptbytes/channel/bang/bangall) fixture mapping control"};
+    c74::min::inlet<> input{this, "(read/set/setall/nset/nsetall/ptbytes/channel/bang/bangall) fixture mapping control"};
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -199,14 +199,33 @@ public:
         }
     };
 
-    c74::min::message<> nset_message{this, "nset", "nset fixture_id parameter normalized_0_to_1",
+    c74::min::message<> nset_message{this, "nset", "nset fixture_id parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
         MIN_FUNCTION {
-            if(args.size() < 3 || !finite_atom(args[2])) {
+            if(args.size() < 3) {
                 report_error("nset requires fixture_id parameter numeric_value");
                 return {};
             }
-            const bbb::dmx::mapper_result result{mapper_.set_normalized(symbol_arg(args[0]), symbol_arg(args[1]), (double)args[2])};
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{set_normalized_parameter_args(symbol_arg(args[0]), args, 1, false)};
             if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> nsetall_message{this, "nsetall", "nsetall parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
+        MIN_FUNCTION {
+            if(args.size() < 2) {
+                report_error("nsetall requires parameter numeric_value");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{set_all_normalized_parameter_args(args)};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
                 return {};
             }
             output_if_autobang();
@@ -411,6 +430,19 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
+    bbb::dmx::mapper_result set_all_normalized_parameter_args(const c74::min::atoms &args) {
+        if(mapper_.patch().fixtures.empty()) {
+            return bbb::dmx::mapper_result::failure("nsetall requires a loaded patch with fixtures");
+        }
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            const bbb::dmx::mapper_result result{set_normalized_parameter_args(fixture.id, args, 0, true)};
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("nsetall fixture " + fixture.id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
     bbb::dmx::mapper_result set_parameter_args(const std::string &fixture_id, const c74::min::atoms &args, std::size_t start_index, bool ignore_unknown_parameters) {
         std::size_t index{start_index};
         while(index < args.size()) {
@@ -439,6 +471,29 @@ private:
             }
             const int value{(int)args[index + 1]};
             const bbb::dmx::mapper_result result{set_parameter_value(fixture_id, parameter, value)};
+            if(!result.ok) {
+                if(ignore_unknown_parameters && is_unknown_parameter_result(result)) {
+                    index += 2;
+                    continue;
+                }
+                return result;
+            }
+            index += 2;
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result set_normalized_parameter_args(const std::string &fixture_id, const c74::min::atoms &args, std::size_t start_index, bool ignore_unknown_parameters) {
+        std::size_t index{start_index};
+        while(index < args.size()) {
+            const std::string parameter{symbol_arg(args[index])};
+            if(args.size() <= index + 1) {
+                return bbb::dmx::mapper_result::failure("nset requires parameter/value pairs");
+            }
+            if(!finite_atom(args[index + 1])) {
+                return bbb::dmx::mapper_result::failure("nset value must be numeric: " + parameter);
+            }
+            const bbb::dmx::mapper_result result{mapper_.set_normalized(fixture_id, parameter, (double)args[index + 1])};
             if(!result.ok) {
                 if(ignore_unknown_parameters && is_unknown_parameter_result(result)) {
                     index += 2;

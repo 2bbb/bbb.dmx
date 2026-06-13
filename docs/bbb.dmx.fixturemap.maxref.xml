@@ -58,7 +58,14 @@
                 <arg name="parameter" type="symbol" optional="0" />
                 <arg name="normalized" type="float" optional="0" />
             </arglist>
-            <description>Set a normalized 0..1 fixture parameter value.</description>
+            <description>Set one or more normalized 0..1 fixture parameter values.</description>
+        </method>
+        <method name="nsetall">
+            <arglist>
+                <arg name="parameter" type="symbol" optional="0" />
+                <arg name="normalized" type="float" optional="0" />
+            </arglist>
+            <description>Apply one or more normalized 0..1 parameter/value pairs to every fixture in the loaded patch. Fixtures that do not expose a requested parameter are silently skipped.</description>
         </method>
         <method name="ptbytes">
             <arglist>
