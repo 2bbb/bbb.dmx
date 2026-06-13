@@ -115,6 +115,7 @@ jobs:
           cp -r scenes dist/bbb.dmx/ 2>/dev/null || true
           cp -r asserts dist/bbb.dmx/ 2>/dev/null || true
           cp -r libs/bbb-dmx/schemas dist/bbb.dmx/ 2>/dev/null || true
+          find dist/bbb.dmx/externals -path '*/Contents/MacOS/*' -type f -exec chmod 755 {} +
 
       - name: Create archive
         run: |
