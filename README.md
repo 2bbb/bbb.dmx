@@ -710,3 +710,4 @@ dump
 Profile/mode inspection still requires the profile to be loaded through the patch JSON `profiles` list.
 
 Typical output selectors are `summary`, `fixture`, `param`, and `error`.
+See [`docs/bbb.dmx.fixtureinfo.md`](docs/bbb.dmx.fixtureinfo.md) for output formats, routing examples, numeric-id behavior, and common mistakes.

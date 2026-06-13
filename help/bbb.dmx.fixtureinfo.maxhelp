@@ -274,6 +274,21 @@
             ""
           ]
         }
+      },
+      {
+        "box": {
+          "id": "obj-14",
+          "maxclass": "comment",
+          "numinlets": 0,
+          "numoutlets": 0,
+          "patching_rect": [
+            50,
+            522,
+            650,
+            20
+          ],
+          "text": "Detailed docs: docs/bbb.dmx.fixtureinfo.md"
+        }
       }
     ],
     "lines": [
