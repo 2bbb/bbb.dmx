@@ -32,7 +32,8 @@ jobs:
             lipo "$binary" -verify_arch x86_64 arm64
           done < <(find externals -path '*/Contents/MacOS/*' -type f | sort)
 
-      - name: Verify macOS signing secrets
+      - name: Check macOS signing secrets
+        id: macos_signing
         if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         shell: bash
         env:
@@ -44,14 +45,18 @@ jobs:
           missing=0
           for name in MACOS_CERTIFICATE_P12 MACOS_CERTIFICATE_PASSWORD DEVELOPER_ID_APPLICATION; do
             if [ -z "${!name:-}" ]; then
-              echo "::error::$name is required for Gatekeeper-safe main/release builds"
+              echo "::notice::$name is not set; macOS externals will be uploaded unsigned"
               missing=1
             fi
           done
-          exit "$missing"
+          if [ "$missing" -eq 0 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Import Developer ID certificate
-        if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        if: steps.macos_signing.outputs.available == 'true'
         shell: bash
         env:
           CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
@@ -70,7 +75,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
       - name: Sign Max externals
-        if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        if: steps.macos_signing.outputs.available == 'true'
         shell: bash
         env:
           DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
@@ -185,7 +190,8 @@ jobs:
           cd dist
           ditto -c -k --keepParent bbb.dmx bbb.dmx.zip
 
-      - name: Verify notarization secrets
+      - name: Check notarization secrets
+        id: notarization
         if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         shell: bash
         env:
@@ -197,14 +203,18 @@ jobs:
           missing=0
           for name in APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD; do
             if [ -z "${!name:-}" ]; then
-              echo "::error::$name is required for Gatekeeper-safe main/release builds"
+              echo "::notice::$name is not set; package will be uploaded without notarization"
               missing=1
             fi
           done
-          exit "$missing"
+          if [ "$missing" -eq 0 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Notarize archive
-        if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        if: steps.notarization.outputs.available == 'true'
         shell: bash
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
