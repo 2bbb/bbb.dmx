@@ -13,13 +13,6 @@
 
 class bbb_dmx_fixturemap : public c74::min::object<bbb_dmx_fixturemap> {
 private:
-    struct color_request {
-    public:
-        double red{0.0};
-        double green{0.0};
-        double blue{0.0};
-    };
-
     bbb::dmx::fixture_mapper mapper_{};
     std::string patch_path_value_{};
     int universe_value_{1};
@@ -314,7 +307,7 @@ public:
                 report_error("color requires fixture_id rgb r g b");
                 return {};
             }
-            color_request color{};
+            bbb::dmx::semantic_color_request color{};
             bbb::dmx::mapper_result result{parse_color_args(args, 1, "color", color)};
             if(!result.ok) {
                 handle_result(result);
@@ -337,7 +330,7 @@ public:
                 report_error("colorall requires rgb r g b");
                 return {};
             }
-            color_request color{};
+            bbb::dmx::semantic_color_request color{};
             bbb::dmx::mapper_result result{parse_color_args(args, 0, "colorall", color)};
             if(!result.ok) {
                 handle_result(result);
@@ -649,19 +642,11 @@ private:
         return std::max(minimum, std::min(maximum, value));
     }
 
-    static double clamp_double(double value, double minimum, double maximum) {
-        return std::max(minimum, std::min(maximum, value));
-    }
-
     static std::string symbol_arg(const c74::min::atom &atom) {
         return bbb::dmx::maxutil::symbol_arg(atom);
     }
 
-    static bool mode_has_parameter(const bbb::dmx::fixture_mode &mode, const char *parameter) {
-        return mode.find_parameter(parameter) != nullptr;
-    }
-
-    bbb::dmx::mapper_result parse_color_args(const c74::min::atoms &args, std::size_t start_index, const char *message_name, color_request &color) const {
+    bbb::dmx::mapper_result parse_color_args(const c74::min::atoms &args, std::size_t start_index, const char *message_name, bbb::dmx::semantic_color_request &color) const {
         if(args.size() <= start_index) {
             return bbb::dmx::mapper_result::failure(std::string(message_name) + " requires rgb r g b");
         }
@@ -685,16 +670,18 @@ private:
         }
 
         const double scale{rgb8 ? 255.0 : 1.0};
-        color.red = clamp_double((double)args[value_index] / scale, 0.0, 1.0);
-        color.green = clamp_double((double)args[value_index + 1] / scale, 0.0, 1.0);
-        color.blue = clamp_double((double)args[value_index + 2] / scale, 0.0, 1.0);
+        color = bbb::dmx::make_semantic_color_request(
+            (double)args[value_index] / scale,
+            (double)args[value_index + 1] / scale,
+            (double)args[value_index + 2] / scale
+        );
         return bbb::dmx::mapper_result::success();
     }
 
     bbb::dmx::mapper_result apply_normalized_color_parameters(
         bbb::dmx::fixture_mapper &trial_mapper,
         const std::string &fixture_id,
-        const std::vector<std::pair<const char *, double>> &parameters
+        const std::vector<std::pair<std::string, double>> &parameters
     ) const
     {
         for(const auto &parameter : parameters) {
@@ -706,7 +693,7 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
-    bbb::dmx::mapper_result apply_semantic_color(const std::string &fixture_id, const color_request &color, bool ignore_non_color_fixtures) {
+    bbb::dmx::mapper_result apply_semantic_color(const std::string &fixture_id, const bbb::dmx::semantic_color_request &color, bool ignore_non_color_fixtures) {
         const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
         if(!fixture) {
             return bbb::dmx::mapper_result::failure("unknown fixture: " + fixture_id);
@@ -720,25 +707,12 @@ private:
             return bbb::dmx::mapper_result::failure("missing mode: " + fixture->mode);
         }
 
-        std::vector<std::pair<const char *, double>> parameters;
-        if(mode_has_parameter(*mode, "red") && mode_has_parameter(*mode, "green") && mode_has_parameter(*mode, "blue")) {
-            const bool has_white{mode_has_parameter(*mode, "white")};
-            if(has_white && color_use_white_value_) {
-                const double white{std::min(color.red, std::min(color.green, color.blue))};
-                parameters.push_back({"red", color.red - white});
-                parameters.push_back({"green", color.green - white});
-                parameters.push_back({"blue", color.blue - white});
-                parameters.push_back({"white", white});
-            } else {
-                parameters.push_back({"red", color.red});
-                parameters.push_back({"green", color.green});
-                parameters.push_back({"blue", color.blue});
-            }
-        } else if(mode_has_parameter(*mode, "cyan") && mode_has_parameter(*mode, "magenta") && mode_has_parameter(*mode, "yellow")) {
-            parameters.push_back({"cyan", 1.0 - color.red});
-            parameters.push_back({"magenta", 1.0 - color.green});
-            parameters.push_back({"yellow", 1.0 - color.blue});
-        } else {
+        const bbb::dmx::semantic_color_mapping mapping{bbb::dmx::semantic_color_parameters_for_mode(
+            *mode,
+            color,
+            bbb::dmx::semantic_color_options{color_use_white_value_}
+        )};
+        if(!mapping.ok) {
             if(ignore_non_color_fixtures) {
                 return bbb::dmx::mapper_result::success();
             }
@@ -746,7 +720,7 @@ private:
         }
 
         bbb::dmx::fixture_mapper trial_mapper{mapper_};
-        const bbb::dmx::mapper_result result{apply_normalized_color_parameters(trial_mapper, fixture_id, parameters)};
+        const bbb::dmx::mapper_result result{apply_normalized_color_parameters(trial_mapper, fixture_id, mapping.parameters)};
         if(!result.ok) {
             return result;
         }
@@ -754,7 +728,7 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
-    bbb::dmx::mapper_result apply_semantic_color_all(const color_request &color) {
+    bbb::dmx::mapper_result apply_semantic_color_all(const bbb::dmx::semantic_color_request &color) {
         if(mapper_.patch().fixtures.empty()) {
             return bbb::dmx::mapper_result::failure("colorall requires a loaded patch with fixtures");
         }
