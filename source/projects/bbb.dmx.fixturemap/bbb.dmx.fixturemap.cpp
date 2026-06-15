@@ -46,7 +46,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(read/readgroups/set/setall/setgroup/nset/nsetall/nsetgroup/color/colorall/colorgroup/dimmer/dimmerall/dimmergroup/shutter/shutterall/shuttergroup/track/trackall/trackgroup/trackrel/trackallrel/trackgrouprel/ptbytes/channel/bang/bangall) fixture mapping control"};
+    c74::min::inlet<> input{this, "(read/readgroups/set/setall/setgroup/rawset/rawsetall/rawsetgroup/nset/nsetall/nsetgroup/color/colorall/colorgroup/dimmer/dimmerall/dimmergroup/shutter/shutterall/shuttergroup/track/trackall/trackgroup/trackrel/trackallrel/trackgrouprel/ptbytes/channel/bang/bangall) fixture mapping control"};
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -301,15 +301,15 @@ public:
         }
     };
 
-    c74::min::message<> set_message{this, "set", "set fixture_id parameter value [parameter value ...] OR set fixture_id pan_tilt pan_u16 tilt_u16",
+    c74::min::message<> set_message{this, "set", "set fixture_id parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
         MIN_FUNCTION {
             if(args.size() < 3) {
-                report_error("set requires fixture_id parameter value");
+                report_error("set requires fixture_id parameter normalized_0_to_1");
                 return {};
             }
             const std::string fixture_id{symbol_arg(args[0])};
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
-            const bbb::dmx::mapper_result result{set_parameter_args(fixture_id, args, 1, false)};
+            const bbb::dmx::mapper_result result{set_normalized_parameter_args(fixture_id, args, 1, false, "set")};
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 return {};
@@ -319,14 +319,14 @@ public:
         }
     };
 
-    c74::min::message<> setall_message{this, "setall", "setall parameter value [parameter value ...]",
+    c74::min::message<> setall_message{this, "setall", "setall parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
         MIN_FUNCTION {
             if(args.size() < 2) {
-                report_error("setall requires parameter value");
+                report_error("setall requires parameter normalized_0_to_1");
                 return {};
             }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
-            const bbb::dmx::mapper_result result{set_all_parameter_args(args)};
+            const bbb::dmx::mapper_result result{set_all_normalized_parameter_args(args, "setall")};
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 return {};
@@ -336,14 +336,66 @@ public:
         }
     };
 
-    c74::min::message<> setgroup_message{this, "setgroup", "setgroup group_id parameter value [parameter value ...]",
+    c74::min::message<> setgroup_message{this, "setgroup", "setgroup group_id parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
         MIN_FUNCTION {
             if(args.size() < 3) {
-                report_error("setgroup requires group_id parameter value");
+                report_error("setgroup requires group_id parameter normalized_0_to_1");
                 return {};
             }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
-            const bbb::dmx::mapper_result result{set_group_parameter_args(symbol_arg(args[0]), args)};
+            const bbb::dmx::mapper_result result{set_group_normalized_parameter_args(symbol_arg(args[0]), args, "setgroup")};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> rawset_message{this, "rawset", "rawset fixture_id parameter value [parameter value ...] OR rawset fixture_id pan_tilt pan_u16 tilt_u16",
+        MIN_FUNCTION {
+            if(args.size() < 3) {
+                report_error("rawset requires fixture_id parameter value");
+                return {};
+            }
+            const std::string fixture_id{symbol_arg(args[0])};
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{set_parameter_args(fixture_id, args, 1, false, "rawset")};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> rawsetall_message{this, "rawsetall", "rawsetall parameter value [parameter value ...]",
+        MIN_FUNCTION {
+            if(args.size() < 2) {
+                report_error("rawsetall requires parameter value");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{set_all_parameter_args(args, "rawsetall")};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> rawsetgroup_message{this, "rawsetgroup", "rawsetgroup group_id parameter value [parameter value ...]",
+        MIN_FUNCTION {
+            if(args.size() < 3) {
+                report_error("rawsetgroup requires group_id parameter value");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{set_group_parameter_args(symbol_arg(args[0]), args, "rawsetgroup")};
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 return {};
@@ -356,11 +408,11 @@ public:
     c74::min::message<> nset_message{this, "nset", "nset fixture_id parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
         MIN_FUNCTION {
             if(args.size() < 3) {
-                report_error("nset requires fixture_id parameter numeric_value");
+                report_error("nset requires fixture_id parameter normalized_0_to_1");
                 return {};
             }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
-            const bbb::dmx::mapper_result result{set_normalized_parameter_args(symbol_arg(args[0]), args, 1, false)};
+            const bbb::dmx::mapper_result result{set_normalized_parameter_args(symbol_arg(args[0]), args, 1, false, "nset")};
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 return {};
@@ -373,7 +425,7 @@ public:
     c74::min::message<> nsetall_message{this, "nsetall", "nsetall parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
         MIN_FUNCTION {
             if(args.size() < 2) {
-                report_error("nsetall requires parameter numeric_value");
+                report_error("nsetall requires parameter normalized_0_to_1");
                 return {};
             }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
@@ -390,7 +442,7 @@ public:
     c74::min::message<> nsetgroup_message{this, "nsetgroup", "nsetgroup group_id parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
         MIN_FUNCTION {
             if(args.size() < 3) {
-                report_error("nsetgroup requires group_id parameter numeric_value");
+                report_error("nsetgroup requires group_id parameter normalized_0_to_1");
                 return {};
             }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
@@ -1417,69 +1469,69 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
-    bbb::dmx::mapper_result set_all_parameter_args(const c74::min::atoms &args) {
+    bbb::dmx::mapper_result set_all_parameter_args(const c74::min::atoms &args, const std::string &operation_name = "setall") {
         if(mapper_.patch().fixtures.empty()) {
-            return bbb::dmx::mapper_result::failure("setall requires a loaded patch with fixtures");
+            return bbb::dmx::mapper_result::failure(operation_name + " requires a loaded patch with fixtures");
         }
         for(const auto &fixture : mapper_.patch().fixtures) {
-            const bbb::dmx::mapper_result result{set_parameter_args(fixture.id, args, 0, true)};
+            const bbb::dmx::mapper_result result{set_parameter_args(fixture.id, args, 0, true, operation_name)};
             if(!result.ok) {
-                return bbb::dmx::mapper_result::failure("setall fixture " + fixture.id + ": " + result.message);
+                return bbb::dmx::mapper_result::failure(operation_name + " fixture " + fixture.id + ": " + result.message);
             }
         }
         return bbb::dmx::mapper_result::success();
     }
 
-    bbb::dmx::mapper_result set_group_parameter_args(const std::string &group_id, const c74::min::atoms &args) {
+    bbb::dmx::mapper_result set_group_parameter_args(const std::string &group_id, const c74::min::atoms &args, const std::string &operation_name = "setgroup") {
         std::vector<std::string> fixture_ids{};
         bbb::dmx::mapper_result result{resolve_group_fixture_ids(group_id, fixture_ids)};
         if(!result.ok) {
             return result;
         }
         for(const auto &fixture_id : fixture_ids) {
-            result = set_parameter_args(fixture_id, args, 1, true);
+            result = set_parameter_args(fixture_id, args, 1, true, operation_name);
             if(!result.ok) {
-                return bbb::dmx::mapper_result::failure("setgroup fixture " + fixture_id + ": " + result.message);
+                return bbb::dmx::mapper_result::failure(operation_name + " fixture " + fixture_id + ": " + result.message);
             }
         }
         return bbb::dmx::mapper_result::success();
     }
 
-    bbb::dmx::mapper_result set_all_normalized_parameter_args(const c74::min::atoms &args) {
+    bbb::dmx::mapper_result set_all_normalized_parameter_args(const c74::min::atoms &args, const std::string &operation_name = "nsetall") {
         if(mapper_.patch().fixtures.empty()) {
-            return bbb::dmx::mapper_result::failure("nsetall requires a loaded patch with fixtures");
+            return bbb::dmx::mapper_result::failure(operation_name + " requires a loaded patch with fixtures");
         }
         for(const auto &fixture : mapper_.patch().fixtures) {
-            const bbb::dmx::mapper_result result{set_normalized_parameter_args(fixture.id, args, 0, true)};
+            const bbb::dmx::mapper_result result{set_normalized_parameter_args(fixture.id, args, 0, true, operation_name)};
             if(!result.ok) {
-                return bbb::dmx::mapper_result::failure("nsetall fixture " + fixture.id + ": " + result.message);
+                return bbb::dmx::mapper_result::failure(operation_name + " fixture " + fixture.id + ": " + result.message);
             }
         }
         return bbb::dmx::mapper_result::success();
     }
 
-    bbb::dmx::mapper_result set_group_normalized_parameter_args(const std::string &group_id, const c74::min::atoms &args) {
+    bbb::dmx::mapper_result set_group_normalized_parameter_args(const std::string &group_id, const c74::min::atoms &args, const std::string &operation_name = "nsetgroup") {
         std::vector<std::string> fixture_ids{};
         bbb::dmx::mapper_result result{resolve_group_fixture_ids(group_id, fixture_ids)};
         if(!result.ok) {
             return result;
         }
         for(const auto &fixture_id : fixture_ids) {
-            result = set_normalized_parameter_args(fixture_id, args, 1, true);
+            result = set_normalized_parameter_args(fixture_id, args, 1, true, operation_name);
             if(!result.ok) {
-                return bbb::dmx::mapper_result::failure("nsetgroup fixture " + fixture_id + ": " + result.message);
+                return bbb::dmx::mapper_result::failure(operation_name + " fixture " + fixture_id + ": " + result.message);
             }
         }
         return bbb::dmx::mapper_result::success();
     }
 
-    bbb::dmx::mapper_result set_parameter_args(const std::string &fixture_id, const c74::min::atoms &args, std::size_t start_index, bool ignore_unknown_parameters) {
+    bbb::dmx::mapper_result set_parameter_args(const std::string &fixture_id, const c74::min::atoms &args, std::size_t start_index, bool ignore_unknown_parameters, const std::string &operation_name) {
         std::size_t index{start_index};
         while(index < args.size()) {
             const std::string parameter{symbol_arg(args[index])};
             if(parameter == "pan_tilt") {
                 if(args.size() <= index + 2 || !finite_atom(args[index + 1]) || !finite_atom(args[index + 2])) {
-                    return bbb::dmx::mapper_result::failure("set pan_tilt requires two numeric u16 values");
+                    return bbb::dmx::mapper_result::failure(operation_name + " pan_tilt requires two numeric u16 values");
                 }
                 const bbb::dmx::mapper_result result{set_pan_tilt_values(
                     fixture_id,
@@ -1494,10 +1546,10 @@ private:
                 continue;
             }
             if(args.size() <= index + 1) {
-                return bbb::dmx::mapper_result::failure("set requires parameter/value pairs");
+                return bbb::dmx::mapper_result::failure(operation_name + " requires parameter/value pairs");
             }
             if(!finite_atom(args[index + 1])) {
-                return bbb::dmx::mapper_result::failure("set value must be numeric: " + parameter);
+                return bbb::dmx::mapper_result::failure(operation_name + " value must be numeric: " + parameter);
             }
             const int value{(int)args[index + 1]};
             const bbb::dmx::mapper_result result{set_parameter_value(fixture_id, parameter, value)};
@@ -1513,15 +1565,15 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
-    bbb::dmx::mapper_result set_normalized_parameter_args(const std::string &fixture_id, const c74::min::atoms &args, std::size_t start_index, bool ignore_unknown_parameters) {
+    bbb::dmx::mapper_result set_normalized_parameter_args(const std::string &fixture_id, const c74::min::atoms &args, std::size_t start_index, bool ignore_unknown_parameters, const std::string &operation_name) {
         std::size_t index{start_index};
         while(index < args.size()) {
             const std::string parameter{symbol_arg(args[index])};
             if(args.size() <= index + 1) {
-                return bbb::dmx::mapper_result::failure("nset requires parameter/value pairs");
+                return bbb::dmx::mapper_result::failure(operation_name + " requires parameter/value pairs");
             }
             if(!finite_atom(args[index + 1])) {
-                return bbb::dmx::mapper_result::failure("nset value must be numeric: " + parameter);
+                return bbb::dmx::mapper_result::failure(operation_name + " value must be numeric: " + parameter);
             }
             const bbb::dmx::mapper_result result{mapper_.set_normalized(fixture_id, parameter, (double)args[index + 1])};
             if(!result.ok) {

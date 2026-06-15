@@ -234,16 +234,15 @@ bang
 Parameter messages:
 
 ```max
-set spot_01 dimmer 255
-set spot_01 dimmer 255 red 255 green 255 blue 0
-setall dimmer 255 red 255 green 255 blue 0
-setgroup front dimmer 255
-set spot_01 pan 32768
-set spot_01 pan_tilt 32768 32768
-nset spot_01 dimmer 1.0
-nset spot_01 red 1.0 green 1.0 blue 0.0
-nsetall red 1.0 green 1.0 blue 0.0
-nsetgroup front dimmer 1.0
+set spot_01 dimmer 1.0
+set spot_01 red 1.0 green 1.0 blue 0.0
+setall red 1.0 green 1.0 blue 0.0
+setgroup front dimmer 1.0
+rawset spot_01 dimmer 255
+rawset spot_01 pan 32768
+rawset spot_01 pan_tilt 32768 32768
+rawsetall dimmer 255
+rawsetgroup front dimmer 255
 color spot_01 rgb 1.0 0.8 0.0
 colorall rgb 1.0 0.8 0.0
 colorall rgb8 255 204 0
@@ -261,7 +260,7 @@ trackgrouprel front 0. -1. 0.
 trackreset [spot_01]
 ```
 
-The first argument of `set`, `nset`, `color`, `shutter`, `ptbytes`, `track`, and `trackrel` is the patch fixture `id` from `fixtures[].id`, not the profile key. Numeric fixture ids from MVR/MA-style JSON are accepted by the parser and canonicalized to strings, so a JSON id `12` is addressed in Max as `set 12 dimmer 255`. `set` and `nset` accept multiple parameter/value pairs for one fixture. `setall`/`nsetall` apply the same pairs to every fixture in the loaded patch. `setgroup`/`nsetgroup` apply to a loaded group in patch order. Broad writes silently skip fixtures that do not expose a requested parameter; unknown fixture ids in the groups file are errors.
+The first argument of `set`, `rawset`, `color`, `shutter`, `ptbytes`, `track`, and `trackrel` is the patch fixture `id` from `fixtures[].id`, not the profile key. Numeric fixture ids from MVR/MA-style JSON are accepted by the parser and canonicalized to strings, so a JSON id `12` is addressed in Max as `set 12 dimmer 1.0`. `set` accepts normalized `0.0..1.0` parameter/value pairs and maps them onto the parameter width. `rawset` accepts raw DMX-domain values, including `rawset fixture pan_tilt pan_u16 tilt_u16`. `nset`/`nsetall`/`nsetgroup` remain normalized aliases. `setall`/`rawsetall` apply the same pairs to every fixture in the loaded patch. `setgroup`/`rawsetgroup` apply to a loaded group in patch order. Broad writes silently skip fixtures that do not expose a requested parameter; unknown fixture ids in the groups file are errors.
 
 Raw channel messages for testing or emergency overrides:
 
@@ -272,9 +271,9 @@ channels 1 255 2 128 3 0
 
 Fixture-aware mover tracking is built into `fixturemap`: `track fixture_id x y z` uses the loaded fixture position, rotation, calibration, and profile pan/tilt ranges, then writes normalized pan/tilt values into that fixture. `trackall x y z` applies the same world-space target to every mover in the patch; `trackgroup group x y z` applies it to a loaded group. Non-movers are silently skipped unless `@track_strict 1` is set. `trackrel` / `trackallrel` / `trackgrouprel` interpret the vector as relative to each fixture origin. `trackreset` clears pan-continuity history.
 
-Semantic color messages are intentionally separate from `setall/nsetall`: `color fixture_id rgb r g b`, `colorall rgb r g b`, and `colorgroup group rgb r g b` express desired additive RGB color and let the fixture profile decide the write model. RGB fixtures receive `red/green/blue`; when a color block has a preceding dimmer/intensity parameter, semantic color uses the nearest preceding color-block dimmer as brightness instead of blindly opening an earlier strobe/beam dimmer. RGBW fixtures receive RGB with extracted `white = min(r,g,b)` when `@color_use_white 1`; with `@color_use_white 0`, `white` is left untouched and the full color remains in RGB. CMY fixtures receive subtractive `cyan = 1-red`, `magenta = 1-green`, `yellow = 1-blue`. `rgb` values are normalized `0.0..1.0`; `rgb8` accepts `0..255`. Fixtures without a supported color model are skipped by `colorall`/`colorgroup` and rejected by per-fixture `color`. If `@color_wheel_fallback 1` is set, non-RGB/CMY fixtures can instead write a color wheel hue plus `dimmer = max(r,g,b)` using profile `wheels` and `ranges` metadata; `rgb 0 0 0` selects open/white and closes dimmer, and equal wheel-slot matches prefer the nearest current raw wheel value. Keep this disabled unless you actually want color requests to move a physical wheel.
+Semantic color messages are intentionally separate from `setall`: `color fixture_id rgb r g b`, `colorall rgb r g b`, and `colorgroup group rgb r g b` express desired additive RGB color and let the fixture profile decide the write model. RGB fixtures receive `red/green/blue`; when a color block has a preceding dimmer/intensity parameter, semantic color uses the nearest preceding color-block dimmer as brightness instead of blindly opening an earlier strobe/beam dimmer. RGBW fixtures receive RGB with extracted `white = min(r,g,b)` when `@color_use_white 1`; with `@color_use_white 0`, `white` is left untouched and the full color remains in RGB. CMY fixtures receive subtractive `cyan = 1-red`, `magenta = 1-green`, `yellow = 1-blue`. `rgb` values are normalized `0.0..1.0`; `rgb8` accepts `0..255`. Fixtures without a supported color model are skipped by `colorall`/`colorgroup` and rejected by per-fixture `color`. If `@color_wheel_fallback 1` is set, non-RGB/CMY fixtures can instead write a color wheel hue plus `dimmer = max(r,g,b)` using profile `wheels` and `ranges` metadata; `rgb 0 0 0` selects open/white and closes dimmer, and equal wheel-slot matches prefer the nearest current raw wheel value. Keep this disabled unless you actually want color requests to move a physical wheel.
 
-Semantic dimmer messages (`dimmer fixture_id value`, `dimmerall value`, `dimmergroup group value`) express fixture intensity rather than raw parameter names. They prefer the RGB/RGBW/CMY color-block dimmer, then the fixture's `dimmer`, then the first dimmer/intensity-like parameter. Raw `nsetall dimmer value` remains an exact parameter write and is not a semantic master dimmer.
+Semantic dimmer messages (`dimmer fixture_id value`, `dimmerall value`, `dimmergroup group value`) express fixture intensity rather than raw parameter names. They prefer the RGB/RGBW/CMY color-block dimmer, then the fixture's `dimmer`, then the first dimmer/intensity-like parameter. `setall dimmer value` remains an exact normalized parameter-name write, and `rawsetall dimmer value` remains an exact raw parameter-name write; neither is a semantic master dimmer.
 
 Semantic shutter messages solve the shutter/strobe naming mess: `shutter fixture_id 1` opens, `shutter fixture_id 0` closes, and `shutterall 1|0` applies the same state to every fixture that exposes a shutter-like parameter. On likely shutter/strobe parameters, range metadata named/functioned `open`, `closed`, `close`, or `blackout` is preferred and the midpoint of the matching range is written. GDTF-style split strobe fixtures are handled by resetting `StrobeMode...` channels to `No effect` / `No function` for both open and close while resetting `StrobeDuration`, `StrobeRate`, `StrobeFrequency`, and `StrobeSpeed` to profile defaults instead of treating them as open fallbacks. When closing a fixture with no explicit shutter closed/blackout range, dimmer/intensity parameters with a closed range are also closed. If no range metadata exists, likely non-rate/non-duration `shutter`/`shutter-strobe`/`strobe` parameters fall back to max for open and zero for close. If shutter and strobe are the same DMX channel, this intentionally overwrites the channel; fixtures with multiple strobe mode channels may receive multiple writes. Unsupported fixtures are skipped by `shutterall` and rejected by per-fixture `shutter`.
 

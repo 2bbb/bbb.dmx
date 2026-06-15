@@ -47,24 +47,47 @@
             <arglist>
                 <arg name="fixture_id" type="symbol" optional="0" />
                 <arg name="parameter" type="symbol" optional="0" />
-                <arg name="value" type="int" optional="0" />
+                <arg name="normalized" type="float" optional="0" />
             </arglist>
-            <description>Set one or more 8-bit, 16-bit, or 24-bit fixture parameter values. Use repeated parameter/value pairs, or parameter pan_tilt with pan and tilt u16 values for paired movement.</description>
+            <description>Set one or more normalized 0..1 fixture parameter values. Use rawset for raw DMX-domain values.</description>
         </method>
         <method name="setall">
             <arglist>
                 <arg name="parameter" type="symbol" optional="0" />
-                <arg name="value" type="int" optional="0" />
+                <arg name="normalized" type="float" optional="0" />
             </arglist>
-            <description>Apply one or more parameter/value pairs to every fixture in the loaded patch. Fixtures that do not expose a requested parameter are silently skipped.</description>
+            <description>Apply one or more normalized 0..1 parameter/value pairs to every fixture in the loaded patch. Fixtures that do not expose a requested parameter are silently skipped.</description>
         </method>
         <method name="setgroup">
             <arglist>
                 <arg name="group_id" type="symbol" optional="0" />
                 <arg name="parameter" type="symbol" optional="0" />
+                <arg name="normalized" type="float" optional="0" />
+            </arglist>
+            <description>Apply one or more normalized 0..1 parameter/value pairs to every fixture in a loaded group. Fixtures that do not expose a requested parameter are silently skipped.</description>
+        </method>
+        <method name="rawset">
+            <arglist>
+                <arg name="fixture_id" type="symbol" optional="0" />
+                <arg name="parameter" type="symbol" optional="0" />
                 <arg name="value" type="int" optional="0" />
             </arglist>
-            <description>Apply one or more parameter/value pairs to every fixture in a loaded group. Fixtures that do not expose a requested parameter are silently skipped.</description>
+            <description>Set one or more raw 8-bit, 16-bit, or 24-bit fixture parameter values. Use repeated parameter/value pairs, or parameter pan_tilt with pan and tilt u16 values for paired movement.</description>
+        </method>
+        <method name="rawsetall">
+            <arglist>
+                <arg name="parameter" type="symbol" optional="0" />
+                <arg name="value" type="int" optional="0" />
+            </arglist>
+            <description>Apply one or more raw parameter/value pairs to every fixture in the loaded patch. Fixtures that do not expose a requested parameter are silently skipped.</description>
+        </method>
+        <method name="rawsetgroup">
+            <arglist>
+                <arg name="group_id" type="symbol" optional="0" />
+                <arg name="parameter" type="symbol" optional="0" />
+                <arg name="value" type="int" optional="0" />
+            </arglist>
+            <description>Apply one or more raw parameter/value pairs to every fixture in a loaded group. Fixtures that do not expose a requested parameter are silently skipped.</description>
         </method>
         <method name="nset">
             <arglist>
