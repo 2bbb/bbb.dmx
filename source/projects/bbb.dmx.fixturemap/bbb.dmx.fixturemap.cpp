@@ -46,7 +46,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(read/readgroups/set/setall/setgroup/nset/nsetall/nsetgroup/color/colorall/colorgroup/shutter/shutterall/shuttergroup/track/trackall/trackgroup/trackrel/trackallrel/trackgrouprel/ptbytes/channel/bang/bangall) fixture mapping control"};
+    c74::min::inlet<> input{this, "(read/readgroups/set/setall/setgroup/nset/nsetall/nsetgroup/color/colorall/colorgroup/dimmer/dimmerall/dimmergroup/shutter/shutterall/shuttergroup/track/trackall/trackgroup/trackrel/trackallrel/trackgrouprel/ptbytes/channel/bang/bangall) fixture mapping control"};
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -464,6 +464,57 @@ public:
             }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
             result = apply_semantic_color_group(symbol_arg(args[0]), color);
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> dimmer_message{this, "dimmer", "dimmer fixture_id normalized_0_to_1",
+        MIN_FUNCTION {
+            if(args.size() < 2 || !finite_atom(args[1])) {
+                report_error("dimmer requires fixture_id normalized_0_to_1");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{apply_semantic_intensity(symbol_arg(args[0]), (double)args[1], false)};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> dimmerall_message{this, "dimmerall", "dimmerall normalized_0_to_1",
+        MIN_FUNCTION {
+            if(args.empty() || !finite_atom(args[0])) {
+                report_error("dimmerall requires normalized_0_to_1");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{apply_semantic_intensity_all((double)args[0])};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> dimmergroup_message{this, "dimmergroup", "dimmergroup group_id normalized_0_to_1",
+        MIN_FUNCTION {
+            if(args.size() < 2 || !finite_atom(args[1])) {
+                report_error("dimmergroup requires group_id normalized_0_to_1");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{apply_semantic_intensity_group(symbol_arg(args[0]), (double)args[1])};
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 return {};
@@ -1090,6 +1141,65 @@ private:
             result = apply_semantic_color(fixture_id, color, true);
             if(!result.ok) {
                 return bbb::dmx::mapper_result::failure("colorgroup fixture " + fixture_id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result apply_semantic_intensity(const std::string &fixture_id, double intensity, bool ignore_unsupported_fixtures) {
+        const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
+        if(!fixture) {
+            return bbb::dmx::mapper_result::failure("unknown fixture: " + fixture_id);
+        }
+        const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture->profile)};
+        if(!profile) {
+            return bbb::dmx::mapper_result::failure("missing profile: " + fixture->profile);
+        }
+        const bbb::dmx::fixture_mode *mode{profile->find_mode(fixture->mode)};
+        if(!mode) {
+            return bbb::dmx::mapper_result::failure("missing mode: " + fixture->mode);
+        }
+
+        const bbb::dmx::semantic_color_mapping mapping{bbb::dmx::semantic_intensity_parameters_for_mode(*mode, intensity)};
+        if(!mapping.ok) {
+            if(ignore_unsupported_fixtures) {
+                return bbb::dmx::mapper_result::success();
+            }
+            return bbb::dmx::mapper_result::failure("fixture has no semantic intensity parameter: " + fixture_id);
+        }
+
+        bbb::dmx::fixture_mapper trial_mapper{mapper_};
+        const bbb::dmx::mapper_result result{apply_normalized_color_parameters(trial_mapper, fixture_id, mapping.parameters)};
+        if(!result.ok) {
+            return result;
+        }
+        mapper_ = trial_mapper;
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result apply_semantic_intensity_all(double intensity) {
+        if(mapper_.patch().fixtures.empty()) {
+            return bbb::dmx::mapper_result::failure("dimmerall requires a loaded patch with fixtures");
+        }
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            const bbb::dmx::mapper_result result{apply_semantic_intensity(fixture.id, intensity, true)};
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("dimmerall fixture " + fixture.id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result apply_semantic_intensity_group(const std::string &group_id, double intensity) {
+        std::vector<std::string> fixture_ids{};
+        bbb::dmx::mapper_result result{resolve_group_fixture_ids(group_id, fixture_ids)};
+        if(!result.ok) {
+            return result;
+        }
+        for(const auto &fixture_id : fixture_ids) {
+            result = apply_semantic_intensity(fixture_id, intensity, true);
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("dimmergroup fixture " + fixture_id + ": " + result.message);
             }
         }
         return bbb::dmx::mapper_result::success();

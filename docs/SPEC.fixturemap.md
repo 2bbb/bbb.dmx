@@ -357,6 +357,16 @@ Color wheel fallback is deliberately opt-in. With `@color_wheel_fallback 1`, onl
 
 `colorall` skips fixtures that do not expose a supported RGB/RGBW/CMY model or, when enabled, a supported color wheel fallback. `colorgroup` applies the same semantic behavior to a loaded group. Per-fixture `color` reports an error for unsupported fixtures. This behavior is deliberately separate from `setall`/`nsetall`, which only write same-named parameters and do not perform color-model conversion.
 
+#### Semantic dimmer input
+
+```max
+dimmer spot_01 1.0
+dimmerall 0.5
+dimmergroup front 0.25
+```
+
+`dimmer`, `dimmerall`, and `dimmergroup` express desired fixture intensity instead of a raw parameter name. For RGB/RGBW/CMY fixtures with a color-block dimmer, this writes the nearest preceding dimmer/intensity parameter for the color block. If no color-block dimmer exists, it falls back to the fixture's `dimmer` parameter, then the first dimmer/intensity-like parameter. Use raw `nset`/`nsetall` when you intentionally need a specific fixture parameter such as `dimmer_2` or a strobe/beam dimmer.
+
 #### Semantic shutter input
 
 ```max
@@ -421,7 +431,7 @@ ptbytes spot_01 pan1 pan2 tilt1 tilt2
 Current behavior:
 
 - Every successful value update updates the internal multi-universe buffer.
-- If `@autobang 1`, successful `read`, `reload`, `set`, `setgroup`, `nset`, `nsetgroup`, `color`, `colorall`, `colorgroup`, `shutter`, `shutterall`, `shuttergroup`, `track`, `trackall`, `trackgroup`, `trackrel`, `trackallrel`, `trackgrouprel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
+- If `@autobang 1`, successful `read`, `reload`, `set`, `setgroup`, `nset`, `nsetgroup`, `color`, `colorall`, `colorgroup`, `dimmer`, `dimmerall`, `dimmergroup`, `shutter`, `shutterall`, `shuttergroup`, `track`, `trackall`, `trackgroup`, `trackrel`, `trackallrel`, `trackgrouprel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
 - `@universe_mode selected` outputs the selected full 512-byte universe as a bare list. This is the default compatibility mode.
 - `@universe_mode all` outputs one `universe <id> <512 values...>` message per known universe.
 - `bang` follows `@universe_mode`; `bangall` forces all-universe output.

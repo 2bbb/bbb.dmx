@@ -118,6 +118,26 @@
             </arglist>
             <description>Apply one semantic RGB color to every supported color fixture in a loaded group. Unsupported fixtures are silently skipped.</description>
         </method>
+        <method name="dimmer">
+            <arglist>
+                <arg name="fixture_id" type="symbol" optional="0" />
+                <arg name="normalized" type="float" optional="0" />
+            </arglist>
+            <description>Set one fixture by semantic intensity. RGB/RGBW/CMY color-block dimmers are preferred; otherwise the fixture dimmer or first dimmer-like parameter is used.</description>
+        </method>
+        <method name="dimmerall">
+            <arglist>
+                <arg name="normalized" type="float" optional="0" />
+            </arglist>
+            <description>Apply semantic intensity to every supported fixture. Unsupported fixtures are silently skipped.</description>
+        </method>
+        <method name="dimmergroup">
+            <arglist>
+                <arg name="group_id" type="symbol" optional="0" />
+                <arg name="normalized" type="float" optional="0" />
+            </arglist>
+            <description>Apply semantic intensity to every supported fixture in a loaded group. Unsupported fixtures are silently skipped.</description>
+        </method>
         <method name="shutter">
             <arglist>
                 <arg name="fixture_id" type="symbol" optional="0" />
