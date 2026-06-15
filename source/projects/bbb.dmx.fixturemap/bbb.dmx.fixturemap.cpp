@@ -13,6 +13,13 @@
 
 class bbb_dmx_fixturemap : public c74::min::object<bbb_dmx_fixturemap> {
 private:
+    struct color_request {
+    public:
+        double red{0.0};
+        double green{0.0};
+        double blue{0.0};
+    };
+
     bbb::dmx::fixture_mapper mapper_{};
     std::string patch_path_value_{};
     int universe_value_{1};
@@ -37,7 +44,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(read/set/setall/nset/nsetall/track/trackall/trackrel/trackallrel/ptbytes/channel/bang/bangall) fixture mapping control"};
+    c74::min::inlet<> input{this, "(read/set/setall/nset/nsetall/color/colorall/track/trackall/trackrel/trackallrel/ptbytes/channel/bang/bangall) fixture mapping control"};
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -283,6 +290,52 @@ public:
             }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
             const bbb::dmx::mapper_result result{set_all_normalized_parameter_args(args)};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> color_message{this, "color", "color fixture_id rgb r g b OR color fixture_id rgb8 r g b",
+        MIN_FUNCTION {
+            if(args.size() < 4) {
+                report_error("color requires fixture_id rgb r g b");
+                return {};
+            }
+            color_request color{};
+            bbb::dmx::mapper_result result{parse_color_args(args, 1, "color", color)};
+            if(!result.ok) {
+                handle_result(result);
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            result = apply_semantic_color(symbol_arg(args[0]), color, false);
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> colorall_message{this, "colorall", "colorall rgb r g b OR colorall rgb8 r g b",
+        MIN_FUNCTION {
+            if(args.size() < 3) {
+                report_error("colorall requires rgb r g b");
+                return {};
+            }
+            color_request color{};
+            bbb::dmx::mapper_result result{parse_color_args(args, 0, "colorall", color)};
+            if(!result.ok) {
+                handle_result(result);
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            result = apply_semantic_color_all(color);
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 return {};
@@ -566,6 +619,9 @@ private:
     }
 
     static bool finite_atom(const c74::min::atom &atom) {
+        if(atom.a_type != c74::max::A_LONG && atom.a_type != c74::max::A_FLOAT) {
+            return false;
+        }
         return bbb::dmx::is_finite((double)atom);
     }
 
@@ -582,8 +638,122 @@ private:
         return std::max(minimum, std::min(maximum, value));
     }
 
+    static double clamp_double(double value, double minimum, double maximum) {
+        return std::max(minimum, std::min(maximum, value));
+    }
+
     static std::string symbol_arg(const c74::min::atom &atom) {
         return bbb::dmx::maxutil::symbol_arg(atom);
+    }
+
+    static bool mode_has_parameter(const bbb::dmx::fixture_mode &mode, const char *parameter) {
+        return mode.find_parameter(parameter) != nullptr;
+    }
+
+    bbb::dmx::mapper_result parse_color_args(const c74::min::atoms &args, std::size_t start_index, const char *message_name, color_request &color) const {
+        if(args.size() <= start_index) {
+            return bbb::dmx::mapper_result::failure(std::string(message_name) + " requires rgb r g b");
+        }
+
+        bool rgb8{false};
+        std::size_t value_index{start_index};
+        if(!finite_atom(args[start_index])) {
+            const std::string color_space{symbol_arg(args[start_index])};
+            value_index = start_index + 1;
+            if(color_space == "rgb") {
+                rgb8 = false;
+            } else if(color_space == "rgb8") {
+                rgb8 = true;
+            } else {
+                return bbb::dmx::mapper_result::failure(std::string(message_name) + " color space must be rgb or rgb8");
+            }
+        }
+
+        if(args.size() <= value_index + 2 || !finite_atoms(args, value_index, 3)) {
+            return bbb::dmx::mapper_result::failure(std::string(message_name) + " requires three numeric color values");
+        }
+
+        const double scale{rgb8 ? 255.0 : 1.0};
+        color.red = clamp_double((double)args[value_index] / scale, 0.0, 1.0);
+        color.green = clamp_double((double)args[value_index + 1] / scale, 0.0, 1.0);
+        color.blue = clamp_double((double)args[value_index + 2] / scale, 0.0, 1.0);
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result apply_normalized_color_parameters(
+        bbb::dmx::fixture_mapper &trial_mapper,
+        const std::string &fixture_id,
+        const std::vector<std::pair<const char *, double>> &parameters
+    ) const
+    {
+        for(const auto &parameter : parameters) {
+            const bbb::dmx::mapper_result result{trial_mapper.set_normalized(fixture_id, parameter.first, parameter.second)};
+            if(!result.ok) {
+                return result;
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result apply_semantic_color(const std::string &fixture_id, const color_request &color, bool ignore_non_color_fixtures) {
+        const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
+        if(!fixture) {
+            return bbb::dmx::mapper_result::failure("unknown fixture: " + fixture_id);
+        }
+        const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture->profile)};
+        if(!profile) {
+            return bbb::dmx::mapper_result::failure("missing profile: " + fixture->profile);
+        }
+        const bbb::dmx::fixture_mode *mode{profile->find_mode(fixture->mode)};
+        if(!mode) {
+            return bbb::dmx::mapper_result::failure("missing mode: " + fixture->mode);
+        }
+
+        std::vector<std::pair<const char *, double>> parameters;
+        if(mode_has_parameter(*mode, "red") && mode_has_parameter(*mode, "green") && mode_has_parameter(*mode, "blue")) {
+            const bool has_white{mode_has_parameter(*mode, "white")};
+            if(has_white) {
+                const double white{std::min(color.red, std::min(color.green, color.blue))};
+                parameters.push_back({"red", color.red - white});
+                parameters.push_back({"green", color.green - white});
+                parameters.push_back({"blue", color.blue - white});
+                parameters.push_back({"white", white});
+            } else {
+                parameters.push_back({"red", color.red});
+                parameters.push_back({"green", color.green});
+                parameters.push_back({"blue", color.blue});
+            }
+        } else if(mode_has_parameter(*mode, "cyan") && mode_has_parameter(*mode, "magenta") && mode_has_parameter(*mode, "yellow")) {
+            parameters.push_back({"cyan", 1.0 - color.red});
+            parameters.push_back({"magenta", 1.0 - color.green});
+            parameters.push_back({"yellow", 1.0 - color.blue});
+        } else {
+            if(ignore_non_color_fixtures) {
+                return bbb::dmx::mapper_result::success();
+            }
+            return bbb::dmx::mapper_result::failure("fixture has no semantic color model: " + fixture_id);
+        }
+
+        bbb::dmx::fixture_mapper trial_mapper{mapper_};
+        const bbb::dmx::mapper_result result{apply_normalized_color_parameters(trial_mapper, fixture_id, parameters)};
+        if(!result.ok) {
+            return result;
+        }
+        mapper_ = trial_mapper;
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result apply_semantic_color_all(const color_request &color) {
+        if(mapper_.patch().fixtures.empty()) {
+            return bbb::dmx::mapper_result::failure("colorall requires a loaded patch with fixtures");
+        }
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            const bbb::dmx::mapper_result result{apply_semantic_color(fixture.id, color, true)};
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("colorall fixture " + fixture.id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
     }
 
     static double normalized_from_u16(std::uint16_t value) {

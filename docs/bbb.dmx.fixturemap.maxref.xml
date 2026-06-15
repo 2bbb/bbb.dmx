@@ -67,6 +67,25 @@
             </arglist>
             <description>Apply one or more normalized 0..1 parameter/value pairs to every fixture in the loaded patch. Fixtures that do not expose a requested parameter are silently skipped.</description>
         </method>
+        <method name="color">
+            <arglist>
+                <arg name="fixture_id" type="symbol" optional="0" />
+                <arg name="space" type="symbol" optional="0" />
+                <arg name="red" type="float" optional="0" />
+                <arg name="green" type="float" optional="0" />
+                <arg name="blue" type="float" optional="0" />
+            </arglist>
+            <description>Set one fixture by semantic RGB color. Use rgb for normalized 0..1 values or rgb8 for 0..255 values; RGB/RGBW/CMY profiles are mapped automatically.</description>
+        </method>
+        <method name="colorall">
+            <arglist>
+                <arg name="space" type="symbol" optional="0" />
+                <arg name="red" type="float" optional="0" />
+                <arg name="green" type="float" optional="0" />
+                <arg name="blue" type="float" optional="0" />
+            </arglist>
+            <description>Apply one semantic RGB color to every supported color fixture. Unsupported fixtures are silently skipped.</description>
+        </method>
         <method name="track">
             <arglist>
                 <arg name="fixture_id" type="symbol" optional="0" />
