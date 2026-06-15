@@ -3,11 +3,21 @@
 #include <bbb/dmx/fixture_json.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <set>
 #include <string>
+#include <vector>
 
 class bbb_dmx_fixtureinfo : public c74::min::object<bbb_dmx_fixtureinfo> {
 private:
+    enum class fixture_sort_key {
+        patch,
+        id,
+        universe,
+        fixturetype
+    };
+
     bbb::dmx::fixture_mapper mapper_{};
     std::string patch_path_value_{};
     bool loaded_{false};
@@ -71,12 +81,30 @@ public:
         }
     };
 
-    c74::min::message<> listfixtures_message{this, "listfixtures", "Output one fixture message per patched fixture.",
+    c74::min::message<> listfixtures_message{this, "listfixtures", "listfixtures [id|universe|fixturetype]",
         MIN_FUNCTION {
             if(!ensure_loaded()) {
                 return {};
             }
-            output_fixtures();
+            fixture_sort_key sort_key{fixture_sort_key::patch};
+            if(!parse_fixture_sort_key(args, sort_key)) {
+                return {};
+            }
+            output_fixtures(sort_key);
+            return {};
+        }
+    };
+
+    c74::min::message<> listfixture_message{this, "listfixture", "Alias for listfixtures [id|universe|fixturetype].",
+        MIN_FUNCTION {
+            if(!ensure_loaded()) {
+                return {};
+            }
+            fixture_sort_key sort_key{fixture_sort_key::patch};
+            if(!parse_fixture_sort_key(args, sort_key)) {
+                return {};
+            }
+            output_fixtures(sort_key);
             return {};
         }
     };
@@ -87,7 +115,7 @@ public:
                 return {};
             }
             output_summary();
-            output_fixtures();
+            output_fixtures(fixture_sort_key::patch);
             return {};
         }
     };
@@ -203,9 +231,17 @@ private:
         output.send(atoms);
     }
 
-    void output_fixtures() {
+    void output_fixtures(fixture_sort_key sort_key) {
+        std::vector<const bbb::dmx::fixture_instance *> fixtures;
+        fixtures.reserve(mapper_.patch().fixtures.size());
         for(const auto &fixture : mapper_.patch().fixtures) {
-            output_fixture(fixture.id);
+            fixtures.push_back(&fixture);
+        }
+        sort_fixtures(fixtures, sort_key);
+        for(const auto *fixture : fixtures) {
+            if(fixture) {
+                output_fixture_atoms(*fixture);
+            }
         }
     }
 
@@ -215,25 +251,29 @@ private:
             send_error(("unknown fixture: " + fixture_id).c_str());
             return;
         }
-        const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture->profile)};
-        const bbb::dmx::fixture_mode *mode{profile ? profile->find_mode(fixture->mode) : nullptr};
+        output_fixture_atoms(*fixture);
+    }
+
+    void output_fixture_atoms(const bbb::dmx::fixture_instance &fixture) {
+        const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture.profile)};
+        const bbb::dmx::fixture_mode *mode{profile ? profile->find_mode(fixture.mode) : nullptr};
         c74::min::atoms atoms;
         atoms.push_back(c74::min::symbol("fixture"));
-        atoms.push_back(c74::min::symbol(fixture->id.c_str()));
+        atoms.push_back(c74::min::symbol(fixture.id.c_str()));
         atoms.push_back(c74::min::symbol("universe"));
-        atoms.push_back(fixture->universe);
+        atoms.push_back(fixture.universe);
         atoms.push_back(c74::min::symbol("address"));
-        atoms.push_back(fixture->address);
+        atoms.push_back(fixture.address);
         atoms.push_back(c74::min::symbol("profile"));
-        atoms.push_back(c74::min::symbol(fixture->profile.c_str()));
+        atoms.push_back(c74::min::symbol(fixture.profile.c_str()));
         atoms.push_back(c74::min::symbol("mode"));
-        atoms.push_back(c74::min::symbol(fixture->mode.c_str()));
+        atoms.push_back(c74::min::symbol(fixture.mode.c_str()));
         atoms.push_back(c74::min::symbol("footprint"));
         atoms.push_back(mode ? mode->footprint : 0);
         atoms.push_back(c74::min::symbol("position"));
-        atoms.push_back(fixture->position.x);
-        atoms.push_back(fixture->position.y);
-        atoms.push_back(fixture->position.z);
+        atoms.push_back(fixture.position.x);
+        atoms.push_back(fixture.position.y);
+        atoms.push_back(fixture.position.z);
         output.send(atoms);
     }
 
@@ -369,6 +409,110 @@ private:
         }
     }
 
+    bool parse_fixture_sort_key(const c74::min::atoms &args, fixture_sort_key &sort_key) {
+        if(args.empty()) {
+            sort_key = fixture_sort_key::patch;
+            return true;
+        }
+        std::size_t option_index{0};
+        const std::string first_option{lowercase(bbb::dmx::maxutil::symbol_arg(args[0]))};
+        if((first_option == "sort" || first_option == "by" || first_option == "@sort") && 1 < args.size()) {
+            option_index = 1;
+        }
+        const std::string option{lowercase(bbb::dmx::maxutil::symbol_arg(args[option_index]))};
+        if(option == "patch" || option == "none" || option == "original") {
+            sort_key = fixture_sort_key::patch;
+            return true;
+        }
+        if(option == "id" || option == "fixture" || option == "fixtureid") {
+            sort_key = fixture_sort_key::id;
+            return true;
+        }
+        if(option == "universe" || option == "address" || option == "dmx") {
+            sort_key = fixture_sort_key::universe;
+            return true;
+        }
+        if(option == "fixturetype" || option == "type" || option == "profile") {
+            sort_key = fixture_sort_key::fixturetype;
+            return true;
+        }
+        send_error(("unknown listfixtures sort option: " + option).c_str());
+        return false;
+    }
+
+    static std::string lowercase(const std::string &value) {
+        std::string result{value};
+        std::transform(result.begin(), result.end(), result.begin(), [](unsigned char character) {
+            return (char)std::tolower(character);
+        });
+        return result;
+    }
+
+    static bool decimal_string(const std::string &value) {
+        if(value.empty()) {
+            return false;
+        }
+        return std::all_of(value.begin(), value.end(), [](unsigned char character) {
+            return std::isdigit(character) != 0;
+        });
+    }
+
+    static bool identifier_less(const std::string &left, const std::string &right) {
+        const bool left_decimal{decimal_string(left)};
+        const bool right_decimal{decimal_string(right)};
+        if(left_decimal && right_decimal && left.size() != right.size()) {
+            return left.size() < right.size();
+        }
+        return left < right;
+    }
+
+    static bool fixture_id_less(const bbb::dmx::fixture_instance *left, const bbb::dmx::fixture_instance *right) {
+        if(!left || !right) {
+            return left < right;
+        }
+        return identifier_less(left->id, right->id);
+    }
+
+    static void sort_fixtures(std::vector<const bbb::dmx::fixture_instance *> &fixtures, fixture_sort_key sort_key) {
+        switch(sort_key) {
+            case fixture_sort_key::id:
+                std::stable_sort(fixtures.begin(), fixtures.end(), [](const auto *left, const auto *right) {
+                    return fixture_id_less(left, right);
+                });
+                break;
+            case fixture_sort_key::universe:
+                std::stable_sort(fixtures.begin(), fixtures.end(), [](const auto *left, const auto *right) {
+                    if(!left || !right) {
+                        return left < right;
+                    }
+                    if(left->universe != right->universe) {
+                        return left->universe < right->universe;
+                    }
+                    if(left->address != right->address) {
+                        return left->address < right->address;
+                    }
+                    return fixture_id_less(left, right);
+                });
+                break;
+            case fixture_sort_key::fixturetype:
+                std::stable_sort(fixtures.begin(), fixtures.end(), [](const auto *left, const auto *right) {
+                    if(!left || !right) {
+                        return left < right;
+                    }
+                    if(left->profile != right->profile) {
+                        return left->profile < right->profile;
+                    }
+                    if(left->mode != right->mode) {
+                        return left->mode < right->mode;
+                    }
+                    return fixture_id_less(left, right);
+                });
+                break;
+            case fixture_sort_key::patch:
+            default:
+                break;
+        }
+    }
 
     void send_error(const char *message) {
         cerr << "bbb.dmx.fixtureinfo: " << message << c74::min::endl;

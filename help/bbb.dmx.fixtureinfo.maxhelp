@@ -161,7 +161,7 @@
             520,
             22
           ],
-          "text": "listfixtures",
+          "text": "listfixtures universe",
           "outlettype": [
             ""
           ]

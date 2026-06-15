@@ -62,13 +62,30 @@ bang
 listfixtures
 ```
 
-### `listfixtures`
+### `listfixtures [sort_key]`
 
 Outputs one `fixture` message for every fixture instance in the loaded patch.
 
 ```max
 listfixtures
+listfixtures id
+listfixtures universe
+listfixtures fixturetype
+listfixtures @sort universe
 ```
+
+`listfixture` is accepted as an alias for `listfixtures`.
+
+Sort keys:
+
+| Sort key | Order |
+|---|---|
+| none / `patch` / `original` | Patch JSON order |
+| `id` | Fixture id order. Pure numeric ids are sorted numerically enough that `2` comes before `10` |
+| `universe` | Universe, then DMX address, then fixture id |
+| `fixturetype` | Profile key, then mode key, then fixture id |
+
+Aliases: `profile` and `type` are accepted for `fixturetype`; `address` and `dmx` are accepted for `universe`.
 
 Output:
 
