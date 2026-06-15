@@ -38,7 +38,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(read/set/setall/nset/nsetall/color/colorall/track/trackall/trackrel/trackallrel/ptbytes/channel/bang/bangall) fixture mapping control"};
+    c74::min::inlet<> input{this, "(read/set/setall/nset/nsetall/color/colorall/shutter/shutterall/track/trackall/trackrel/trackallrel/ptbytes/channel/bang/bangall) fixture mapping control"};
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -338,6 +338,52 @@ public:
             }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
             result = apply_semantic_color_all(color);
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> shutter_message{this, "shutter", "shutter fixture_id 1|0",
+        MIN_FUNCTION {
+            if(args.size() < 2) {
+                report_error("shutter requires fixture_id state");
+                return {};
+            }
+            bool open{false};
+            bbb::dmx::mapper_result result{parse_shutter_state(args[1], open)};
+            if(!result.ok) {
+                handle_result(result);
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            result = apply_semantic_shutter(symbol_arg(args[0]), open, false);
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> shutterall_message{this, "shutterall", "shutterall 1|0",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("shutterall requires state");
+                return {};
+            }
+            bool open{false};
+            bbb::dmx::mapper_result result{parse_shutter_state(args[0], open)};
+            if(!result.ok) {
+                handle_result(result);
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            result = apply_semantic_shutter_all(open);
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 return {};
@@ -741,6 +787,68 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
+    bbb::dmx::mapper_result parse_shutter_state(const c74::min::atom &atom, bool &open) const {
+        if(finite_atom(atom)) {
+            open = (int)atom != 0;
+            return bbb::dmx::mapper_result::success();
+        }
+
+        const std::string text{bbb::dmx::normalized_semantic_key(symbol_arg(atom))};
+        if(text == "open" || text == "on" || text == "true") {
+            open = true;
+            return bbb::dmx::mapper_result::success();
+        }
+        if(text == "close" || text == "closed" || text == "off" || text == "false" || text == "blackout") {
+            open = false;
+            return bbb::dmx::mapper_result::success();
+        }
+        return bbb::dmx::mapper_result::failure("shutter state must be 1/open or 0/closed");
+    }
+
+    bbb::dmx::mapper_result apply_semantic_shutter(const std::string &fixture_id, bool open, bool ignore_unsupported_fixtures) {
+        const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
+        if(!fixture) {
+            return bbb::dmx::mapper_result::failure("unknown fixture: " + fixture_id);
+        }
+        const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture->profile)};
+        if(!profile) {
+            return bbb::dmx::mapper_result::failure("missing profile: " + fixture->profile);
+        }
+        const bbb::dmx::fixture_mode *mode{profile->find_mode(fixture->mode)};
+        if(!mode) {
+            return bbb::dmx::mapper_result::failure("missing mode: " + fixture->mode);
+        }
+
+        const bbb::dmx::semantic_shutter_mapping mapping{bbb::dmx::semantic_shutter_parameter_for_mode(*mode, open)};
+        if(!mapping.ok) {
+            if(ignore_unsupported_fixtures) {
+                return bbb::dmx::mapper_result::success();
+            }
+            return bbb::dmx::mapper_result::failure("fixture has no semantic shutter parameter: " + fixture_id);
+        }
+
+        bbb::dmx::fixture_mapper trial_mapper{mapper_};
+        const bbb::dmx::mapper_result result{set_parameter_value_on_mapper(trial_mapper, fixture_id, mapping.parameter, mapping.value)};
+        if(!result.ok) {
+            return result;
+        }
+        mapper_ = trial_mapper;
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result apply_semantic_shutter_all(bool open) {
+        if(mapper_.patch().fixtures.empty()) {
+            return bbb::dmx::mapper_result::failure("shutterall requires a loaded patch with fixtures");
+        }
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            const bbb::dmx::mapper_result result{apply_semantic_shutter(fixture.id, open, true)};
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("shutterall fixture " + fixture.id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
     static double normalized_from_u16(std::uint16_t value) {
         return (double)value / 65535.0;
     }
@@ -964,12 +1072,16 @@ private:
     }
 
     bbb::dmx::mapper_result set_parameter_value(const std::string &fixture_id, const std::string &parameter, int value) {
-        bbb::dmx::mapper_result result{mapper_.set_u24(fixture_id, parameter, (std::uint32_t)clamp_int(value, 0, 16777215))};
+        return set_parameter_value_on_mapper(mapper_, fixture_id, parameter, value);
+    }
+
+    bbb::dmx::mapper_result set_parameter_value_on_mapper(bbb::dmx::fixture_mapper &target_mapper, const std::string &fixture_id, const std::string &parameter, int value) const {
+        bbb::dmx::mapper_result result{target_mapper.set_u24(fixture_id, parameter, (std::uint32_t)clamp_int(value, 0, 16777215))};
         if(!result.ok) {
-            result = mapper_.set_u16(fixture_id, parameter, (std::uint16_t)clamp_int(value, 0, 65535));
+            result = target_mapper.set_u16(fixture_id, parameter, (std::uint16_t)clamp_int(value, 0, 65535));
         }
         if(!result.ok) {
-            result = mapper_.set_u8(fixture_id, parameter, value);
+            result = target_mapper.set_u8(fixture_id, parameter, value);
         }
         return result;
     }

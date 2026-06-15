@@ -86,6 +86,19 @@
             </arglist>
             <description>Apply one semantic RGB color to every supported color fixture. Unsupported fixtures are silently skipped.</description>
         </method>
+        <method name="shutter">
+            <arglist>
+                <arg name="fixture_id" type="symbol" optional="0" />
+                <arg name="state" type="int" optional="0" />
+            </arglist>
+            <description>Open or close one fixture by semantic shutter state. Use 1/open/on/true for open and 0/close/closed/off/false/blackout for close. Shutter/strobe shared channels are intentionally overwritten.</description>
+        </method>
+        <method name="shutterall">
+            <arglist>
+                <arg name="state" type="int" optional="0" />
+            </arglist>
+            <description>Apply one semantic shutter state to every supported fixture. Unsupported fixtures are silently skipped.</description>
+        </method>
         <method name="track">
             <arglist>
                 <arg name="fixture_id" type="symbol" optional="0" />

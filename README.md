@@ -242,6 +242,8 @@ nsetall red 1.0 green 1.0 blue 0.0
 color spot_01 rgb 1.0 0.8 0.0
 colorall rgb 1.0 0.8 0.0
 colorall rgb8 255 204 0
+shutter spot_01 1
+shutterall 0
 ptbytes spot_01 127 255 127 255
 track spot_01 0. 0. 1.5
 trackall 0. 0. 1.5
@@ -250,7 +252,7 @@ trackallrel 0. -1. 0.
 trackreset [spot_01]
 ```
 
-The first argument of `set`, `nset`, `color`, `ptbytes`, `track`, and `trackrel` is the patch fixture `id` from `fixtures[].id`, not the profile key. Numeric fixture ids from MVR/MA-style JSON are accepted by the parser and canonicalized to strings, so a JSON id `12` is addressed in Max as `set 12 dimmer 255`. `set` and `nset` accept multiple parameter/value pairs for one fixture. `setall` and `nsetall` apply the same pairs to every fixture in the loaded patch, silently skipping fixtures that do not expose a requested parameter.
+The first argument of `set`, `nset`, `color`, `shutter`, `ptbytes`, `track`, and `trackrel` is the patch fixture `id` from `fixtures[].id`, not the profile key. Numeric fixture ids from MVR/MA-style JSON are accepted by the parser and canonicalized to strings, so a JSON id `12` is addressed in Max as `set 12 dimmer 255`. `set` and `nset` accept multiple parameter/value pairs for one fixture. `setall` and `nsetall` apply the same pairs to every fixture in the loaded patch, silently skipping fixtures that do not expose a requested parameter.
 
 Raw channel messages for testing or emergency overrides:
 
@@ -262,6 +264,8 @@ channels 1 255 2 128 3 0
 Fixture-aware mover tracking is built into `fixturemap`: `track fixture_id x y z` uses the loaded fixture position, rotation, calibration, and profile pan/tilt ranges, then writes normalized pan/tilt values into that fixture. `trackall x y z` applies the same world-space target to every mover in the patch and silently skips fixtures without both `pan` and `tilt` unless `@track_strict 1` is set. `trackrel` / `trackallrel` interpret the vector as relative to each fixture origin. `trackreset` clears pan-continuity history.
 
 Semantic color messages are intentionally separate from `setall/nsetall`: `color fixture_id rgb r g b` and `colorall rgb r g b` express desired additive RGB color and let the fixture profile decide the write model. RGB fixtures receive `red/green/blue`; RGBW fixtures receive RGB with extracted `white = min(r,g,b)` when `@color_use_white 1`; with `@color_use_white 0`, `white` is left untouched and the full color remains in RGB. CMY fixtures receive subtractive `cyan = 1-red`, `magenta = 1-green`, `yellow = 1-blue`. `rgb` values are normalized `0.0..1.0`; `rgb8` accepts `0..255`. Fixtures without a supported color model are skipped by `colorall` and rejected by per-fixture `color`.
+
+Semantic shutter messages solve the shutter/strobe naming mess: `shutter fixture_id 1` opens, `shutter fixture_id 0` closes, and `shutterall 1|0` applies the same state to every fixture that exposes a shutter-like parameter. On likely shutter/strobe parameters, range metadata named/functioned `open`, `closed`, `close`, or `blackout` is preferred and the midpoint of the matching range is written. If no range metadata exists, likely `shutter`/`shutter-strobe`/`strobe` parameters fall back to max for open and zero for close. If shutter and strobe are the same DMX channel, this intentionally overwrites the channel. Unsupported fixtures are skipped by `shutterall` and rejected by per-fixture `shutter`.
 
 `bbb.dmx.movertrack` is still kept as a low-level/test object. For manual wiring, `ptbytes` accepts `pan_byte_1 pan_byte_2 tilt_byte_1 tilt_byte_2` and converts them through the target fixture profile's pan/tilt byte-order metadata.
 

@@ -445,7 +445,7 @@
             760,
             48
           ],
-          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/setall/nset/nsetall, color/colorall, track/trackall/trackrel/trackallrel/trackreset, ptbytes, raw channel/channels, @patch, @autobang, @universe_mode, color/tracking attrs."
+          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/setall/nset/nsetall, color/colorall, shutter/shutterall, track/trackall/trackrel/trackallrel/trackreset, ptbytes, raw channel/channels, @patch, @autobang, @universe_mode, color/tracking attrs."
         }
       },
       {
@@ -458,7 +458,7 @@
             760,
             48
           ],
-          "text": "color/colorall maps semantic RGB onto RGB, RGBW, or CMY fixture profiles. @color_use_white controls whether RGBW uses W extraction or leaves W untouched. track/trackall use loaded fixture position, rotation, calibration, and pan/tilt ranges."
+          "text": "color/colorall maps semantic RGB onto RGB, RGBW, or CMY fixture profiles. shutter/shutterall opens or closes semantic shutter/strobe channels and overwrites shared strobe channels. track/trackall use loaded fixture position, rotation, calibration, and pan/tilt ranges."
         }
       },
       {
@@ -584,7 +584,7 @@
             170,
             22
           ],
-          "text": "colorall rgb8 255 204 0"
+          "text": "shutter spot_01 1"
         }
       },
       {
@@ -602,7 +602,7 @@
             105,
             22
           ],
-          "text": "color_use_white 0"
+          "text": "colorall rgb8 255 204 0"
         }
       }
     ],
