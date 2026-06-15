@@ -445,7 +445,7 @@
             760,
             48
           ],
-          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/setall/nset/nsetall, color/colorall, track/trackall/trackrel/trackallrel/trackreset, ptbytes, raw channel/channels, @patch, @autobang, @universe_mode, and tracking attrs."
+          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/setall/nset/nsetall, color/colorall, track/trackall/trackrel/trackallrel/trackreset, ptbytes, raw channel/channels, @patch, @autobang, @universe_mode, color/tracking attrs."
         }
       },
       {
@@ -458,7 +458,7 @@
             760,
             48
           ],
-          "text": "color/colorall maps semantic RGB onto RGB, RGBW, or CMY fixture profiles. track/trackall use loaded fixture position, rotation, calibration, and pan/tilt ranges. movertrack remains useful for small tests; ptbytes still accepts its byte tuple."
+          "text": "color/colorall maps semantic RGB onto RGB, RGBW, or CMY fixture profiles. @color_use_white controls whether RGBW uses W extraction or RGB-only output. track/trackall use loaded fixture position, rotation, calibration, and pan/tilt ranges."
         }
       },
       {
@@ -585,6 +585,24 @@
             22
           ],
           "text": "colorall rgb8 255 204 0"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-34",
+          "maxclass": "message",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "outlettype": [
+            ""
+          ],
+          "patching_rect": [
+            590,
+            270,
+            105,
+            22
+          ],
+          "text": "color_use_white 0"
         }
       }
     ],
@@ -881,6 +899,18 @@
         "patchline": {
           "source": [
             "obj-33",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-34",
             0
           ],
           "destination": [

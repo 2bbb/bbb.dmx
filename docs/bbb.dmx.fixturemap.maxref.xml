@@ -162,6 +162,9 @@
         <attribute name="track_strict" get="1" set="1" type="int">
             <description>When non-zero, trackall reports non-mover fixtures as errors instead of skipping them.</description>
         </attribute>
+        <attribute name="color_use_white" get="1" set="1" type="int">
+            <description>When non-zero, semantic color extracts RGBW white from min(red, green, blue). When zero, RGBW white is forced to 0 and RGB channels carry the full color.</description>
+        </attribute>
     </attributelist>
     <seealsolist>
         <seealso name="bbb.dmx.movertrack" />

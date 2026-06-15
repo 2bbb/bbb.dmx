@@ -29,6 +29,7 @@ private:
     double default_pan_range_value_{540.0};
     double default_tilt_range_value_{270.0};
     bool track_strict_value_{false};
+    bool color_use_white_value_{true};
     std::map<std::string, bbb::dmx::movertrack_engine> tracking_engines_{};
     bool warn_invalid_numeric_{false};
     bool warn_invalid_universe_mode_{false};
@@ -164,6 +165,14 @@ public:
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             track_strict_value_ = !args.empty() && ((int)args[0] != 0);
             return {track_strict_value_};
+        }}
+    };
+
+    c74::min::attribute<bool> color_use_white{this, "color_use_white", true,
+        c74::min::description{"When non-zero, semantic color extracts RGBW white from min(r,g,b). When zero, RGBW white is forced to 0 and RGB channels carry the full color."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            color_use_white_value_ = args.empty() || ((int)args[0] != 0);
+            return {color_use_white_value_};
         }}
     };
 
@@ -520,6 +529,8 @@ public:
             status_atoms.push_back(c74::min::symbol(bbb::dmx::tracking_mode_to_string(tracking_mode_value_)));
             status_atoms.push_back(c74::min::symbol("track_strict"));
             status_atoms.push_back(track_strict_value_ ? 1 : 0);
+            status_atoms.push_back(c74::min::symbol("color_use_white"));
+            status_atoms.push_back(color_use_white_value_ ? 1 : 0);
             status_atoms.push_back(c74::min::symbol("universes"));
             for(const int universe_id : mapper_.universe_ids()) {
                 status_atoms.push_back(universe_id);
@@ -712,7 +723,7 @@ private:
         std::vector<std::pair<const char *, double>> parameters;
         if(mode_has_parameter(*mode, "red") && mode_has_parameter(*mode, "green") && mode_has_parameter(*mode, "blue")) {
             const bool has_white{mode_has_parameter(*mode, "white")};
-            if(has_white) {
+            if(has_white && color_use_white_value_) {
                 const double white{std::min(color.red, std::min(color.green, color.blue))};
                 parameters.push_back({"red", color.red - white});
                 parameters.push_back({"green", color.green - white});
@@ -722,6 +733,9 @@ private:
                 parameters.push_back({"red", color.red});
                 parameters.push_back({"green", color.green});
                 parameters.push_back({"blue", color.blue});
+                if(has_white) {
+                    parameters.push_back({"white", 0.0});
+                }
             }
         } else if(mode_has_parameter(*mode, "cyan") && mode_has_parameter(*mode, "magenta") && mode_has_parameter(*mode, "yellow")) {
             parameters.push_back({"cyan", 1.0 - color.red});
