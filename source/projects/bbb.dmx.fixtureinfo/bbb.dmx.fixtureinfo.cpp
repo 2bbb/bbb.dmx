@@ -355,6 +355,17 @@ private:
         atoms.push_back(parameter.default_value);
         atoms.push_back(c74::min::symbol("range_degrees"));
         atoms.push_back(parameter.range_degrees);
+        atoms.push_back(c74::min::symbol("ranges"));
+        atoms.push_back((int)parameter.ranges.size());
+        for(const auto &range : parameter.ranges) {
+            atoms.push_back(c74::min::symbol("range"));
+            atoms.push_back(range.from);
+            atoms.push_back(range.to);
+            atoms.push_back(c74::min::symbol("function"));
+            atoms.push_back(c74::min::symbol(range.function.c_str()));
+            atoms.push_back(c74::min::symbol("label"));
+            atoms.push_back(c74::min::symbol(range.label.c_str()));
+        }
     }
 
     const bbb::dmx::fixture_instance *find_fixture(const std::string &fixture_id) const {
