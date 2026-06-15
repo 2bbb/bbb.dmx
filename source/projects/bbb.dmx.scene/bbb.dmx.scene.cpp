@@ -1,5 +1,7 @@
 #include "c74_min.h"
 
+#include <bbb/dmx/build_info.hpp>
+
 #include <bbb/dmx/fixture_json.hpp>
 #include <bbb/dmx/fixture_runtime.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
@@ -86,6 +88,7 @@ public:
     };
 
     bbb_dmx_scene() {
+        bbb::dmx::report_external_build_info(cout, "bbb.dmx.scene");
         init_timer.delay(0);
     }
 

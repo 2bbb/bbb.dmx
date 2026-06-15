@@ -1,5 +1,7 @@
 #include "c74_min.h"
 
+#include <bbb/dmx/build_info.hpp>
+
 #include <bbb/dmx/curve.hpp>
 #include <bbb/dmx/fixture_json.hpp>
 #include <bbb/dmx/frame_set.hpp>
@@ -38,6 +40,7 @@ public:
     };
 
     bbb_dmx_curve() {
+        bbb::dmx::report_external_build_info(cout, "bbb.dmx.curve");
         init_timer.delay(0);
     }
 

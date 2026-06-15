@@ -1,5 +1,7 @@
 #include "c74_min.h"
 
+#include <bbb/dmx/build_info.hpp>
+
 #include <bbb/dmx/frame_set.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 
@@ -18,6 +20,10 @@ public:
     MIN_TAGS{"dmx, lighting, diff, compare, universe"};
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.monitor, bbb.dmx.assert, bbb.dmx.record"};
+
+    bbb_dmx_diff() {
+        bbb::dmx::report_external_build_info(cout, "bbb.dmx.diff");
+    }
 
     c74::min::inlet<> input{this, "(a/b/list/universe/compare/clear) DMX diff input"};
     c74::min::outlet<> output{this, "(anything) changed channel records and summary"};

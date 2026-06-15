@@ -1,5 +1,7 @@
 #include "c74_min.h"
 
+#include <bbb/dmx/build_info.hpp>
+
 #include <bbb/dmx/frame_set.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 
@@ -25,6 +27,10 @@ public:
     MIN_TAGS{"dmx, lighting, record, playback, universe"};
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.monitor, bbb.dmx.merge, bbb.dmx.fade"};
+
+    bbb_dmx_record() {
+        bbb::dmx::report_external_build_info(cout, "bbb.dmx.record");
+    }
 
     c74::min::inlet<> input{this, "(universe/list/record/play/write/read/bang) recorder input"};
     c74::min::outlet<> output{this, "(anything) universe id and 512 DMX bytes"};

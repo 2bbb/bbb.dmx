@@ -1,5 +1,7 @@
 #include "c74_min.h"
 
+#include <bbb/dmx/build_info.hpp>
+
 #include <bbb/dmx/movertrack.hpp>
 
 #include <algorithm>
@@ -32,6 +34,10 @@ public:
     MIN_TAGS{"dmx, lighting, mover, pan, tilt, tracking"};
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx"};
+
+    bbb_dmx_movertrack() {
+        bbb::dmx::report_external_build_info(cout, "bbb.dmx.movertrack");
+    }
 
     c74::min::inlet<> input{this, "(list/target/relative/pos/rot/range/bang) target and control input"};
     c74::min::outlet<> output{this, "(list) pan coarse/fine and tilt coarse/fine bytes"};

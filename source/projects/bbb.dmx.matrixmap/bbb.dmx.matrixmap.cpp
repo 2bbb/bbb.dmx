@@ -1,4 +1,6 @@
 #include "c74_min.h"
+
+#include <bbb/dmx/build_info.hpp>
 #include "c74_jitter.h"
 
 #include <bbb/dmx/fixture_json.hpp>
@@ -186,6 +188,7 @@ public:
     };
 
     bbb_dmx_matrixmap() {
+        bbb::dmx::report_external_build_info(cout, "bbb.dmx.matrixmap");
         init_timer.delay(0);
     }
 

@@ -10,9 +10,23 @@ if(NOT EXISTS "${BBB_DMX_CORE_DIR}/include/bbb/dmx/common.hpp")
     message(FATAL_ERROR "bbb-dmx core submodule is missing. Run: git submodule update --init --recursive")
 endif()
 
+set(BBB_DMX_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(BBB_DMX_BUILD_INFO_HEADER "${BBB_DMX_GENERATED_INCLUDE_DIR}/bbb/dmx/build_info_generated.hpp")
+add_custom_target(bbb_dmx_build_info_header ALL
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DCORE_DIR=${BBB_DMX_CORE_DIR}
+        -DOUTPUT_FILE=${BBB_DMX_BUILD_INFO_HEADER}
+        -DPACKAGE_VERSION=${PROJECT_VERSION}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/write_build_info.cmake
+    BYPRODUCTS ${BBB_DMX_BUILD_INFO_HEADER}
+    COMMENT "Generating bbb.dmx build information"
+)
+
 set(BBB_DMX_COMMON_INCLUDE_DIRS
     "${BBB_DMX_CORE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/source"
+    "${BBB_DMX_GENERATED_INCLUDE_DIR}"
 )
 
 add_library(bbb_dmx_common INTERFACE)

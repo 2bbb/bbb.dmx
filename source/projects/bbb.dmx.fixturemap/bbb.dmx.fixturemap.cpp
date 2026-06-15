@@ -1,5 +1,7 @@
 #include "c74_min.h"
 
+#include <bbb/dmx/build_info.hpp>
+
 #include <bbb/dmx/fixture_groups.hpp>
 #include <bbb/dmx/fixture_json.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
@@ -70,7 +72,9 @@ public:
         }
     };
 
-    bbb_dmx_fixturemap() = default;
+    bbb_dmx_fixturemap() {
+        bbb::dmx::report_external_build_info(cout, "bbb.dmx.fixturemap");
+    }
 
     c74::min::attribute<c74::min::symbol> patch{this, "patch", "",
         c74::min::description{"Patch JSON file path to load on object initialization."},

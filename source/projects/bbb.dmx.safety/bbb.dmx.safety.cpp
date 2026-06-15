@@ -1,5 +1,7 @@
 #include "c74_min.h"
 
+#include <bbb/dmx/build_info.hpp>
+
 #include <bbb/dmx/frame_set.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 
@@ -25,6 +27,10 @@ public:
     MIN_TAGS{"dmx, lighting, safety, blackout, freeze, universe"};
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.generator, bbb.dmx.merge"};
+
+    bbb_dmx_safety() {
+        bbb::dmx::report_external_build_info(cout, "bbb.dmx.safety");
+    }
 
     c74::min::inlet<> input{this, "(list/universe/channel/channels/blackout/freeze/bang) protected DMX input"};
     c74::min::outlet<> output{this, "(anything) protected universe data"};

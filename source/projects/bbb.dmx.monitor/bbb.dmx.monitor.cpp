@@ -1,5 +1,7 @@
 #include "c74_min.h"
 
+#include <bbb/dmx/build_info.hpp>
+
 #include <bbb/dmx/frame_set.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 
@@ -17,6 +19,10 @@ public:
     MIN_TAGS{"dmx, lighting, monitor, universe, debug"};
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.fixturemap, bbb.dmx.merge"};
+
+    bbb_dmx_monitor() {
+        bbb::dmx::report_external_build_info(cout, "bbb.dmx.monitor");
+    }
 
     c74::min::inlet<> input{this, "(list/universe/channel/channels/bang/dump) DMX monitor input"};
     c74::min::outlet<> output{this, "(anything) universe or changed channel data"};

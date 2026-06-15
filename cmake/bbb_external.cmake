@@ -98,6 +98,9 @@ macro(bbb_add_external)
 
     # --- build library ---
     add_library(${PROJECT_NAME} MODULE ${_bbb_sources})
+    if(TARGET bbb_dmx_build_info_header)
+        add_dependencies(${PROJECT_NAME} bbb_dmx_build_info_header)
+    endif()
 
     if(_bbb_target_link_flags)
         set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "${_bbb_target_link_flags}")
