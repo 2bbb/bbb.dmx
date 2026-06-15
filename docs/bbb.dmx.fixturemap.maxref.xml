@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <c74object name="bbb.dmx.fixturemap" category="bbb.dmx">
     <digest>Map fixture parameters into one or more DMX universes.</digest>
-    <description>Loads a bbb.dmx patch JSON file, accepts fixture parameter messages, and outputs 512-channel DMX universe lists. It can output one selected universe or all known universes.</description>
+    <description>Loads a bbb.dmx patch JSON file, accepts fixture parameter and fixture-aware tracking messages, and outputs 512-channel DMX universe lists. It can output one selected universe or all known universes.</description>
     <metadatalist>
         <metadata name="author">2bit</metadata>
         <metadata name="tag">dmx</metadata>
@@ -67,6 +67,46 @@
             </arglist>
             <description>Apply one or more normalized 0..1 parameter/value pairs to every fixture in the loaded patch. Fixtures that do not expose a requested parameter are silently skipped.</description>
         </method>
+        <method name="track">
+            <arglist>
+                <arg name="fixture_id" type="symbol" optional="0" />
+                <arg name="target_x" type="float" optional="0" />
+                <arg name="target_y" type="float" optional="0" />
+                <arg name="target_z" type="float" optional="0" />
+            </arglist>
+            <description>Track one mover fixture toward a world-space target using loaded fixture position, rotation, calibration, and profile pan/tilt ranges.</description>
+        </method>
+        <method name="trackall">
+            <arglist>
+                <arg name="target_x" type="float" optional="0" />
+                <arg name="target_y" type="float" optional="0" />
+                <arg name="target_z" type="float" optional="0" />
+            </arglist>
+            <description>Track every mover fixture toward one world-space target. Non-mover fixtures are skipped unless track_strict is enabled.</description>
+        </method>
+        <method name="trackrel">
+            <arglist>
+                <arg name="fixture_id" type="symbol" optional="0" />
+                <arg name="relative_x" type="float" optional="0" />
+                <arg name="relative_y" type="float" optional="0" />
+                <arg name="relative_z" type="float" optional="0" />
+            </arglist>
+            <description>Track one mover using a vector relative to the fixture origin.</description>
+        </method>
+        <method name="trackallrel">
+            <arglist>
+                <arg name="relative_x" type="float" optional="0" />
+                <arg name="relative_y" type="float" optional="0" />
+                <arg name="relative_z" type="float" optional="0" />
+            </arglist>
+            <description>Track every mover using the same vector relative to each fixture origin.</description>
+        </method>
+        <method name="trackreset">
+            <arglist>
+                <arg name="fixture_id" type="symbol" optional="1" />
+            </arglist>
+            <description>Clear stored pan-continuity history for one fixture, or for all fixtures when no id is supplied.</description>
+        </method>
         <method name="ptbytes">
             <arglist>
                 <arg name="fixture_key" type="symbol" optional="0" />
@@ -90,6 +130,18 @@
         </attribute>
         <attribute name="autobang" get="1" set="1" type="int">
             <description>When non-zero, output automatically after parameter changes.</description>
+        </attribute>
+        <attribute name="tracking_mode" get="1" set="1" type="symbol">
+            <description>Pan continuity mode for track and trackall messages: smart, pan, or off.</description>
+        </attribute>
+        <attribute name="default_pan_range" get="1" set="1" type="float">
+            <description>Fallback pan range in degrees when the fixture profile omits pan.range_degrees.</description>
+        </attribute>
+        <attribute name="default_tilt_range" get="1" set="1" type="float">
+            <description>Fallback tilt range in degrees when the fixture profile omits tilt.range_degrees.</description>
+        </attribute>
+        <attribute name="track_strict" get="1" set="1" type="int">
+            <description>When non-zero, trackall reports non-mover fixtures as errors instead of skipping them.</description>
         </attribute>
     </attributelist>
     <seealsolist>

@@ -64,7 +64,7 @@
             620,
             24
           ],
-          "text": "bbb.dmx.fixturemap — map fixture parameters into one or more DMX universes"
+          "text": "bbb.dmx.fixturemap \u2014 map fixture parameters into one or more DMX universes"
         }
       },
       {
@@ -354,7 +354,7 @@
             720,
             45
           ],
-          "text": "Patch files reference fixture profile JSON files relative to the patch file. A patch may contain fixtures across multiple universes; use @universe for selected output or bangall for all universes."
+          "text": "Patch files reference fixture profile JSON files relative to the patch file. A patch may contain fixtures across multiple universes; use @universe for selected output or @universe_mode all / bangall for explicit multi-universe messages."
         }
       },
       {
@@ -441,11 +441,11 @@
           "maxclass": "comment",
           "patching_rect": [
             30,
-            455,
+            485,
             760,
-            36
+            42
           ],
-          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/setall/nset/nsetall/ptbytes, raw channel/channels, @patch, @autobang, and @universe_mode selected|all."
+          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/setall/nset/nsetall, track/trackall/trackrel/trackallrel/trackreset, ptbytes, raw channel/channels, @patch, @autobang, @universe_mode, and tracking attrs."
         }
       },
       {
@@ -454,11 +454,11 @@
           "maxclass": "comment",
           "patching_rect": [
             30,
-            495,
+            535,
             760,
-            22
+            36
           ],
-          "text": "ptbytes consumes movertrack byte output and uses the fixture profile byte_order for pan/tilt mapping."
+          "text": "track/trackall use loaded fixture position, rotation, calibration, and pan/tilt ranges. movertrack remains useful for small tests; ptbytes still accepts its byte tuple."
         }
       },
       {
@@ -495,6 +495,60 @@
             22
           ],
           "text": "universe_mode all"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-29",
+          "maxclass": "message",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "outlettype": [
+            ""
+          ],
+          "patching_rect": [
+            30,
+            240,
+            180,
+            22
+          ],
+          "text": "track spot_01 0. 0. 1.5"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-30",
+          "maxclass": "message",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "outlettype": [
+            ""
+          ],
+          "patching_rect": [
+            30,
+            270,
+            180,
+            22
+          ],
+          "text": "trackall 0. 0. 1.5"
+        }
+      },
+      {
+        "box": {
+          "id": "obj-31",
+          "maxclass": "message",
+          "numinlets": 2,
+          "numoutlets": 1,
+          "outlettype": [
+            ""
+          ],
+          "patching_rect": [
+            30,
+            300,
+            145,
+            22
+          ],
+          "text": "trackreset spot_01"
         }
       }
     ],
@@ -731,6 +785,42 @@
         "patchline": {
           "source": [
             "obj-28",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-29",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-30",
+            0
+          ],
+          "destination": [
+            "obj-10",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "obj-31",
             0
           ],
           "destination": [

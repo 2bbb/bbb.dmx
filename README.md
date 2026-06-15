@@ -204,13 +204,17 @@ bang              // recomputes the last target, or outputs neutral center befor
 
 The left outlet outputs a 512-integer list for the selected universe: DMX channel 1 first, channel 512 last. The right outlet outputs status/error messages such as load failures and `dump` status. Fixture profiles live in `fixtures/`; show patch files live in `patches/`. Profile paths inside patch JSON are resolved relative to the patch file. Patch paths passed to `read` or `@patch` are resolved through Max's file/path system, so patcher-relative paths work when the patcher is saved.
 
-`fixturemap` can load patches containing multiple universes, but each object instance outputs one selected universe. If you need a fully explicit multi-universe stream, run one `fixturemap` per universe or pass its output through `prepend universe <id>` before the rest of the chain.
+`fixturemap` can load patches containing multiple universes. By default it outputs the selected universe as a bare 512-value list; set `@universe_mode all` or send `bangall` to output one `universe <id> <512 values...>` message per known universe.
 
 Attributes:
 
 - `@patch` — patch JSON path. Loaded after object initialization and when the attribute changes; use `patch path.json`/attrui for deferred attribute loading or `read path.json` for immediate explicit loading.
 - `@universe` — selected universe, starting at `1`.
-- `@autobang` — if non-zero, successful updates immediately output the full 512-channel universe. Default is `1`.
+- `@autobang` — if non-zero, successful updates immediately output according to `@universe_mode`. Default is `1`.
+- `@universe_mode` — `selected` outputs the selected bare 512-value list; `all` outputs explicit `universe <id> <512 values...>` messages.
+- `@tracking_mode` — pan continuity for `track`/`trackall`: `smart` (default), `pan`, or `off`.
+- `@default_pan_range` / `@default_tilt_range` — fallback mover ranges when a profile omits `range_degrees`. Defaults are `540.` and `270.`.
+- `@track_strict` — if non-zero, `trackall` errors on non-mover fixtures instead of skipping them.
 
 Load / inspect messages:
 
@@ -235,9 +239,14 @@ nset spot_01 dimmer 1.0
 nset spot_01 red 1.0 green 1.0 blue 0.0
 nsetall red 1.0 green 1.0 blue 0.0
 ptbytes spot_01 127 255 127 255
+track spot_01 0. 0. 1.5
+trackall 0. 0. 1.5
+trackrel spot_01 0. -1. 0.
+trackallrel 0. -1. 0.
+trackreset [spot_01]
 ```
 
-The first argument of `set`, `nset`, and `ptbytes` is the patch fixture `id` from `fixtures[].id`, not the profile key. Numeric fixture ids from MVR/MA-style JSON are accepted by the parser and canonicalized to strings, so a JSON id `12` is addressed in Max as `set 12 dimmer 255`. `set` and `nset` accept multiple parameter/value pairs for one fixture. `setall` and `nsetall` apply the same pairs to every fixture in the loaded patch, silently skipping fixtures that do not expose a requested parameter.
+The first argument of `set`, `nset`, `ptbytes`, `track`, and `trackrel` is the patch fixture `id` from `fixtures[].id`, not the profile key. Numeric fixture ids from MVR/MA-style JSON are accepted by the parser and canonicalized to strings, so a JSON id `12` is addressed in Max as `set 12 dimmer 255`. `set` and `nset` accept multiple parameter/value pairs for one fixture. `setall` and `nsetall` apply the same pairs to every fixture in the loaded patch, silently skipping fixtures that do not expose a requested parameter.
 
 Raw channel messages for testing or emergency overrides:
 
@@ -246,17 +255,9 @@ channel 512 255
 channels 1 255 2 128 3 0
 ```
 
-Movertrack integration is intentionally byte-tuple based for now:
+Fixture-aware mover tracking is built into `fixturemap`: `track fixture_id x y z` uses the loaded fixture position, rotation, calibration, and profile pan/tilt ranges, then writes normalized pan/tilt values into that fixture. `trackall x y z` applies the same world-space target to every mover in the patch and silently skips fixtures without both `pan` and `tilt` unless `@track_strict 1` is set. `trackrel` / `trackallrel` interpret the vector as relative to each fixture origin. `trackreset` clears pan-continuity history.
 
-```max
-[bbb.dmx.movertrack ...]
-|
-[prepend ptbytes spot_01]
-|
-[bbb.dmx.fixturemap @patch patches/example.json]
-```
-
-`ptbytes` accepts `pan_byte_1 pan_byte_2 tilt_byte_1 tilt_byte_2` and converts them through the target fixture profile's pan/tilt byte-order metadata.
+`bbb.dmx.movertrack` is still kept as a low-level/test object. For manual wiring, `ptbytes` accepts `pan_byte_1 pan_byte_2 tilt_byte_1 tilt_byte_2` and converts them through the target fixture profile's pan/tilt byte-order metadata.
 
 ## `bbb.dmx.matrixmap`
 

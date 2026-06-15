@@ -2,10 +2,12 @@
 
 #include <bbb/dmx/fixture_json.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
+#include <bbb/dmx/movertrack.hpp>
 
 #include <algorithm>
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -16,8 +18,15 @@ private:
     int universe_value_{1};
     bool autobang_value_{true};
     bool output_all_universes_{false};
+    bbb::dmx::tracking_mode tracking_mode_value_{bbb::dmx::tracking_mode::smart};
+    double default_pan_range_value_{540.0};
+    double default_tilt_range_value_{270.0};
+    bool track_strict_value_{false};
+    std::map<std::string, bbb::dmx::movertrack_engine> tracking_engines_{};
     bool warn_invalid_numeric_{false};
     bool warn_invalid_universe_mode_{false};
+    bool warn_invalid_tracking_mode_{false};
+    bool warn_invalid_range_{false};
     bool warn_runtime_error_{false};
     bool patch_load_pending_{false};
     bool suppress_patch_attribute_load_{false};
@@ -28,7 +37,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(read/set/setall/nset/nsetall/ptbytes/channel/bang/bangall) fixture mapping control"};
+    c74::min::inlet<> input{this, "(read/set/setall/nset/nsetall/track/trackall/trackrel/trackallrel/ptbytes/channel/bang/bangall) fixture mapping control"};
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -102,6 +111,55 @@ public:
         }}
     };
 
+    c74::min::attribute<c74::min::symbol> tracking_mode{this, "tracking_mode", "smart",
+        c74::min::description{"Pan continuity mode for track/trackall messages: smart, pan, or off."},
+        c74::min::enum_map{"smart", "pan", "off"},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                return {c74::min::symbol(bbb::dmx::tracking_mode_to_string(tracking_mode_value_))};
+            }
+            bbb::dmx::tracking_mode mode{tracking_mode_value_};
+            if(!bbb::dmx::tracking_mode_from_string(symbol_arg(args[0]), mode)) {
+                warn_once(warn_invalid_tracking_mode_, "invalid tracking_mode ignored");
+                return {c74::min::symbol(bbb::dmx::tracking_mode_to_string(tracking_mode_value_))};
+            }
+            tracking_mode_value_ = mode;
+            return {c74::min::symbol(bbb::dmx::tracking_mode_to_string(tracking_mode_value_))};
+        }}
+    };
+
+    c74::min::attribute<double> default_pan_range{this, "default_pan_range", 540.0,
+        c74::min::description{"Fallback pan range in degrees when the fixture profile omits pan.range_degrees."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty() || !finite_atom(args[0]) || (double)args[0] <= 0.0) {
+                warn_once(warn_invalid_range_, "invalid default_pan_range ignored");
+                return {default_pan_range_value_};
+            }
+            default_pan_range_value_ = (double)args[0];
+            return {default_pan_range_value_};
+        }}
+    };
+
+    c74::min::attribute<double> default_tilt_range{this, "default_tilt_range", 270.0,
+        c74::min::description{"Fallback tilt range in degrees when the fixture profile omits tilt.range_degrees."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty() || !finite_atom(args[0]) || (double)args[0] <= 0.0) {
+                warn_once(warn_invalid_range_, "invalid default_tilt_range ignored");
+                return {default_tilt_range_value_};
+            }
+            default_tilt_range_value_ = (double)args[0];
+            return {default_tilt_range_value_};
+        }}
+    };
+
+    c74::min::attribute<bool> track_strict{this, "track_strict", false,
+        c74::min::description{"When non-zero, trackall reports fixtures without pan/tilt as errors instead of skipping them."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            track_strict_value_ = !args.empty() && ((int)args[0] != 0);
+            return {track_strict_value_};
+        }}
+    };
+
     c74::min::message<> read_message{this, "read", "read patch_json_path",
         MIN_FUNCTION {
             if(args.empty()) {
@@ -133,6 +191,7 @@ public:
     c74::min::message<> clear_message{this, "clear", "Clear all loaded profiles, patch data, and universe buffers.",
         MIN_FUNCTION {
             mapper_.clear();
+            tracking_engines_.clear();
             report_status("clear");
             output_if_autobang();
             return {};
@@ -254,6 +313,111 @@ public:
         }
     };
 
+    c74::min::message<> track_message{this, "track", "track fixture_id target_x target_y target_z",
+        MIN_FUNCTION {
+            if(args.size() < 4 || !finite_atoms(args, 1, 3)) {
+                report_error("track requires fixture_id target_x target_y target_z");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_tracking_engines = tracking_engines_;
+            const bbb::dmx::mapper_result result{track_fixture(
+                symbol_arg(args[0]),
+                bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]},
+                false,
+                false
+            )};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                tracking_engines_ = previous_tracking_engines;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> trackrel_message{this, "trackrel", "trackrel fixture_id rel_x rel_y rel_z",
+        MIN_FUNCTION {
+            if(args.size() < 4 || !finite_atoms(args, 1, 3)) {
+                report_error("trackrel requires fixture_id rel_x rel_y rel_z");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_tracking_engines = tracking_engines_;
+            const bbb::dmx::mapper_result result{track_fixture(
+                symbol_arg(args[0]),
+                bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]},
+                true,
+                false
+            )};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                tracking_engines_ = previous_tracking_engines;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> trackall_message{this, "trackall", "trackall target_x target_y target_z",
+        MIN_FUNCTION {
+            if(args.size() < 3 || !finite_atoms(args, 0, 3)) {
+                report_error("trackall requires target_x target_y target_z");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_tracking_engines = tracking_engines_;
+            const bbb::dmx::mapper_result result{track_all(
+                bbb::dmx::vec3{(double)args[0], (double)args[1], (double)args[2]},
+                false
+            )};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                tracking_engines_ = previous_tracking_engines;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> trackallrel_message{this, "trackallrel", "trackallrel rel_x rel_y rel_z",
+        MIN_FUNCTION {
+            if(args.size() < 3 || !finite_atoms(args, 0, 3)) {
+                report_error("trackallrel requires rel_x rel_y rel_z");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_tracking_engines = tracking_engines_;
+            const bbb::dmx::mapper_result result{track_all(
+                bbb::dmx::vec3{(double)args[0], (double)args[1], (double)args[2]},
+                true
+            )};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                tracking_engines_ = previous_tracking_engines;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> trackreset_message{this, "trackreset", "trackreset [fixture_id]",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                tracking_engines_.clear();
+                report_status("trackreset");
+                return {};
+            }
+            tracking_engines_.erase(symbol_arg(args[0]));
+            report_status("trackreset");
+            return {};
+        }
+    };
+
     c74::min::message<> channel_message{this, "channel", "channel address value in selected universe",
         MIN_FUNCTION {
             if(args.size() < 2 || !finite_atoms(args, 0, 2)) {
@@ -299,6 +463,10 @@ public:
             status_atoms.push_back(universe_value_);
             status_atoms.push_back(c74::min::symbol("universe_mode"));
             status_atoms.push_back(c74::min::symbol(output_all_universes_ ? "all" : "selected"));
+            status_atoms.push_back(c74::min::symbol("tracking_mode"));
+            status_atoms.push_back(c74::min::symbol(bbb::dmx::tracking_mode_to_string(tracking_mode_value_)));
+            status_atoms.push_back(c74::min::symbol("track_strict"));
+            status_atoms.push_back(track_strict_value_ ? 1 : 0);
             status_atoms.push_back(c74::min::symbol("universes"));
             for(const int universe_id : mapper_.universe_ids()) {
                 status_atoms.push_back(universe_id);
@@ -326,6 +494,7 @@ private:
             return;
         }
         mapper_ = loaded_mapper;
+        tracking_engines_.clear();
         report_status("loaded");
         output_if_autobang();
     }
@@ -415,6 +584,123 @@ private:
 
     static std::string symbol_arg(const c74::min::atom &atom) {
         return bbb::dmx::maxutil::symbol_arg(atom);
+    }
+
+    static double normalized_from_u16(std::uint16_t value) {
+        return (double)value / 65535.0;
+    }
+
+    const bbb::dmx::fixture_instance *find_fixture_instance(const std::string &fixture_id) const {
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            if(fixture.id == fixture_id) {
+                return &fixture;
+            }
+        }
+        return nullptr;
+    }
+
+    bbb::dmx::mapper_result configure_tracking_engine(const bbb::dmx::fixture_instance &fixture, bbb::dmx::movertrack_engine &engine) const {
+        const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture.profile)};
+        if(!profile) {
+            return bbb::dmx::mapper_result::failure("missing profile: " + fixture.profile);
+        }
+        const bbb::dmx::fixture_mode *mode{profile->find_mode(fixture.mode)};
+        if(!mode) {
+            return bbb::dmx::mapper_result::failure("missing mode: " + fixture.mode);
+        }
+        const bbb::dmx::fixture_parameter *pan_parameter{mode->find_parameter("pan")};
+        const bbb::dmx::fixture_parameter *tilt_parameter{mode->find_parameter("tilt")};
+        if(!pan_parameter || !tilt_parameter) {
+            return bbb::dmx::mapper_result::failure("fixture is not a mover: " + fixture.id);
+        }
+
+        const double pan_range{0.0 < pan_parameter->range_degrees ? pan_parameter->range_degrees : default_pan_range_value_};
+        const double tilt_range{0.0 < tilt_parameter->range_degrees ? tilt_parameter->range_degrees : default_tilt_range_value_};
+        if(!bbb::dmx::is_finite(pan_range) || !bbb::dmx::is_finite(tilt_range) || pan_range <= 0.0 || tilt_range <= 0.0) {
+            return bbb::dmx::mapper_result::failure("invalid pan/tilt range for fixture: " + fixture.id);
+        }
+
+        if(!engine.set_fixture_position(fixture.position)) {
+            return bbb::dmx::mapper_result::failure("invalid fixture position: " + fixture.id);
+        }
+        if(!engine.set_rotation_degrees(fixture.rotation)) {
+            return bbb::dmx::mapper_result::failure("invalid fixture rotation: " + fixture.id);
+        }
+        if(!engine.set_ranges(pan_range, tilt_range)) {
+            return bbb::dmx::mapper_result::failure("invalid pan/tilt range for fixture: " + fixture.id);
+        }
+        if(!engine.set_pan_offset(fixture.calibration.pan_offset)) {
+            return bbb::dmx::mapper_result::failure("invalid pan offset for fixture: " + fixture.id);
+        }
+        if(!engine.set_tilt_offset(fixture.calibration.tilt_offset)) {
+            return bbb::dmx::mapper_result::failure("invalid tilt offset for fixture: " + fixture.id);
+        }
+        engine.set_pan_invert(fixture.calibration.pan_invert);
+        engine.set_tilt_invert(fixture.calibration.tilt_invert);
+        engine.set_tracking_mode(tracking_mode_value_);
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::movertrack_engine tracking_engine_copy_for(const std::string &fixture_id) const {
+        const auto found = tracking_engines_.find(fixture_id);
+        if(found == tracking_engines_.end()) {
+            return bbb::dmx::movertrack_engine{};
+        }
+        return found->second;
+    }
+
+    bbb::dmx::mapper_result apply_tracking_output(const std::string &fixture_id, const bbb::dmx::movertrack_output &output, bool ignore_unknown_parameters) {
+        bbb::dmx::fixture_mapper trial_mapper{mapper_};
+        bbb::dmx::mapper_result result{trial_mapper.set_normalized(fixture_id, "pan", normalized_from_u16(output.pan))};
+        if(result.ok) {
+            result = trial_mapper.set_normalized(fixture_id, "tilt", normalized_from_u16(output.tilt));
+        }
+        if(!result.ok) {
+            if(ignore_unknown_parameters && is_unknown_parameter_result(result)) {
+                return bbb::dmx::mapper_result::success();
+            }
+            return result;
+        }
+        mapper_ = trial_mapper;
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result track_fixture(const std::string &fixture_id, const bbb::dmx::vec3 &target, bool relative, bool ignore_non_movers) {
+        const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
+        if(!fixture) {
+            return bbb::dmx::mapper_result::failure("unknown fixture: " + fixture_id);
+        }
+
+        bbb::dmx::movertrack_engine trial_engine{tracking_engine_copy_for(fixture_id)};
+        bbb::dmx::mapper_result result{configure_tracking_engine(*fixture, trial_engine)};
+        if(!result.ok) {
+            if(ignore_non_movers && is_non_mover_result(result)) {
+                return bbb::dmx::mapper_result::success();
+            }
+            return result;
+        }
+
+        const bbb::dmx::movertrack_output output{relative ? trial_engine.compute_relative(target) : trial_engine.compute(target)};
+        result = apply_tracking_output(fixture_id, output, ignore_non_movers);
+        if(!result.ok) {
+            return result;
+        }
+        tracking_engines_[fixture_id] = trial_engine;
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result track_all(const bbb::dmx::vec3 &target, bool relative) {
+        if(mapper_.patch().fixtures.empty()) {
+            return bbb::dmx::mapper_result::failure("trackall requires a loaded patch with fixtures");
+        }
+        const bool ignore_non_movers{!track_strict_value_};
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            const bbb::dmx::mapper_result result{track_fixture(fixture.id, target, relative, ignore_non_movers)};
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("trackall fixture " + fixture.id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
     }
 
     bbb::dmx::mapper_result set_all_parameter_args(const c74::min::atoms &args) {
@@ -535,6 +821,11 @@ private:
 
     static bool is_unknown_parameter_result(const bbb::dmx::mapper_result &result) {
         const std::string prefix{"unknown parameter: "};
+        return !result.ok && result.message.rfind(prefix, 0) == 0;
+    }
+
+    static bool is_non_mover_result(const bbb::dmx::mapper_result &result) {
+        const std::string prefix{"fixture is not a mover: "};
         return !result.ok && result.message.rfind(prefix, 0) == 0;
     }
 
