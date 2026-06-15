@@ -134,7 +134,18 @@ macro(bbb_add_external)
     endif()
 
     # --- min-api post-target ---
+    if(APPLE)
+        set(AUTHOR_DOMAIN "jp.2bit")
+        set(BUNDLE_IDENTIFIER "${PROJECT_NAME}")
+    endif()
     include(${C74_MIN_API_DIR}/script/min-posttarget.cmake)
+    if(APPLE)
+        set(_bbb_bundle_identifier "jp.2bit.${PROJECT_NAME}")
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            MACOSX_BUNDLE_GUI_IDENTIFIER "${_bbb_bundle_identifier}"
+            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${_bbb_bundle_identifier}"
+        )
+    endif()
 
     endif() # _bbb_should_build
 
@@ -147,6 +158,7 @@ macro(bbb_add_external)
         unset(_bbb_saved_${_bbb_var})
         unset(_bbb_had_${_bbb_var})
     endforeach()
+    unset(_bbb_bundle_identifier)
     unset(BBB_ARG_MACOS_ONLY)
     unset(BBB_ARG_WIN32_ONLY)
     unset(BBB_ARG_RPATH)

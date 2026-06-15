@@ -32,6 +32,65 @@ jobs:
             lipo "$binary" -verify_arch x86_64 arm64
           done < <(find externals -path '*/Contents/MacOS/*' -type f | sort)
 
+      - name: Verify macOS signing secrets
+        if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        shell: bash
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in MACOS_CERTIFICATE_P12 MACOS_CERTIFICATE_PASSWORD DEVELOPER_ID_APPLICATION; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is required for Gatekeeper-safe main/release builds"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Import Developer ID certificate
+        if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        shell: bash
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/developer-id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          printf '%s' "$CERTIFICATE_P12" | base64 -D > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Sign Max externals
+        if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        shell: bash
+        env:
+          DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+          BUNDLE_ID_PREFIX: jp.2bit
+        run: |
+          set -euo pipefail
+          sanitize_identifier_component() {
+            printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9.-]+/-/g; s/^-+//; s/-+$//'
+          }
+          while IFS= read -r -d '' mxo; do
+            name="$(basename "$mxo" .mxo)"
+            component="$(sanitize_identifier_component "$name")"
+            identifier="${BUNDLE_ID_PREFIX}.${component}"
+            codesign --force --deep --options runtime --timestamp \
+              --identifier "$identifier" \
+              --sign "$DEVELOPER_ID_APPLICATION" \
+              "$mxo"
+            codesign --verify --deep --strict --verbose=2 "$mxo"
+          done < <(find externals -name "*.mxo" -type d -print0 | sort -z)
+
       - name: Upload externals
         uses: actions/upload-artifact@v7
         with:
@@ -78,7 +137,7 @@ jobs:
     permissions:
       contents: write
     needs: [build-macos, build-windows, validate-json]
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
         with:
@@ -97,7 +156,9 @@ jobs:
           path: dist/bbb.dmx/externals/
 
       - name: Assemble package
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist/bbb.dmx
           cp package-info.json dist/bbb.dmx/
           cp README.md dist/bbb.dmx/ 2>/dev/null || true
@@ -117,10 +178,45 @@ jobs:
           cp -r libs/bbb-dmx/schemas dist/bbb.dmx/ 2>/dev/null || true
           find dist/bbb.dmx/externals -path '*/Contents/MacOS/*' -type f -exec chmod 755 {} +
 
-      - name: Create archive
+      - name: Create macOS-preserving archive
+        shell: bash
         run: |
+          set -euo pipefail
           cd dist
-          zip -r bbb.dmx.zip bbb.dmx/
+          ditto -c -k --keepParent bbb.dmx bbb.dmx.zip
+
+      - name: Verify notarization secrets
+        if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in APPLE_ID APPLE_TEAM_ID APPLE_APP_SPECIFIC_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is required for Gatekeeper-safe main/release builds"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Notarize archive
+        if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          xcrun notarytool submit "dist/bbb.dmx.zip" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --wait
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
