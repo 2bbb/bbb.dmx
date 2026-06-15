@@ -1127,8 +1127,8 @@ private:
             return bbb::dmx::mapper_result::failure("missing mode: " + fixture->mode);
         }
 
-        const bbb::dmx::semantic_shutter_mapping mapping{bbb::dmx::semantic_shutter_parameter_for_mode(*mode, open)};
-        if(!mapping.ok) {
+        const bbb::dmx::semantic_shutter_mappings mappings{bbb::dmx::semantic_shutter_parameters_for_mode(*mode, open)};
+        if(!mappings.ok) {
             if(ignore_unsupported_fixtures) {
                 return bbb::dmx::mapper_result::success();
             }
@@ -1136,9 +1136,11 @@ private:
         }
 
         bbb::dmx::fixture_mapper trial_mapper{mapper_};
-        const bbb::dmx::mapper_result result{set_parameter_value_on_mapper(trial_mapper, fixture_id, mapping.parameter, mapping.value)};
-        if(!result.ok) {
-            return result;
+        for(const auto &mapping : mappings.mappings) {
+            const bbb::dmx::mapper_result result{set_parameter_value_on_mapper(trial_mapper, fixture_id, mapping.parameter, mapping.value)};
+            if(!result.ok) {
+                return result;
+            }
         }
         mapper_ = trial_mapper;
         return bbb::dmx::mapper_result::success();
