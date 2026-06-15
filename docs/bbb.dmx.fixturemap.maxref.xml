@@ -239,7 +239,7 @@
             <description>When non-zero, semantic color extracts RGBW white from min(red, green, blue). When zero, RGBW white is left untouched and RGB channels carry the full color.</description>
         </attribute>
         <attribute name="color_wheel_fallback" get="1" set="1" type="int">
-            <description>When non-zero, semantic color falls back to the nearest color wheel slot only for fixtures without RGB, RGBW, or CMY parameters.</description>
+            <description>When non-zero, fixtures without RGB/RGBW/CMY use color wheel hue plus dimmer brightness when available.</description>
         </attribute>
     </attributelist>
     <seealsolist>

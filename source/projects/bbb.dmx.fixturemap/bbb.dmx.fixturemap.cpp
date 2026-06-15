@@ -208,7 +208,7 @@ public:
     };
 
     c74::min::attribute<bool> color_wheel_fallback{this, "color_wheel_fallback", false,
-        c74::min::description{"When non-zero, semantic color falls back to the nearest color wheel slot only for fixtures without RGB/RGBW/CMY parameters."},
+        c74::min::description{"When non-zero, fixtures without RGB/RGBW/CMY use color wheel hue plus dimmer brightness when available."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             color_wheel_fallback_value_ = !args.empty() && ((int)args[0] != 0);
             return {color_wheel_fallback_value_};
@@ -995,6 +995,21 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
+    std::vector<std::pair<std::string, int>> current_color_wheel_parameter_values(const std::string &fixture_id, const bbb::dmx::fixture_mode &mode) const {
+        std::vector<std::pair<std::string, int>> values;
+        for(const auto &parameter : mode.parameters) {
+            if(!bbb::dmx::parameter_is_likely_color_wheel(parameter)) {
+                continue;
+            }
+            int value{0};
+            const bbb::dmx::mapper_result result{mapper_.current_raw_value(fixture_id, parameter.key, value)};
+            if(result.ok) {
+                values.push_back({parameter.key, value});
+            }
+        }
+        return values;
+    }
+
     bbb::dmx::mapper_result apply_semantic_color(const std::string &fixture_id, const bbb::dmx::semantic_color_request &color, bool ignore_non_color_fixtures) {
         const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
         if(!fixture) {
@@ -1009,11 +1024,16 @@ private:
             return bbb::dmx::mapper_result::failure("missing mode: " + fixture->mode);
         }
 
+        std::vector<std::pair<std::string, int>> current_color_wheel_values;
+        if(color_wheel_fallback_value_) {
+            current_color_wheel_values = current_color_wheel_parameter_values(fixture_id, *mode);
+        }
         const bbb::dmx::semantic_color_mapping mapping{bbb::dmx::semantic_color_parameters_for_mode(
             profile,
             *mode,
             color,
-            bbb::dmx::semantic_color_options{color_use_white_value_, color_wheel_fallback_value_}
+            bbb::dmx::semantic_color_options{color_use_white_value_, color_wheel_fallback_value_},
+            current_color_wheel_values
         )};
         if(!mapping.ok) {
             if(ignore_non_color_fixtures) {
