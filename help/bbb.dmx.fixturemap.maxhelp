@@ -458,7 +458,7 @@
             760,
             48
           ],
-          "text": "color/colorall maps semantic RGB onto RGB, RGBW, or CMY fixture profiles. @color_use_white controls whether RGBW uses W extraction or RGB-only output. track/trackall use loaded fixture position, rotation, calibration, and pan/tilt ranges."
+          "text": "color/colorall maps semantic RGB onto RGB, RGBW, or CMY fixture profiles. @color_use_white controls whether RGBW uses W extraction or leaves W untouched. track/trackall use loaded fixture position, rotation, calibration, and pan/tilt ranges."
         }
       },
       {

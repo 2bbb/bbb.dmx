@@ -215,7 +215,7 @@ Attributes:
 - `@tracking_mode` — pan continuity for `track`/`trackall`: `smart` (default), `pan`, or `off`.
 - `@default_pan_range` / `@default_tilt_range` — fallback mover ranges when a profile omits `range_degrees`. Defaults are `540.` and `270.`.
 - `@track_strict` — if non-zero, `trackall` errors on non-mover fixtures instead of skipping them.
-- `@color_use_white` — RGBW behavior for `color`/`colorall`. Default `1` extracts `white = min(r,g,b)`; `0` forces `white` to `0` and keeps full RGB in RGB channels.
+- `@color_use_white` — RGBW behavior for `color`/`colorall`. Default `1` extracts `white = min(r,g,b)`; `0` leaves `white` untouched and keeps full RGB in RGB channels.
 
 Load / inspect messages:
 
@@ -261,7 +261,7 @@ channels 1 255 2 128 3 0
 
 Fixture-aware mover tracking is built into `fixturemap`: `track fixture_id x y z` uses the loaded fixture position, rotation, calibration, and profile pan/tilt ranges, then writes normalized pan/tilt values into that fixture. `trackall x y z` applies the same world-space target to every mover in the patch and silently skips fixtures without both `pan` and `tilt` unless `@track_strict 1` is set. `trackrel` / `trackallrel` interpret the vector as relative to each fixture origin. `trackreset` clears pan-continuity history.
 
-Semantic color messages are intentionally separate from `setall/nsetall`: `color fixture_id rgb r g b` and `colorall rgb r g b` express desired additive RGB color and let the fixture profile decide the write model. RGB fixtures receive `red/green/blue`; RGBW fixtures receive RGB with extracted `white = min(r,g,b)` when `@color_use_white 1`; with `@color_use_white 0`, white is forced to `0` and the full color remains in RGB. CMY fixtures receive subtractive `cyan = 1-red`, `magenta = 1-green`, `yellow = 1-blue`. `rgb` values are normalized `0.0..1.0`; `rgb8` accepts `0..255`. Fixtures without a supported color model are skipped by `colorall` and rejected by per-fixture `color`.
+Semantic color messages are intentionally separate from `setall/nsetall`: `color fixture_id rgb r g b` and `colorall rgb r g b` express desired additive RGB color and let the fixture profile decide the write model. RGB fixtures receive `red/green/blue`; RGBW fixtures receive RGB with extracted `white = min(r,g,b)` when `@color_use_white 1`; with `@color_use_white 0`, `white` is left untouched and the full color remains in RGB. CMY fixtures receive subtractive `cyan = 1-red`, `magenta = 1-green`, `yellow = 1-blue`. `rgb` values are normalized `0.0..1.0`; `rgb8` accepts `0..255`. Fixtures without a supported color model are skipped by `colorall` and rejected by per-fixture `color`.
 
 `bbb.dmx.movertrack` is still kept as a low-level/test object. For manual wiring, `ptbytes` accepts `pan_byte_1 pan_byte_2 tilt_byte_1 tilt_byte_2` and converts them through the target fixture profile's pan/tilt byte-order metadata.
 

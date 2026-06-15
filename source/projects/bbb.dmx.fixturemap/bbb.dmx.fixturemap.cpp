@@ -169,7 +169,7 @@ public:
     };
 
     c74::min::attribute<bool> color_use_white{this, "color_use_white", true,
-        c74::min::description{"When non-zero, semantic color extracts RGBW white from min(r,g,b). When zero, RGBW white is forced to 0 and RGB channels carry the full color."},
+        c74::min::description{"When non-zero, semantic color extracts RGBW white from min(r,g,b). When zero, semantic color leaves white untouched and RGB channels carry the full color."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             color_use_white_value_ = args.empty() || ((int)args[0] != 0);
             return {color_use_white_value_};
@@ -733,9 +733,6 @@ private:
                 parameters.push_back({"red", color.red});
                 parameters.push_back({"green", color.green});
                 parameters.push_back({"blue", color.blue});
-                if(has_white) {
-                    parameters.push_back({"white", 0.0});
-                }
             }
         } else if(mode_has_parameter(*mode, "cyan") && mode_has_parameter(*mode, "magenta") && mode_has_parameter(*mode, "yellow")) {
             parameters.push_back({"cyan", 1.0 - color.red});
