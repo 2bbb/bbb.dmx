@@ -1,5 +1,6 @@
 #include "c74_min.h"
 
+#include <bbb/dmx/fixture_groups.hpp>
 #include <bbb/dmx/fixture_json.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 #include <bbb/dmx/movertrack.hpp>
@@ -15,6 +16,8 @@ class bbb_dmx_fixturemap : public c74::min::object<bbb_dmx_fixturemap> {
 private:
     bbb::dmx::fixture_mapper mapper_{};
     std::string patch_path_value_{};
+    std::string groups_path_value_{};
+    bbb::dmx::fixture_group_set groups_{};
     int universe_value_{1};
     bool autobang_value_{true};
     bool output_all_universes_{false};
@@ -31,7 +34,11 @@ private:
     bool warn_invalid_range_{false};
     bool warn_runtime_error_{false};
     bool patch_load_pending_{false};
+    bool groups_load_pending_{false};
+    bool groups_loaded_{false};
+    bool groups_validated_{false};
     bool suppress_patch_attribute_load_{false};
+    bool suppress_groups_attribute_load_{false};
 
 public:
     MIN_DESCRIPTION{"Map semantic fixture parameters into one or more 512-channel DMX universe lists."};
@@ -39,7 +46,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(read/set/setall/nset/nsetall/color/colorall/shutter/shutterall/track/trackall/trackrel/trackallrel/ptbytes/channel/bang/bangall) fixture mapping control"};
+    c74::min::inlet<> input{this, "(read/readgroups/set/setall/setgroup/nset/nsetall/nsetgroup/color/colorall/colorgroup/shutter/shutterall/shuttergroup/track/trackall/trackgroup/trackrel/trackallrel/trackgrouprel/ptbytes/channel/bang/bangall) fixture mapping control"};
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -48,6 +55,16 @@ public:
             if(patch_load_pending_ && !patch_path_value_.empty()) {
                 patch_load_pending_ = false;
                 load_patch_file(patch_path_value_);
+            }
+            return {};
+        }
+    };
+
+    c74::min::timer<c74::min::timer_options::defer_delivery> groups_load_timer{this,
+        MIN_FUNCTION {
+            if(groups_load_pending_ && !groups_path_value_.empty()) {
+                groups_load_pending_ = false;
+                load_groups_file(groups_path_value_);
             }
             return {};
         }
@@ -67,6 +84,26 @@ public:
             patch_path_value_ = symbol_value.c_str();
             if(!suppress_patch_attribute_load_) {
                 schedule_patch_load();
+            }
+            return {symbol_value};
+        }}
+    };
+
+    c74::min::attribute<c74::min::symbol> groups{this, "groups", "",
+        c74::min::description{"Optional bbb.dmx groups JSON path. Groups are validated against the loaded patch and used by *group messages."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                groups_path_value_.clear();
+                groups_load_pending_ = false;
+                groups_ = bbb::dmx::fixture_group_set{};
+                groups_loaded_ = false;
+                groups_validated_ = false;
+                return {c74::min::symbol("")};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            groups_path_value_ = symbol_value.c_str();
+            if(!suppress_groups_attribute_load_) {
+                schedule_groups_load();
             }
             return {symbol_value};
         }}
@@ -195,6 +232,23 @@ public:
         }
     };
 
+    c74::min::message<> readgroups_message{this, "readgroups", "readgroups groups_json_path",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("readgroups requires a groups JSON path");
+                return {};
+            }
+            const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
+            groups_path_value_ = path_symbol.c_str();
+            suppress_groups_attribute_load_ = true;
+            groups = path_symbol;
+            suppress_groups_attribute_load_ = false;
+            groups_load_pending_ = false;
+            load_groups_file(groups_path_value_);
+            return {};
+        }
+    };
+
     c74::min::message<> reload_message{this, "reload", "Reload the current patch JSON file.",
         MIN_FUNCTION {
             if(patch_path_value_.empty()) {
@@ -202,6 +256,9 @@ public:
                 return {};
             }
             load_patch_file(patch_path_value_);
+            if(!groups_path_value_.empty()) {
+                load_groups_file(groups_path_value_);
+            }
             return {};
         }
     };
@@ -209,6 +266,9 @@ public:
     c74::min::message<> clear_message{this, "clear", "Clear all loaded profiles, patch data, and universe buffers.",
         MIN_FUNCTION {
             mapper_.clear();
+            groups_ = bbb::dmx::fixture_group_set{};
+            groups_loaded_ = false;
+            groups_validated_ = false;
             tracking_engines_.clear();
             report_status("clear");
             output_if_autobang();
@@ -276,6 +336,23 @@ public:
         }
     };
 
+    c74::min::message<> setgroup_message{this, "setgroup", "setgroup group_id parameter value [parameter value ...]",
+        MIN_FUNCTION {
+            if(args.size() < 3) {
+                report_error("setgroup requires group_id parameter value");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{set_group_parameter_args(symbol_arg(args[0]), args)};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
     c74::min::message<> nset_message{this, "nset", "nset fixture_id parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
         MIN_FUNCTION {
             if(args.size() < 3) {
@@ -301,6 +378,23 @@ public:
             }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
             const bbb::dmx::mapper_result result{set_all_normalized_parameter_args(args)};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> nsetgroup_message{this, "nsetgroup", "nsetgroup group_id parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
+        MIN_FUNCTION {
+            if(args.size() < 3) {
+                report_error("nsetgroup requires group_id parameter numeric_value");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::mapper_result result{set_group_normalized_parameter_args(symbol_arg(args[0]), args)};
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 return {};
@@ -356,6 +450,29 @@ public:
         }
     };
 
+    c74::min::message<> colorgroup_message{this, "colorgroup", "colorgroup group_id rgb r g b OR colorgroup group_id rgb8 r g b",
+        MIN_FUNCTION {
+            if(args.size() < 4) {
+                report_error("colorgroup requires group_id rgb r g b");
+                return {};
+            }
+            bbb::dmx::semantic_color_request color{};
+            bbb::dmx::mapper_result result{parse_color_args(args, 1, "colorgroup", color)};
+            if(!result.ok) {
+                handle_result(result);
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            result = apply_semantic_color_group(symbol_arg(args[0]), color);
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
     c74::min::message<> shutter_message{this, "shutter", "shutter fixture_id 1|0",
         MIN_FUNCTION {
             if(args.size() < 2) {
@@ -393,6 +510,29 @@ public:
             }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
             result = apply_semantic_shutter_all(open);
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> shuttergroup_message{this, "shuttergroup", "shuttergroup group_id 1|0",
+        MIN_FUNCTION {
+            if(args.size() < 2) {
+                report_error("shuttergroup requires group_id state");
+                return {};
+            }
+            bool open{false};
+            bbb::dmx::mapper_result result{parse_shutter_state(args[1], open)};
+            if(!result.ok) {
+                handle_result(result);
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            result = apply_semantic_shutter_group(symbol_arg(args[0]), open);
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 return {};
@@ -493,6 +633,29 @@ public:
         }
     };
 
+    c74::min::message<> trackgroup_message{this, "trackgroup", "trackgroup group_id target_x target_y target_z",
+        MIN_FUNCTION {
+            if(args.size() < 4 || !finite_atoms(args, 1, 3)) {
+                report_error("trackgroup requires group_id target_x target_y target_z");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_tracking_engines = tracking_engines_;
+            const bbb::dmx::mapper_result result{track_group(
+                symbol_arg(args[0]),
+                bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]},
+                false
+            )};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                tracking_engines_ = previous_tracking_engines;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
     c74::min::message<> trackallrel_message{this, "trackallrel", "trackallrel rel_x rel_y rel_z",
         MIN_FUNCTION {
             if(args.size() < 3 || !finite_atoms(args, 0, 3)) {
@@ -503,6 +666,29 @@ public:
             const auto previous_tracking_engines = tracking_engines_;
             const bbb::dmx::mapper_result result{track_all(
                 bbb::dmx::vec3{(double)args[0], (double)args[1], (double)args[2]},
+                true
+            )};
+            if(!handle_result(result)) {
+                mapper_ = previous_mapper;
+                tracking_engines_ = previous_tracking_engines;
+                return {};
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> trackgrouprel_message{this, "trackgrouprel", "trackgrouprel group_id rel_x rel_y rel_z",
+        MIN_FUNCTION {
+            if(args.size() < 4 || !finite_atoms(args, 1, 3)) {
+                report_error("trackgrouprel requires group_id rel_x rel_y rel_z");
+                return {};
+            }
+            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_tracking_engines = tracking_engines_;
+            const bbb::dmx::mapper_result result{track_group(
+                symbol_arg(args[0]),
+                bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]},
                 true
             )};
             if(!handle_result(result)) {
@@ -581,6 +767,14 @@ public:
             status_atoms.push_back(color_use_white_value_ ? 1 : 0);
             status_atoms.push_back(c74::min::symbol("color_wheel_fallback"));
             status_atoms.push_back(color_wheel_fallback_value_ ? 1 : 0);
+            status_atoms.push_back(c74::min::symbol("groups_loaded"));
+            status_atoms.push_back(groups_loaded_ ? 1 : 0);
+            status_atoms.push_back(c74::min::symbol("groups_validated"));
+            status_atoms.push_back(groups_validated_ ? 1 : 0);
+            status_atoms.push_back(c74::min::symbol("groups"));
+            for(const auto &group : groups_.groups) {
+                status_atoms.push_back(c74::min::symbol(group.id.c_str()));
+            }
             status_atoms.push_back(c74::min::symbol("universes"));
             for(const int universe_id : mapper_.universe_ids()) {
                 status_atoms.push_back(universe_id);
@@ -600,6 +794,15 @@ private:
         patch_load_timer.delay(0);
     }
 
+    void schedule_groups_load() {
+        if(groups_path_value_.empty()) {
+            groups_load_pending_ = false;
+            return;
+        }
+        groups_load_pending_ = true;
+        groups_load_timer.delay(0);
+    }
+
     void load_patch_file(const std::string &path) {
         const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
         bbb::dmx::fixture_mapper loaded_mapper{};
@@ -609,10 +812,52 @@ private:
         }
         mapper_ = loaded_mapper;
         tracking_engines_.clear();
+        groups_validated_ = false;
+        if(groups_loaded_) {
+            const bbb::dmx::mapper_result groups_result{validate_loaded_groups()};
+            if(!groups_result.ok) {
+                handle_result(groups_result);
+            }
+        }
         report_status("loaded");
         output_if_autobang();
     }
 
+    void load_groups_file(const std::string &path) {
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        bbb::dmx::fixture_group_set loaded_groups{};
+        const bbb::dmx::mapper_result result{bbb::dmx::read_fixture_groups_file(resolved_path, loaded_groups)};
+        if(!handle_result(result)) {
+            return;
+        }
+        if(!mapper_.patch().fixtures.empty()) {
+            const bbb::dmx::mapper_result validate_result{bbb::dmx::validate_fixture_groups_for_patch(loaded_groups, mapper_.patch())};
+            if(!handle_result(validate_result)) {
+                return;
+            }
+        }
+        groups_ = loaded_groups;
+        groups_loaded_ = true;
+        groups_validated_ = !mapper_.patch().fixtures.empty();
+        report_status("groups_loaded");
+    }
+
+    bbb::dmx::mapper_result validate_loaded_groups() {
+        if(!groups_loaded_) {
+            return bbb::dmx::mapper_result::failure("no groups loaded");
+        }
+        if(mapper_.patch().fixtures.empty()) {
+            groups_validated_ = false;
+            return bbb::dmx::mapper_result::success();
+        }
+        const bbb::dmx::mapper_result result{bbb::dmx::validate_fixture_groups_for_patch(groups_, mapper_.patch())};
+        if(result.ok) {
+            groups_validated_ = true;
+        } else {
+            groups_validated_ = false;
+        }
+        return result;
+    }
 
     void output_if_autobang() {
         if(autobang_value_) {
@@ -799,6 +1044,37 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
+    bbb::dmx::mapper_result resolve_group_fixture_ids(const std::string &group_id, std::vector<std::string> &fixture_ids) {
+        if(mapper_.patch().fixtures.empty()) {
+            return bbb::dmx::mapper_result::failure("group operation requires a loaded patch with fixtures");
+        }
+        if(!groups_loaded_) {
+            return bbb::dmx::mapper_result::failure("group operation requires loaded groups");
+        }
+        if(!groups_validated_) {
+            const bbb::dmx::mapper_result validate_result{validate_loaded_groups()};
+            if(!validate_result.ok) {
+                return validate_result;
+            }
+        }
+        return bbb::dmx::resolve_fixture_group_fixture_ids(groups_, mapper_.patch(), group_id, fixture_ids);
+    }
+
+    bbb::dmx::mapper_result apply_semantic_color_group(const std::string &group_id, const bbb::dmx::semantic_color_request &color) {
+        std::vector<std::string> fixture_ids{};
+        bbb::dmx::mapper_result result{resolve_group_fixture_ids(group_id, fixture_ids)};
+        if(!result.ok) {
+            return result;
+        }
+        for(const auto &fixture_id : fixture_ids) {
+            result = apply_semantic_color(fixture_id, color, true);
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("colorgroup fixture " + fixture_id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
     bbb::dmx::mapper_result parse_shutter_state(const c74::min::atom &atom, bool &open) const {
         if(finite_atom(atom)) {
             open = (int)atom != 0;
@@ -856,6 +1132,21 @@ private:
             const bbb::dmx::mapper_result result{apply_semantic_shutter(fixture.id, open, true)};
             if(!result.ok) {
                 return bbb::dmx::mapper_result::failure("shutterall fixture " + fixture.id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result apply_semantic_shutter_group(const std::string &group_id, bool open) {
+        std::vector<std::string> fixture_ids{};
+        bbb::dmx::mapper_result result{resolve_group_fixture_ids(group_id, fixture_ids)};
+        if(!result.ok) {
+            return result;
+        }
+        for(const auto &fixture_id : fixture_ids) {
+            result = apply_semantic_shutter(fixture_id, open, true);
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("shuttergroup fixture " + fixture_id + ": " + result.message);
             }
         }
         return bbb::dmx::mapper_result::success();
@@ -978,6 +1269,22 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
+    bbb::dmx::mapper_result track_group(const std::string &group_id, const bbb::dmx::vec3 &target, bool relative) {
+        std::vector<std::string> fixture_ids{};
+        bbb::dmx::mapper_result result{resolve_group_fixture_ids(group_id, fixture_ids)};
+        if(!result.ok) {
+            return result;
+        }
+        const bool ignore_non_movers{!track_strict_value_};
+        for(const auto &fixture_id : fixture_ids) {
+            result = track_fixture(fixture_id, target, relative, ignore_non_movers);
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("trackgroup fixture " + fixture_id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
     bbb::dmx::mapper_result set_all_parameter_args(const c74::min::atoms &args) {
         if(mapper_.patch().fixtures.empty()) {
             return bbb::dmx::mapper_result::failure("setall requires a loaded patch with fixtures");
@@ -991,6 +1298,21 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
+    bbb::dmx::mapper_result set_group_parameter_args(const std::string &group_id, const c74::min::atoms &args) {
+        std::vector<std::string> fixture_ids{};
+        bbb::dmx::mapper_result result{resolve_group_fixture_ids(group_id, fixture_ids)};
+        if(!result.ok) {
+            return result;
+        }
+        for(const auto &fixture_id : fixture_ids) {
+            result = set_parameter_args(fixture_id, args, 1, true);
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("setgroup fixture " + fixture_id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
     bbb::dmx::mapper_result set_all_normalized_parameter_args(const c74::min::atoms &args) {
         if(mapper_.patch().fixtures.empty()) {
             return bbb::dmx::mapper_result::failure("nsetall requires a loaded patch with fixtures");
@@ -999,6 +1321,21 @@ private:
             const bbb::dmx::mapper_result result{set_normalized_parameter_args(fixture.id, args, 0, true)};
             if(!result.ok) {
                 return bbb::dmx::mapper_result::failure("nsetall fixture " + fixture.id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result set_group_normalized_parameter_args(const std::string &group_id, const c74::min::atoms &args) {
+        std::vector<std::string> fixture_ids{};
+        bbb::dmx::mapper_result result{resolve_group_fixture_ids(group_id, fixture_ids)};
+        if(!result.ok) {
+            return result;
+        }
+        for(const auto &fixture_id : fixture_ids) {
+            result = set_normalized_parameter_args(fixture_id, args, 1, true);
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("nsetgroup fixture " + fixture_id + ": " + result.message);
             }
         }
         return bbb::dmx::mapper_result::success();

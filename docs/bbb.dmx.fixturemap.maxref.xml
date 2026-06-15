@@ -22,6 +22,12 @@
             </arglist>
             <description>Read a bbb.dmx patch JSON file immediately. Relative paths are resolved by Max against the patch/search path.</description>
         </method>
+        <method name="readgroups">
+            <arglist>
+                <arg name="path" type="symbol" optional="0" />
+            </arglist>
+            <description>Read an optional bbb.dmx groups JSON file. Groups are explicit fixture id arrays validated against the loaded patch.</description>
+        </method>
         <method name="bang">
             <description>Output the current DMX frame.</description>
         </method>
@@ -52,6 +58,14 @@
             </arglist>
             <description>Apply one or more parameter/value pairs to every fixture in the loaded patch. Fixtures that do not expose a requested parameter are silently skipped.</description>
         </method>
+        <method name="setgroup">
+            <arglist>
+                <arg name="group_id" type="symbol" optional="0" />
+                <arg name="parameter" type="symbol" optional="0" />
+                <arg name="value" type="int" optional="0" />
+            </arglist>
+            <description>Apply one or more parameter/value pairs to every fixture in a loaded group. Fixtures that do not expose a requested parameter are silently skipped.</description>
+        </method>
         <method name="nset">
             <arglist>
                 <arg name="fixture_id" type="symbol" optional="0" />
@@ -66,6 +80,14 @@
                 <arg name="normalized" type="float" optional="0" />
             </arglist>
             <description>Apply one or more normalized 0..1 parameter/value pairs to every fixture in the loaded patch. Fixtures that do not expose a requested parameter are silently skipped.</description>
+        </method>
+        <method name="nsetgroup">
+            <arglist>
+                <arg name="group_id" type="symbol" optional="0" />
+                <arg name="parameter" type="symbol" optional="0" />
+                <arg name="normalized" type="float" optional="0" />
+            </arglist>
+            <description>Apply one or more normalized 0..1 parameter/value pairs to every fixture in a loaded group. Fixtures that do not expose a requested parameter are silently skipped.</description>
         </method>
         <method name="color">
             <arglist>
@@ -86,6 +108,16 @@
             </arglist>
             <description>Apply one semantic RGB color to every supported color fixture. Unsupported fixtures are silently skipped.</description>
         </method>
+        <method name="colorgroup">
+            <arglist>
+                <arg name="group_id" type="symbol" optional="0" />
+                <arg name="space" type="symbol" optional="0" />
+                <arg name="red" type="float" optional="0" />
+                <arg name="green" type="float" optional="0" />
+                <arg name="blue" type="float" optional="0" />
+            </arglist>
+            <description>Apply one semantic RGB color to every supported color fixture in a loaded group. Unsupported fixtures are silently skipped.</description>
+        </method>
         <method name="shutter">
             <arglist>
                 <arg name="fixture_id" type="symbol" optional="0" />
@@ -98,6 +130,13 @@
                 <arg name="state" type="int" optional="0" />
             </arglist>
             <description>Apply one semantic shutter state to every supported fixture. Unsupported fixtures are silently skipped.</description>
+        </method>
+        <method name="shuttergroup">
+            <arglist>
+                <arg name="group_id" type="symbol" optional="0" />
+                <arg name="state" type="int" optional="0" />
+            </arglist>
+            <description>Apply one semantic shutter state to every supported fixture in a loaded group. Unsupported fixtures are silently skipped.</description>
         </method>
         <method name="track">
             <arglist>
@@ -116,6 +155,15 @@
             </arglist>
             <description>Track every mover fixture toward one world-space target. Non-mover fixtures are skipped unless track_strict is enabled.</description>
         </method>
+        <method name="trackgroup">
+            <arglist>
+                <arg name="group_id" type="symbol" optional="0" />
+                <arg name="target_x" type="float" optional="0" />
+                <arg name="target_y" type="float" optional="0" />
+                <arg name="target_z" type="float" optional="0" />
+            </arglist>
+            <description>Track mover fixtures in a loaded group toward one world-space target. Non-mover fixtures are skipped unless track_strict is enabled.</description>
+        </method>
         <method name="trackrel">
             <arglist>
                 <arg name="fixture_id" type="symbol" optional="0" />
@@ -132,6 +180,15 @@
                 <arg name="relative_z" type="float" optional="0" />
             </arglist>
             <description>Track every mover using the same vector relative to each fixture origin.</description>
+        </method>
+        <method name="trackgrouprel">
+            <arglist>
+                <arg name="group_id" type="symbol" optional="0" />
+                <arg name="relative_x" type="float" optional="0" />
+                <arg name="relative_y" type="float" optional="0" />
+                <arg name="relative_z" type="float" optional="0" />
+            </arglist>
+            <description>Track mover fixtures in a loaded group using the same vector relative to each fixture origin.</description>
         </method>
         <method name="trackreset">
             <arglist>
@@ -153,6 +210,9 @@
     <attributelist>
         <attribute name="patch" get="1" set="1" type="symbol">
             <description>Patch JSON path to read after object initialization and whenever the attribute changes. Attribute loading is deferred; use the read message for immediate explicit loading.</description>
+        </attribute>
+        <attribute name="groups" get="1" set="1" type="symbol">
+            <description>Optional groups JSON path to read after object initialization and whenever the attribute changes. Groups are explicit fixture id arrays validated against the loaded patch.</description>
         </attribute>
         <attribute name="universe" get="1" set="1" type="int">
             <description>Selected output universe for single-universe output.</description>

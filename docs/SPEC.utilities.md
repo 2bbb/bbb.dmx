@@ -84,8 +84,9 @@ This should sit late in the chain, immediately before the sender. It is not a su
 
 Validates fixture patch/profile JSON.
 
-- Input: `read`, `bang`
-- Output: `ok fixtures <count> universes <id...>` or `error <message>`
+- Input: `read`, `readgroups`, `bang`
+- Output: `ok fixtures <count> groups <count> universes <id...>` or `error <message>`
+- Optional groups validation: set `@groups` or send `readgroups path` before `bang`; output includes `groups <count>`.
 
 ### `bbb.dmx.fixtureinfo`
 
@@ -119,6 +120,22 @@ Applies named normalized parameter palettes through fixture patch/profile metada
 - `apply palette_name [fixture_pattern ...]` filters fixture ids with `*`/`?` wildcards.
 
 Palette values are normalized `0.0..1.0` and are written through fixture parameter depth (`u8`, `u16`, `u24`). Unknown parameters on a fixture are skipped so broad color palettes can target mixed fixture sets.
+
+### Fixture groups
+
+Fixture groups are optional selection files, separate from fixture patches:
+
+```json
+{
+  "schema": "bbb.dmx.groups.v1",
+  "groups": {
+    "front": ["pointe_01", "pointe_02"]
+  }
+}
+```
+
+`bbb.dmx.fixturemap` loads them with `readgroups groups/show.groups.json` or `@groups groups/show.groups.json`.
+Group operations are explicit: `setgroup`, `nsetgroup`, `colorgroup`, `shuttergroup`, `trackgroup`, and `trackgrouprel`. Unknown fixture ids in the groups file are validation errors. Fixtures are applied in patch order, not group array order.
 
 ### `bbb.dmx.scene`
 

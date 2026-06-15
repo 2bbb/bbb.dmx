@@ -29,6 +29,7 @@ Current schema ids:
 | Fixture profile | `bbb.dmx.fixture.profile.v1` | `schemas/bbb.dmx.fixture.profile.v1.schema.json` |
 | Fixture patch | `bbb.dmx.patch.v2` | `schemas/bbb.dmx.patch.v2.schema.json` |
 | Matrix map | `bbb.dmx.matrixmap.v1` | `schemas/bbb.dmx.matrixmap.v1.schema.json` |
+| Fixture groups | `bbb.dmx.groups.v1` | `schemas/bbb.dmx.groups.v1.schema.json` |
 | Palette set | `bbb.dmx.palette.v1` | `schemas/bbb.dmx.palette.v1.schema.json` |
 | Scene set | `bbb.dmx.scene.v1` | `schemas/bbb.dmx.scene.v1.schema.json` |
 | Curve rules | `bbb.dmx.curve.v1` | `schemas/bbb.dmx.curve.v1.schema.json` |
@@ -440,7 +441,32 @@ Top-level must contain at least one of `fixtures`, `grid`, or `grids`.
 
 `char` matrices are normalized as `byte / 255`. `float32` matrices are clamped directly to `0.0..1.0`.
 
-## 5. Palette set: `bbb.dmx.palette.v1`
+## 5. Fixture groups: `bbb.dmx.groups.v1`
+
+A groups file stores runtime fixture selections separately from the physical DMX patch. The patch remains the source of truth for fixture identity, profile, mode, address, placement, and calibration; groups only name explicit subsets of fixture ids for broad operations such as `setgroup`, `colorgroup`, and `trackgroup`.
+
+Typical path: `groups/*.json`.
+
+```json
+{
+  "schema": "bbb.dmx.groups.v1",
+  "groups": {
+    "front": ["pointe_01", "pointe_02"],
+    "back": ["pointe_03", "pointe_04"]
+  }
+}
+```
+
+| Field | Type | Required | Meaning |
+|---|---:|---:|---|
+| `schema` | string | yes | Must be `bbb.dmx.groups.v1`. |
+| `groups` | object | yes | Map of `group_name -> fixture id array`. |
+
+Group arrays are explicit fixture ids only. Wildcards are intentionally unsupported in v1. Numeric ids are accepted for imported patches and canonicalized to decimal strings by runtime consumers.
+
+Groups are meaningful only with a loaded patch. Unknown fixture ids are errors, not silent skips. Runtime group operations resolve fixtures in patch order and de-duplicate repeated ids so output behavior remains deterministic regardless of group array ordering.
+
+## 6. Palette set: `bbb.dmx.palette.v1`
 
 A palette set stores named normalized parameter values. Applying a palette modifies the current fixture state; it does not reset all fixture channels first.
 
@@ -462,7 +488,7 @@ Typical path: `palettes/*.json`.
 
 A parameter map is an object whose keys are fixture parameter names and whose values are numbers. Canonical values are normalized `0.0..1.0`; runtime clamps when writing to fixture parameters. Unknown parameters are ignored per fixture, allowing broad palettes across mixed rigs. This also means spelling mistakes can silently do nothing; validate with `fixtureview` or `fixtureinfo`.
 
-## 6. Scene set: `bbb.dmx.scene.v1`
+## 7. Scene set: `bbb.dmx.scene.v1`
 
 A scene set stores deterministic recalls. Applying a scene resets patched fixture channels to profile defaults, applies matching fixture-pattern rules in JSON order, then outputs all patched universes.
 
@@ -494,7 +520,7 @@ Pattern syntax follows the runtime wildcard matcher:
 
 If multiple patterns match one fixture, rules are applied in file/object order. Avoid depending on duplicate or ambiguous ordering across JSON generators; emit specific patterns after broad patterns when order matters.
 
-## 7. Curve rules: `bbb.dmx.curve.v1`
+## 8. Curve rules: `bbb.dmx.curve.v1`
 
 Curve rules transform DMX byte values across channel ranges.
 
@@ -528,7 +554,7 @@ Rule fields:
 | `threshold` | number | no | `0.5` | Used by `threshold`, clamped to `0..1`. |
 | `points` | array of `[x,y]` | no | empty | If present, forces `curve` to `points`. Points are clamped to `0..1` and sorted by `x`. |
 
-## 8. Mask rules: `bbb.dmx.mask.v1`
+## 9. Mask rules: `bbb.dmx.mask.v1`
 
 Mask rules mute, hold, allow, or force channel ranges.
 
@@ -557,7 +583,7 @@ Rule fields:
 
 If any rule uses `allow`, the object enters allow-list mode: channels not matched by an `allow` rule are muted after other rule processing. This is deliberately strict; do not mix `allow` casually with broad `mute`/`hold` rules unless you understand the order.
 
-## 9. Assertion rules: `bbb.dmx.assert.v1`
+## 10. Assertion rules: `bbb.dmx.assert.v1`
 
 Assertion rules validate DMX frame values for tests and patch guardrails.
 
@@ -589,7 +615,7 @@ Rule fields:
 
 Canonical assertion rules should include at least one of `min`, `max`, or `equals`. A rule without predicates only increments pass counts and is usually useless.
 
-## 10. Validation workflow for external applications
+## 11. Validation workflow for external applications
 
 External producers should validate in three layers:
 
@@ -606,7 +632,7 @@ npx ajv-cli validate -s schemas/bbb.dmx.patch.v2.schema.json -d patches/rgb-grid
 
 Schema validation catches shape errors. It cannot catch fixture-specific mistakes like a `profile` key that exists in another repository but not in your runtime package, or pan/tilt calibration that is physically wrong.
 
-## 10. CLI validation
+## 12. CLI validation
 
 Use `bbb-dmx-lint` from `tools/bbb-dmx-convert` to validate files generated outside Max:
 

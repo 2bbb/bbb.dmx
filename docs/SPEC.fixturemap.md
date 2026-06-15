@@ -277,6 +277,7 @@ Attributes implemented today:
 | Attribute | Type | Default | Description |
 |---|---|---:|---|
 | `@patch` | symbol/string | empty | Patch JSON path. Loaded on initialization and by `read`. |
+| `@groups` | symbol/string | empty | Optional groups JSON path. Loaded on initialization and by `readgroups`. |
 | `@universe` | int | `1` | Selected universe to output. Universes are 1-based. |
 | `@autobang` | bool | `1` | If non-zero, successful updates immediately output according to `@universe_mode`. |
 | `@universe_mode` | symbol | `selected` | Output mode for `bang` and autobang: `selected` or `all`. |
@@ -298,6 +299,7 @@ Outlets:
 
 ```max
 read patches/show.json
+readgroups groups/show.groups.json
 reload
 dump
 clear
@@ -307,8 +309,9 @@ bangall
 ```
 
 - `read` loads a patch JSON path.
-- `reload` reloads the current patch.
-- `dump` reports current load status, selected universe, `universe_mode`, tracking settings, color white/fallback modes, and known universe ids from the right outlet.
+- `readgroups` loads a `bbb.dmx.groups.v1` file whose explicit fixture ids are validated against the loaded patch.
+- `reload` reloads the current patch and current groups file when one is set.
+- `dump` reports current load status, selected universe, `universe_mode`, tracking settings, color white/fallback modes, group status, group ids, and known universe ids from the right outlet.
 - `clear` clears loaded profiles, patch data, and universe buffers.
 - `reset` restores loaded fixture channels to profile defaults.
 - `bang` outputs according to `@universe_mode`. Default `selected` mode preserves the bare 512-value list.
@@ -321,9 +324,11 @@ set spot_01 dimmer 255
 set spot_01 pan 32768
 set spot_01 tilt 32768
 set spot_01 pan_tilt 32768 32768
+setall dimmer 255
+setgroup front dimmer 255
 ```
 
-`set` first attempts the parameter as a 16-bit value and falls back to 8-bit where appropriate. `pan_tilt` is a convenience pseudo-parameter for setting both 16-bit pan and tilt in one message.
+`set` first attempts the parameter as a 16-bit value and falls back to 8-bit where appropriate. `pan_tilt` is a convenience pseudo-parameter for setting both 16-bit pan and tilt in one message. `setall` applies to every fixture in patch order. `setgroup` applies to the named loaded group in patch order. Unknown parameters are skipped for broad `setall` / `setgroup` writes; unknown fixture ids in the groups file are errors.
 
 #### Normalized input
 
@@ -331,9 +336,11 @@ set spot_01 pan_tilt 32768 32768
 nset spot_01 dimmer 1.0
 nset spot_01 pan 0.5
 nset spot_01 tilt 0.5
+nsetall dimmer 1.0
+nsetgroup front dimmer 1.0
 ```
 
-`nset` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`.
+`nset` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`. `nsetall` and `nsetgroup` are the normalized broad-write equivalents.
 
 #### Semantic color input
 
@@ -341,13 +348,14 @@ nset spot_01 tilt 0.5
 color spot_01 rgb 1.0 0.8 0.0
 colorall rgb 1.0 0.8 0.0
 colorall rgb8 255 204 0
+colorgroup front rgb 1.0 0.0 0.0
 ```
 
 `color` and `colorall` express the desired additive RGB color instead of raw fixture parameter names. `rgb` values are normalized `0.0..1.0`; `rgb8` values are `0..255`. RGB fixtures receive `red`, `green`, and `blue`. RGBW fixtures receive `red`, `green`, `blue`, and extracted `white = min(red, green, blue)` when `@color_use_white 1`. With `@color_use_white 0`, RGBW fixtures receive full `red`, `green`, and `blue`; `white` is left untouched so it can be managed separately. CMY fixtures receive subtractive `cyan = 1 - red`, `magenta = 1 - green`, and `yellow = 1 - blue`.
 
 Color wheel fallback is deliberately opt-in. With `@color_wheel_fallback 1`, only fixtures that have no RGB/RGBW/CMY semantic model fall back to the nearest color wheel range. Matching uses `parameter.wheel` / `range.wheel_slot` against top-level `wheels[].slots[].rgb` or `cie_xyY`; if those are absent it falls back to conservative color-name matching from range/slot labels. The written value is the midpoint of the matched range. With the default `@color_wheel_fallback 0`, semantic color never touches a color wheel.
 
-`colorall` skips fixtures that do not expose a supported RGB/RGBW/CMY model or, when enabled, a supported color wheel fallback. Per-fixture `color` reports an error for unsupported fixtures. This behavior is deliberately separate from `setall`/`nsetall`, which only write same-named parameters and do not perform color-model conversion.
+`colorall` skips fixtures that do not expose a supported RGB/RGBW/CMY model or, when enabled, a supported color wheel fallback. `colorgroup` applies the same semantic behavior to a loaded group. Per-fixture `color` reports an error for unsupported fixtures. This behavior is deliberately separate from `setall`/`nsetall`, which only write same-named parameters and do not perform color-model conversion.
 
 #### Semantic shutter input
 
@@ -356,9 +364,10 @@ shutter spot_01 1
 shutter spot_01 0
 shutterall 1
 shutterall 0
+shuttergroup front open
 ```
 
-`shutter` and `shutterall` express desired shutter state instead of raw `shutter`, `shutter-strobe`, or `strobe` DMX values. Numeric `1`/non-zero means open; `0` means close. Symbols `open`, `on`, `true`, `close`, `closed`, `off`, `false`, and `blackout` are also accepted.
+`shutter`, `shutterall`, and `shuttergroup` express desired shutter state instead of raw `shutter`, `shutter-strobe`, or `strobe` DMX values. Numeric `1`/non-zero means open; `0` means close. Symbols `open`, `on`, `true`, `close`, `closed`, `off`, `false`, and `blackout` are also accepted.
 
 Resolution order is deliberately simple and deterministic:
 
@@ -384,14 +393,16 @@ Raw override is implemented for testing and emergency control. It should stay vi
 ```max
 track spot_01 target_x target_y target_z
 trackall target_x target_y target_z
+trackgroup front target_x target_y target_z
 trackrel spot_01 relative_x relative_y relative_z
 trackallrel relative_x relative_y relative_z
+trackgrouprel front relative_x relative_y relative_z
 trackreset [spot_01]
 ```
 
 `track` uses the loaded patch fixture `position`, `rotation`, and `calibration` values, plus the target fixture mode's semantic `pan` and `tilt` parameters. The pan/tilt ranges come from `parameters[].range_degrees`; missing ranges fall back to `@default_pan_range` and `@default_tilt_range`. The resulting 16-bit normalized pan/tilt values are written through the fixture profile, so `u8`, `u16`, and `u24` parameter widths keep their declared byte order.
 
-`trackall` applies the same world-space target to every mover in the patch. Non-mover fixtures are skipped by default; set `@track_strict 1` to turn those skips into errors. `trackrel` and `trackallrel` interpret the vector relative to each fixture origin. `trackreset` clears stored pan-continuity history used by `@tracking_mode smart|pan|off`.
+`trackall` applies the same world-space target to every mover in the patch. `trackgroup` applies it to a loaded group. Non-mover fixtures are skipped by default; set `@track_strict 1` to turn those skips into errors. `trackrel`, `trackallrel`, and `trackgrouprel` interpret the vector relative to each fixture origin. `trackreset` clears stored pan-continuity history used by `@tracking_mode smart|pan|off`.
 
 `bbb.dmx.movertrack` remains useful for small projects, tests, and hand-built Max patches. Its byte tuple can still be routed into fixturemap:
 
@@ -408,7 +419,7 @@ ptbytes spot_01 pan1 pan2 tilt1 tilt2
 Current behavior:
 
 - Every successful value update updates the internal multi-universe buffer.
-- If `@autobang 1`, successful `read`, `reload`, `set`, `nset`, `color`, `colorall`, `shutter`, `shutterall`, `track`, `trackall`, `trackrel`, `trackallrel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
+- If `@autobang 1`, successful `read`, `reload`, `set`, `setgroup`, `nset`, `nsetgroup`, `color`, `colorall`, `colorgroup`, `shutter`, `shutterall`, `shuttergroup`, `track`, `trackall`, `trackgroup`, `trackrel`, `trackallrel`, `trackgrouprel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
 - `@universe_mode selected` outputs the selected full 512-byte universe as a bare list. This is the default compatibility mode.
 - `@universe_mode all` outputs one `universe <id> <512 values...>` message per known universe.
 - `bang` follows `@universe_mode`; `bangall` forces all-universe output.
