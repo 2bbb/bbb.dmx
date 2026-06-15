@@ -97,7 +97,7 @@
                 <arg name="green" type="float" optional="0" />
                 <arg name="blue" type="float" optional="0" />
             </arglist>
-            <description>Set one fixture by semantic RGB color. Use rgb for normalized 0..1 values or rgb8 for 0..255 values; RGB/RGBW/CMY profiles are mapped automatically.</description>
+            <description>Set one fixture by semantic RGB color. Use rgb for normalized 0..1 values or rgb8 for 0..255 values; RGB/RGBW/CMY profiles are mapped automatically, using the nearest preceding color-block dimmer when present.</description>
         </method>
         <method name="colorall">
             <arglist>
@@ -106,7 +106,7 @@
                 <arg name="green" type="float" optional="0" />
                 <arg name="blue" type="float" optional="0" />
             </arglist>
-            <description>Apply one semantic RGB color to every supported color fixture. Unsupported fixtures are silently skipped.</description>
+            <description>Apply one semantic RGB color to every supported color fixture. Unsupported fixtures are silently skipped. Color-block dimmers are mapped when present.</description>
         </method>
         <method name="colorgroup">
             <arglist>
