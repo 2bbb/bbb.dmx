@@ -23,6 +23,7 @@ private:
     double default_tilt_range_value_{270.0};
     bool track_strict_value_{false};
     bool color_use_white_value_{true};
+    bool color_wheel_fallback_value_{false};
     std::map<std::string, bbb::dmx::movertrack_engine> tracking_engines_{};
     bool warn_invalid_numeric_{false};
     bool warn_invalid_universe_mode_{false};
@@ -166,6 +167,14 @@ public:
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             color_use_white_value_ = args.empty() || ((int)args[0] != 0);
             return {color_use_white_value_};
+        }}
+    };
+
+    c74::min::attribute<bool> color_wheel_fallback{this, "color_wheel_fallback", false,
+        c74::min::description{"When non-zero, semantic color falls back to the nearest color wheel slot only for fixtures without RGB/RGBW/CMY parameters."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            color_wheel_fallback_value_ = !args.empty() && ((int)args[0] != 0);
+            return {color_wheel_fallback_value_};
         }}
     };
 
@@ -570,6 +579,8 @@ public:
             status_atoms.push_back(track_strict_value_ ? 1 : 0);
             status_atoms.push_back(c74::min::symbol("color_use_white"));
             status_atoms.push_back(color_use_white_value_ ? 1 : 0);
+            status_atoms.push_back(c74::min::symbol("color_wheel_fallback"));
+            status_atoms.push_back(color_wheel_fallback_value_ ? 1 : 0);
             status_atoms.push_back(c74::min::symbol("universes"));
             for(const int universe_id : mapper_.universe_ids()) {
                 status_atoms.push_back(universe_id);
@@ -754,9 +765,10 @@ private:
         }
 
         const bbb::dmx::semantic_color_mapping mapping{bbb::dmx::semantic_color_parameters_for_mode(
+            profile,
             *mode,
             color,
-            bbb::dmx::semantic_color_options{color_use_white_value_}
+            bbb::dmx::semantic_color_options{color_use_white_value_, color_wheel_fallback_value_}
         )};
         if(!mapping.ok) {
             if(ignore_non_color_fixtures) {
