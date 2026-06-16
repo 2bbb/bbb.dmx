@@ -6,6 +6,7 @@
 #include <bbb/dmx/fixture_json.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 #include <bbb/dmx/movertrack.hpp>
+#include <bbb/dmx/semantic_overrides.hpp>
 
 #include <algorithm>
 
@@ -20,6 +21,8 @@ private:
     std::string patch_path_value_{};
     std::string groups_path_value_{};
     bbb::dmx::fixture_group_set groups_{};
+    std::string semantic_overrides_path_value_{};
+    bbb::dmx::fixture_semantic_overrides semantic_overrides_{};
     int universe_value_{1};
     bool autobang_value_{true};
     bool output_all_universes_{false};
@@ -37,10 +40,15 @@ private:
     bool warn_runtime_error_{false};
     bool patch_load_pending_{false};
     bool groups_load_pending_{false};
+    bool semantic_overrides_load_pending_{false};
     bool groups_loaded_{false};
     bool groups_validated_{false};
+    bool semantic_overrides_loaded_{false};
+    bool semantic_overrides_validated_{false};
     bool suppress_patch_attribute_load_{false};
     bool suppress_groups_attribute_load_{false};
+    bool suppress_group_attribute_load_{false};
+    bool suppress_semantic_overrides_attribute_load_{false};
 
 public:
     MIN_DESCRIPTION{"Map semantic fixture parameters into one or more 512-channel DMX universe lists."};
@@ -48,7 +56,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(read/readgroups/set/setall/setgroup/rawset/rawsetall/rawsetgroup/nset/nsetall/nsetgroup/color/colorall/colorgroup/dimmer/dimmerall/dimmergroup/shutter/shutterall/shuttergroup/track/trackall/trackgroup/trackrel/trackallrel/trackgrouprel/ptbytes/channel/bang/bangall) fixture mapping control"};
+    c74::min::inlet<> input{this, "(read/readgroups/readoverrides/set/setall/setgroup/rawset/rawsetall/rawsetgroup/nset/nsetall/nsetgroup/color/colorall/colorgroup/dimmer/dimmerall/dimmergroup/shutter/shutterall/shuttergroup/track/trackall/trackgroup/trackrel/trackallrel/trackgrouprel/ptbytes/channel/channels/uchannels/bang/bangall) fixture mapping control"};
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -67,6 +75,16 @@ public:
             if(groups_load_pending_ && !groups_path_value_.empty()) {
                 groups_load_pending_ = false;
                 load_groups_file(groups_path_value_);
+            }
+            return {};
+        }
+    };
+
+    c74::min::timer<c74::min::timer_options::defer_delivery> semantic_overrides_load_timer{this,
+        MIN_FUNCTION {
+            if(semantic_overrides_load_pending_ && !semantic_overrides_path_value_.empty()) {
+                semantic_overrides_load_pending_ = false;
+                load_semantic_overrides_file(semantic_overrides_path_value_);
             }
             return {};
         }
@@ -108,6 +126,42 @@ public:
             groups_path_value_ = symbol_value.c_str();
             if(!suppress_groups_attribute_load_) {
                 schedule_groups_load();
+            }
+            return {symbol_value};
+        }}
+    };
+
+    c74::min::attribute<c74::min::symbol> group{this, "group", "",
+        c74::min::description{"Alias for @groups. Optional bbb.dmx groups JSON path."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                clear_groups();
+                return {c74::min::symbol("")};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            groups_path_value_ = symbol_value.c_str();
+            if(!suppress_group_attribute_load_) {
+                schedule_groups_load();
+            }
+            return {symbol_value};
+        }}
+    };
+
+    c74::min::attribute<c74::min::symbol> semantic_overrides{this, "semantic_overrides", "",
+        c74::min::description{"Optional bbb.dmx semantic overrides JSON path. Overrides per-profile/mode parameter aliases and semantic color/intensity behavior."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                semantic_overrides_path_value_.clear();
+                semantic_overrides_load_pending_ = false;
+                semantic_overrides_ = bbb::dmx::fixture_semantic_overrides{};
+                semantic_overrides_loaded_ = false;
+                semantic_overrides_validated_ = false;
+                return {c74::min::symbol("")};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            semantic_overrides_path_value_ = symbol_value.c_str();
+            if(!suppress_semantic_overrides_attribute_load_) {
+                schedule_semantic_overrides_load();
             }
             return {symbol_value};
         }}
@@ -253,6 +307,23 @@ public:
         }
     };
 
+    c74::min::message<> readoverrides_message{this, "readoverrides", "readoverrides semantic_overrides_json_path",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("readoverrides requires a semantic overrides JSON path");
+                return {};
+            }
+            const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
+            semantic_overrides_path_value_ = path_symbol.c_str();
+            suppress_semantic_overrides_attribute_load_ = true;
+            semantic_overrides = path_symbol;
+            suppress_semantic_overrides_attribute_load_ = false;
+            semantic_overrides_load_pending_ = false;
+            load_semantic_overrides_file(semantic_overrides_path_value_);
+            return {};
+        }
+    };
+
     c74::min::message<> reload_message{this, "reload", "Reload the current patch JSON file.",
         MIN_FUNCTION {
             if(patch_path_value_.empty()) {
@@ -262,6 +333,9 @@ public:
             load_patch_file(patch_path_value_);
             if(!groups_path_value_.empty()) {
                 load_groups_file(groups_path_value_);
+            }
+            if(!semantic_overrides_path_value_.empty()) {
+                load_semantic_overrides_file(semantic_overrides_path_value_);
             }
             return {};
         }
@@ -273,6 +347,9 @@ public:
             groups_ = bbb::dmx::fixture_group_set{};
             groups_loaded_ = false;
             groups_validated_ = false;
+            semantic_overrides_ = bbb::dmx::fixture_semantic_overrides{};
+            semantic_overrides_loaded_ = false;
+            semantic_overrides_validated_ = false;
             tracking_engines_.clear();
             report_status("clear");
             output_if_autobang();
@@ -857,6 +934,28 @@ public:
         }
     };
 
+    c74::min::message<> uchannels_message{this, "uchannels", "uchannels universe address value ... as repeated triples",
+        MIN_FUNCTION {
+            if(args.size() < 3 || (args.size() % 3) != 0) {
+                report_error("uchannels requires universe/address/value triples");
+                return {};
+            }
+            for(std::size_t index = 0; index < args.size(); index += 3) {
+                if(!finite_atom(args[index]) || !finite_atom(args[index + 1]) || !finite_atom(args[index + 2])) {
+                    report_error("uchannels triple must be numeric");
+                    return {};
+                }
+                const int universe_id{std::max(1, (int)args[index])};
+                const bbb::dmx::mapper_result result{mapper_.set_channel(universe_id, (int)args[index + 1], (int)args[index + 2])};
+                if(!handle_result(result)) {
+                    return {};
+                }
+            }
+            output_if_autobang();
+            return {};
+        }
+    };
+
     c74::min::message<> dump_message{this, "dump", "Output status information from the status outlet.",
         MIN_FUNCTION {
             c74::min::atoms status_atoms;
@@ -882,6 +981,10 @@ public:
             for(const auto &group : groups_.groups) {
                 status_atoms.push_back(c74::min::symbol(group.id.c_str()));
             }
+            status_atoms.push_back(c74::min::symbol("semantic_overrides_loaded"));
+            status_atoms.push_back(semantic_overrides_loaded_ ? 1 : 0);
+            status_atoms.push_back(c74::min::symbol("semantic_overrides_validated"));
+            status_atoms.push_back(semantic_overrides_validated_ ? 1 : 0);
             status_atoms.push_back(c74::min::symbol("universes"));
             for(const int universe_id : mapper_.universe_ids()) {
                 status_atoms.push_back(universe_id);
@@ -910,6 +1013,23 @@ private:
         groups_load_timer.delay(0);
     }
 
+    void schedule_semantic_overrides_load() {
+        if(semantic_overrides_path_value_.empty()) {
+            semantic_overrides_load_pending_ = false;
+            return;
+        }
+        semantic_overrides_load_pending_ = true;
+        semantic_overrides_load_timer.delay(0);
+    }
+
+    void clear_groups() {
+        groups_path_value_.clear();
+        groups_load_pending_ = false;
+        groups_ = bbb::dmx::fixture_group_set{};
+        groups_loaded_ = false;
+        groups_validated_ = false;
+    }
+
     void load_patch_file(const std::string &path) {
         const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
         bbb::dmx::fixture_mapper loaded_mapper{};
@@ -924,6 +1044,13 @@ private:
             const bbb::dmx::mapper_result groups_result{validate_loaded_groups()};
             if(!groups_result.ok) {
                 handle_result(groups_result);
+            }
+        }
+        semantic_overrides_validated_ = false;
+        if(semantic_overrides_loaded_) {
+            const bbb::dmx::mapper_result semantic_overrides_result{validate_loaded_semantic_overrides()};
+            if(!semantic_overrides_result.ok) {
+                handle_result(semantic_overrides_result);
             }
         }
         report_status("loaded");
@@ -949,6 +1076,25 @@ private:
         report_status("groups_loaded");
     }
 
+    void load_semantic_overrides_file(const std::string &path) {
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        bbb::dmx::fixture_semantic_overrides loaded_overrides{};
+        const bbb::dmx::mapper_result result{bbb::dmx::read_fixture_semantic_overrides_file(resolved_path, loaded_overrides)};
+        if(!handle_result(result)) {
+            return;
+        }
+        semantic_overrides_ = loaded_overrides;
+        semantic_overrides_loaded_ = true;
+        semantic_overrides_validated_ = false;
+        if(!mapper_.patch().fixtures.empty()) {
+            const bbb::dmx::mapper_result validate_result{validate_loaded_semantic_overrides()};
+            if(!handle_result(validate_result)) {
+                return;
+            }
+        }
+        report_status("semantic_overrides_loaded");
+    }
+
     bbb::dmx::mapper_result validate_loaded_groups() {
         if(!groups_loaded_) {
             return bbb::dmx::mapper_result::failure("no groups loaded");
@@ -964,6 +1110,98 @@ private:
             groups_validated_ = false;
         }
         return result;
+    }
+
+    bbb::dmx::mapper_result validate_loaded_semantic_overrides() {
+        if(!semantic_overrides_loaded_) {
+            return bbb::dmx::mapper_result::failure("no semantic overrides loaded");
+        }
+        if(mapper_.patch().fixtures.empty()) {
+            semantic_overrides_validated_ = false;
+            return bbb::dmx::mapper_result::success();
+        }
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_override_for_fixture(fixture)};
+            if(!mode_override) {
+                continue;
+            }
+            const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture.profile)};
+            if(!profile) {
+                semantic_overrides_validated_ = false;
+                return bbb::dmx::mapper_result::failure("semantic_overrides missing profile: " + fixture.profile);
+            }
+            const bbb::dmx::fixture_mode *mode{profile->find_mode(fixture.mode)};
+            if(!mode) {
+                semantic_overrides_validated_ = false;
+                return bbb::dmx::mapper_result::failure("semantic_overrides missing mode: " + fixture.profile + ":" + fixture.mode);
+            }
+            bbb::dmx::mapper_result result{validate_semantic_override_parameters(fixture, *mode, *mode_override)};
+            if(!result.ok) {
+                semantic_overrides_validated_ = false;
+                return result;
+            }
+        }
+        semantic_overrides_validated_ = true;
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result validate_semantic_override_parameter(
+        const bbb::dmx::fixture_instance &fixture,
+        const bbb::dmx::fixture_mode &mode,
+        const std::string &parameter_key,
+        const std::string &usage
+    ) const
+    {
+        if(parameter_key.empty()) {
+            return bbb::dmx::mapper_result::success();
+        }
+        if(!mode.find_parameter(parameter_key)) {
+            return bbb::dmx::mapper_result::failure(
+                "semantic_overrides " + fixture.profile + ":" + fixture.mode + " " + usage + " references unknown parameter: " + parameter_key
+            );
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result validate_semantic_override_parameters(
+        const bbb::dmx::fixture_instance &fixture,
+        const bbb::dmx::fixture_mode &mode,
+        const bbb::dmx::fixture_semantic_mode_override &mode_override
+    ) const
+    {
+        for(const auto &alias : mode_override.aliases) {
+            bbb::dmx::mapper_result result{validate_semantic_override_parameter(fixture, mode, alias.second, "alias " + alias.first)};
+            if(!result.ok) {
+                return result;
+            }
+        }
+        for(const auto &parameter_key : mode_override.intensity_parameters) {
+            bbb::dmx::mapper_result result{validate_semantic_override_parameter(fixture, mode, parameter_key, "intensity")};
+            if(!result.ok) {
+                return result;
+            }
+        }
+        bbb::dmx::mapper_result result{validate_semantic_override_parameter(fixture, mode, mode_override.primary_intensity_parameter, "primary_intensity")};
+        if(!result.ok) {
+            return result;
+        }
+        for(const auto &block : mode_override.rgb_blocks) {
+            for(const auto &parameter_key : {block.red, block.green, block.blue, block.white, block.dimmer}) {
+                result = validate_semantic_override_parameter(fixture, mode, parameter_key, "rgb");
+                if(!result.ok) {
+                    return result;
+                }
+            }
+        }
+        for(const auto &block : mode_override.cmy_blocks) {
+            for(const auto &parameter_key : {block.cyan, block.magenta, block.yellow, block.dimmer}) {
+                result = validate_semantic_override_parameter(fixture, mode, parameter_key, "cmy");
+                if(!result.ok) {
+                    return result;
+                }
+            }
+        }
+        return bbb::dmx::mapper_result::success();
     }
 
     void output_if_autobang() {
@@ -1130,6 +1368,7 @@ private:
         if(!mode) {
             return bbb::dmx::mapper_result::failure("missing mode: " + fixture->mode);
         }
+        const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_override_for_fixture(*fixture)};
 
         std::vector<std::pair<std::string, int>> current_color_wheel_values;
         if(color_wheel_fallback_value_) {
@@ -1140,7 +1379,8 @@ private:
             *mode,
             color,
             bbb::dmx::semantic_color_options{color_use_white_value_, color_wheel_fallback_value_},
-            current_color_wheel_values
+            current_color_wheel_values,
+            mode_override
         )};
         if(!mapping.ok) {
             if(ignore_non_color_fixtures) {
@@ -1215,8 +1455,9 @@ private:
         if(!mode) {
             return bbb::dmx::mapper_result::failure("missing mode: " + fixture->mode);
         }
+        const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_override_for_fixture(*fixture)};
 
-        const bbb::dmx::semantic_color_mapping mapping{bbb::dmx::semantic_intensity_parameters_for_mode(*mode, intensity)};
+        const bbb::dmx::semantic_color_mapping mapping{bbb::dmx::semantic_intensity_parameters_for_mode(*mode, intensity, mode_override)};
         if(!mapping.ok) {
             if(ignore_unsupported_fixtures) {
                 return bbb::dmx::mapper_result::success();
@@ -1292,8 +1533,9 @@ private:
         if(!mode) {
             return bbb::dmx::mapper_result::failure("missing mode: " + fixture->mode);
         }
+        const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_override_for_fixture(*fixture)};
 
-        const bbb::dmx::semantic_shutter_mappings mappings{bbb::dmx::semantic_shutter_parameters_for_mode(*mode, open)};
+        const bbb::dmx::semantic_shutter_mappings mappings{bbb::dmx::semantic_shutter_parameters_for_mode(*mode, open, mode_override)};
         if(!mappings.ok) {
             if(ignore_unsupported_fixtures) {
                 return bbb::dmx::mapper_result::success();
@@ -1351,6 +1593,25 @@ private:
             }
         }
         return nullptr;
+    }
+
+    const bbb::dmx::fixture_semantic_mode_override *semantic_override_for_fixture(const bbb::dmx::fixture_instance &fixture) const {
+        if(!semantic_overrides_loaded_) {
+            return nullptr;
+        }
+        return semantic_overrides_.find_mode_override(fixture.profile, fixture.mode);
+    }
+
+    std::string resolve_parameter_alias(const std::string &fixture_id, const std::string &parameter_key) const {
+        const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
+        if(!fixture) {
+            return parameter_key;
+        }
+        const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_override_for_fixture(*fixture)};
+        if(!mode_override) {
+            return parameter_key;
+        }
+        return mode_override->resolve_alias(parameter_key);
     }
 
     bbb::dmx::mapper_result configure_tracking_engine(const bbb::dmx::fixture_instance &fixture, bbb::dmx::movertrack_engine &engine) const {
@@ -1532,7 +1793,8 @@ private:
     bbb::dmx::mapper_result set_parameter_args(const std::string &fixture_id, const c74::min::atoms &args, std::size_t start_index, bool ignore_unknown_parameters, const std::string &operation_name) {
         std::size_t index{start_index};
         while(index < args.size()) {
-            const std::string parameter{symbol_arg(args[index])};
+            const std::string requested_parameter{symbol_arg(args[index])};
+            const std::string parameter{resolve_parameter_alias(fixture_id, requested_parameter)};
             if(parameter == "pan_tilt") {
                 if(args.size() <= index + 2 || !finite_atom(args[index + 1]) || !finite_atom(args[index + 2])) {
                     return bbb::dmx::mapper_result::failure(operation_name + " pan_tilt requires two numeric u16 values");
@@ -1553,7 +1815,7 @@ private:
                 return bbb::dmx::mapper_result::failure(operation_name + " requires parameter/value pairs");
             }
             if(!finite_atom(args[index + 1])) {
-                return bbb::dmx::mapper_result::failure(operation_name + " value must be numeric: " + parameter);
+                return bbb::dmx::mapper_result::failure(operation_name + " value must be numeric: " + requested_parameter);
             }
             const int value{(int)args[index + 1]};
             const bbb::dmx::mapper_result result{set_parameter_value(fixture_id, parameter, value)};
@@ -1572,12 +1834,13 @@ private:
     bbb::dmx::mapper_result set_normalized_parameter_args(const std::string &fixture_id, const c74::min::atoms &args, std::size_t start_index, bool ignore_unknown_parameters, const std::string &operation_name) {
         std::size_t index{start_index};
         while(index < args.size()) {
-            const std::string parameter{symbol_arg(args[index])};
+            const std::string requested_parameter{symbol_arg(args[index])};
+            const std::string parameter{resolve_parameter_alias(fixture_id, requested_parameter)};
             if(args.size() <= index + 1) {
                 return bbb::dmx::mapper_result::failure(operation_name + " requires parameter/value pairs");
             }
             if(!finite_atom(args[index + 1])) {
-                return bbb::dmx::mapper_result::failure(operation_name + " value must be numeric: " + parameter);
+                return bbb::dmx::mapper_result::failure(operation_name + " value must be numeric: " + requested_parameter);
             }
             const bbb::dmx::mapper_result result{mapper_.set_normalized(fixture_id, parameter, (double)args[index + 1])};
             if(!result.ok) {

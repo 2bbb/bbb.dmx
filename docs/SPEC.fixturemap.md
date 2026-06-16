@@ -277,7 +277,8 @@ Attributes implemented today:
 | Attribute | Type | Default | Description |
 |---|---|---:|---|
 | `@patch` | symbol/string | empty | Patch JSON path. Loaded on initialization and by `read`. |
-| `@groups` | symbol/string | empty | Optional groups JSON path. Loaded on initialization and by `readgroups`. |
+| `@groups` / `@group` | symbol/string | empty | Optional groups JSON path. Loaded on initialization and by `readgroups`. `@group` is a singular alias for Max patch readability. |
+| `@semantic_overrides` | symbol/string | empty | Optional semantic overrides JSON path. Loaded on initialization and by `readoverrides`; affects parameter aliases plus semantic color/intensity behavior. |
 | `@universe` | int | `1` | Selected universe to output. Universes are 1-based. |
 | `@autobang` | bool | `1` | If non-zero, successful updates immediately output according to `@universe_mode`. |
 | `@universe_mode` | symbol | `selected` | Output mode for `bang` and autobang: `selected` or `all`. |
@@ -300,6 +301,7 @@ Outlets:
 ```max
 read patches/show.json
 readgroups groups/show.groups.json
+readoverrides fixtures/show.semantic-overrides.json
 reload
 dump
 clear
@@ -310,12 +312,51 @@ bangall
 
 - `read` loads a patch JSON path.
 - `readgroups` loads a `bbb.dmx.groups.v1` file whose explicit fixture ids are validated against the loaded patch.
-- `reload` reloads the current patch and current groups file when one is set.
-- `dump` reports current load status, selected universe, `universe_mode`, tracking settings, color white/fallback modes, group status, group ids, and known universe ids from the right outlet.
+- `readoverrides` loads a `bbb.dmx.semantic_overrides.v1` file. Overrides are validated against matching loaded patch fixtures.
+- `reload` reloads the current patch, current groups file, and current semantic overrides file when set.
+- `dump` reports current load status, selected universe, `universe_mode`, tracking settings, color white/fallback modes, group status, semantic override status, group ids, and known universe ids from the right outlet.
 - `clear` clears loaded profiles, patch data, and universe buffers.
 - `reset` restores loaded fixture channels to profile defaults.
 - `bang` outputs according to `@universe_mode`. Default `selected` mode preserves the bare 512-value list.
 - `bangall` always outputs every known universe as `universe <id> <512 values...>` messages.
+
+### 7.2.1 Semantic overrides
+
+Semantic overrides are a separate JSON layer, not fixture profile data. Use this for profile/mode-specific interpretation that the imported fixture file cannot reliably express. The initial supported schema is:
+
+```json
+{
+  "schema": "bbb.dmx.semantic_overrides.v1",
+  "profiles": {
+    "glp.glp.jdc.1": {
+      "modes": {
+        "mode.2.normal.23ch": {
+          "aliases": {
+            "plate_dimmer": "dimmer_2",
+            "beam_dimmer": "dimmer_3"
+          },
+          "intensity": {
+            "primary": "dimmer",
+            "parameters": ["dimmer", "dimmer_2", "dimmer_3"]
+          },
+          "color": {
+            "rgb": [
+              {"red": "red", "green": "green", "blue": "blue", "dimmer": "dimmer_2"},
+              {"red": "red_2", "green": "green_2", "blue": "blue_2", "dimmer": "dimmer_3"}
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+- `aliases` remap parameter names for `set`/`nset`/`rawset` and their `all`/`group` variants. If no alias exists, the requested parameter name is used unchanged.
+- `intensity.parameters` overrides what `dimmer`, `dimmerall`, and `dimmergroup` write.
+- `intensity.primary` overrides the single dimmer used by narrow fallback behavior such as shutter-close intensity fallback.
+- `color.rgb` / `color.cmy` override semantic color blocks. An optional block `dimmer` receives brightness `max(r,g,b)`; color components are normalized by that brightness.
+- Overrides win over built-in heuristics only for profile/mode pairs that match the loaded patch. Do not pollute generated fixture profiles with these show-specific repairs.
 
 #### Normalized fixture parameter
 
@@ -327,7 +368,7 @@ setall dimmer 1.0
 setgroup front dimmer 1.0
 ```
 
-`set` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`. `setall` applies to every fixture in patch order. `setgroup` applies to the named loaded group in patch order. Unknown parameters are skipped for broad `setall` / `setgroup` writes; unknown fixture ids in the groups file are errors. `nset`, `nsetall`, and `nsetgroup` remain aliases for normalized writes.
+`set` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`. Loaded semantic override aliases are resolved before parameter lookup. `setall` applies to every fixture in patch order. `setgroup` applies to the named loaded group in patch order. Unknown parameters are skipped for broad `setall` / `setgroup` writes; unknown fixture ids in the groups file are errors. `nset`, `nsetall`, and `nsetgroup` remain aliases for normalized writes.
 
 #### Raw fixture parameter
 
@@ -340,7 +381,7 @@ rawsetall dimmer 255
 rawsetgroup front dimmer 255
 ```
 
-`rawset` writes raw fixture parameter values. It first attempts the parameter as a 16-bit value and falls back to 8-bit where appropriate. `pan_tilt` is a convenience pseudo-parameter for setting both 16-bit pan and tilt in one message. `rawsetall` and `rawsetgroup` are broad raw writes.
+`rawset` writes raw fixture parameter values. Loaded semantic override aliases are resolved before parameter lookup. It first attempts the parameter as a 16-bit value and falls back to 8-bit where appropriate. `pan_tilt` is a convenience pseudo-parameter for setting both 16-bit pan and tilt in one message. `rawsetall` and `rawsetgroup` are broad raw writes.
 
 #### Semantic color input
 
@@ -351,7 +392,7 @@ colorall rgb8 255 204 0
 colorgroup front rgb 1.0 0.0 0.0
 ```
 
-`color` and `colorall` express the desired additive RGB color instead of raw fixture parameter names. `rgb` values are normalized `0.0..1.0`; `rgb8` values are `0..255`. RGB fixtures receive `red`, `green`, and `blue`. If an RGB/RGBW/CMY color block has a preceding dimmer/intensity parameter, semantic color uses the nearest preceding dimmer as brightness `max(r,g,b)` and normalizes the color channels by that brightness. This avoids opening earlier non-color dimmers on fixtures such as strobe hybrids. RGBW fixtures receive `red`, `green`, `blue`, and extracted `white = min(red, green, blue)` when `@color_use_white 1`. With `@color_use_white 0`, RGBW fixtures receive full `red`, `green`, and `blue`; `white` is left untouched so it can be managed separately. CMY fixtures receive subtractive `cyan = 1 - red`, `magenta = 1 - green`, and `yellow = 1 - blue`.
+If a loaded semantic override defines color blocks for the fixture profile/mode, those explicit blocks are used before built-in RGB/RGBW/CMY heuristics. `color` and `colorall` express the desired additive RGB color instead of raw fixture parameter names. `rgb` values are normalized `0.0..1.0`; `rgb8` values are `0..255`. RGB fixtures receive every complete `red`/`green`/`blue` block, including suffixed multi-emitter blocks such as `red_2`/`green_2`/`blue_2`. If an RGB/RGBW/CMY color block has a preceding dimmer/intensity parameter, semantic color uses the nearest preceding dimmer as brightness `max(r,g,b)` and normalizes that block's color channels by that brightness. This avoids opening earlier non-color/master dimmers on fixtures such as strobe hybrids. RGBW fixtures receive `red`, `green`, `blue`, and extracted `white = min(red, green, blue)` when `@color_use_white 1`. With `@color_use_white 0`, RGBW fixtures receive full `red`, `green`, and `blue`; `white` is left untouched so it can be managed separately. CMY fixtures receive subtractive `cyan = 1 - red`, `magenta = 1 - green`, and `yellow = 1 - blue` for every complete CMY block.
 
 Color wheel fallback is deliberately opt-in. With `@color_wheel_fallback 1`, only fixtures that have no RGB/RGBW/CMY semantic model fall back to a color wheel plus dimmer model. The requested RGB is split into brightness `max(r,g,b)` and normalized hue `rgb / brightness`; black (`0 0 0`) uses open/white hue with brightness `0`. Matching uses `parameter.wheel` / `range.wheel_slot` against top-level `wheels[].slots[].rgb` or `cie_xyY`; if those are absent it falls back to conservative color-name matching from range/slot labels. The color wheel value is the midpoint of the matched range; if a `dimmer` parameter exists, it is set to the brightness. When multiple ranges are equally good matches, current wheel raw value is used as a tie-breaker so the nearest equivalent open/slot is chosen. With the default `@color_wheel_fallback 0`, semantic color never touches a color wheel.
 
@@ -365,7 +406,7 @@ dimmerall 0.5
 dimmergroup front 0.25
 ```
 
-`dimmer`, `dimmerall`, and `dimmergroup` express desired fixture intensity instead of a raw parameter name. For RGB/RGBW/CMY fixtures with a color-block dimmer, this writes the nearest preceding dimmer/intensity parameter for the color block. If no color-block dimmer exists, it falls back to the fixture's `dimmer` parameter, then the first dimmer/intensity-like parameter. Use exact `set`/`setall` normalized writes or `rawset`/`rawsetall` raw writes when you intentionally need a specific fixture parameter such as `dimmer_2` or a strobe/beam dimmer.
+If a loaded semantic override defines `intensity.parameters` for the fixture profile/mode, that explicit list is used before built-in dimmer heuristics. `dimmer`, `dimmerall`, and `dimmergroup` express desired fixture intensity instead of a raw parameter name. They write all intensity dimmer-like parameters in the fixture mode, so multi-emitter fixtures with `dimmer`, `dimmer_2`, and `dimmer_3` open together. Parameters that look like dimmer configuration/curve controls are skipped when their ranges do not describe intensity. Use exact `set`/`setall` normalized writes or `rawset`/`rawsetall` raw writes when you intentionally need only one specific fixture parameter.
 
 #### Semantic shutter input
 
@@ -394,7 +435,10 @@ If shutter and strobe share the same channel, the semantic shutter write intenti
 ```max
 channel 1 255
 channels 1 255 2 128 3 0
+uchannels 13 1 255 13 2 128 13 3 0
 ```
+
+`channel` and `channels` write to the selected `@universe`. `uchannels` writes repeated `universe channel value` triples directly, without changing the selected universe.
 
 Raw override is implemented for testing and emergency control. It should stay visibly separate from fixture parameters; otherwise patches become unreadable.
 
@@ -431,7 +475,7 @@ ptbytes spot_01 pan1 pan2 tilt1 tilt2
 Current behavior:
 
 - Every successful value update updates the internal multi-universe buffer.
-- If `@autobang 1`, successful `read`, `reload`, `set`, `setall`, `setgroup`, `rawset`, `rawsetall`, `rawsetgroup`, `nset`, `nsetall`, `nsetgroup`, `color`, `colorall`, `colorgroup`, `dimmer`, `dimmerall`, `dimmergroup`, `shutter`, `shutterall`, `shuttergroup`, `track`, `trackall`, `trackgroup`, `trackrel`, `trackallrel`, `trackgrouprel`, `ptbytes`, `channel`, `channels`, `clear`, and `reset` operations output according to `@universe_mode`.
+- If `@autobang 1`, successful `read`, `reload`, `set`, `setall`, `setgroup`, `rawset`, `rawsetall`, `rawsetgroup`, `nset`, `nsetall`, `nsetgroup`, `color`, `colorall`, `colorgroup`, `dimmer`, `dimmerall`, `dimmergroup`, `shutter`, `shutterall`, `shuttergroup`, `track`, `trackall`, `trackgroup`, `trackrel`, `trackallrel`, `trackgrouprel`, `ptbytes`, `channel`, `channels`, `uchannels`, `clear`, and `reset` operations output according to `@universe_mode`.
 - `@universe_mode selected` outputs the selected full 512-byte universe as a bare list. This is the default compatibility mode.
 - `@universe_mode all` outputs one `universe <id> <512 values...>` message per known universe.
 - `bang` follows `@universe_mode`; `bangall` forces all-universe output.

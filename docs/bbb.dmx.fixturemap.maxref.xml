@@ -28,6 +28,12 @@
             </arglist>
             <description>Read an optional bbb.dmx groups JSON file. Groups are explicit fixture id arrays validated against the loaded patch.</description>
         </method>
+        <method name="readoverrides">
+            <arglist>
+                <arg name="path" type="symbol" optional="0" />
+            </arglist>
+            <description>Read an optional bbb.dmx semantic overrides JSON file. Overrides add parameter aliases and profile/mode-specific semantic color/intensity behavior.</description>
+        </method>
         <method name="bang">
             <description>Output the current DMX frame.</description>
         </method>
@@ -49,7 +55,7 @@
                 <arg name="parameter" type="symbol" optional="0" />
                 <arg name="normalized" type="float" optional="0" />
             </arglist>
-            <description>Set one or more normalized 0..1 fixture parameter values. Use rawset for raw DMX-domain values.</description>
+            <description>Set one or more normalized 0..1 fixture parameter values. Semantic override aliases are resolved before parameter lookup. Use rawset for raw DMX-domain values.</description>
         </method>
         <method name="setall">
             <arglist>
@@ -72,7 +78,7 @@
                 <arg name="parameter" type="symbol" optional="0" />
                 <arg name="value" type="int" optional="0" />
             </arglist>
-            <description>Set one or more raw 8-bit, 16-bit, or 24-bit fixture parameter values. Use repeated parameter/value pairs, or parameter pan_tilt with pan and tilt u16 values for paired movement.</description>
+            <description>Set one or more raw 8-bit, 16-bit, or 24-bit fixture parameter values. Semantic override aliases are resolved before parameter lookup. Use repeated parameter/value pairs, or parameter pan_tilt with pan and tilt u16 values for paired movement.</description>
         </method>
         <method name="rawsetall">
             <arglist>
@@ -120,7 +126,7 @@
                 <arg name="green" type="float" optional="0" />
                 <arg name="blue" type="float" optional="0" />
             </arglist>
-            <description>Set one fixture by semantic RGB color. Use rgb for normalized 0..1 values or rgb8 for 0..255 values; RGB/RGBW/CMY profiles are mapped automatically, using the nearest preceding color-block dimmer when present.</description>
+            <description>Set one fixture by semantic RGB color. Semantic override color blocks win over heuristics; otherwise RGB/RGBW/CMY profiles are mapped automatically, using the nearest preceding color-block dimmer when present.</description>
         </method>
         <method name="colorall">
             <arglist>
@@ -146,7 +152,7 @@
                 <arg name="fixture_id" type="symbol" optional="0" />
                 <arg name="normalized" type="float" optional="0" />
             </arglist>
-            <description>Set one fixture by semantic intensity. RGB/RGBW/CMY color-block dimmers are preferred; otherwise the fixture dimmer or first dimmer-like parameter is used.</description>
+            <description>Set one fixture by semantic intensity. Semantic override intensity lists win over heuristics; otherwise all intensity dimmer-like parameters are used.</description>
         </method>
         <method name="dimmerall">
             <arglist>
@@ -249,6 +255,28 @@
             </arglist>
             <description>Patch movertrack pan/tilt byte output into a fixture using that fixture profile's byte order.</description>
         </method>
+        <method name="channel">
+            <arglist>
+                <arg name="address" type="int" optional="0" />
+                <arg name="value" type="int" optional="0" />
+            </arglist>
+            <description>Set one raw DMX channel in the selected universe.</description>
+        </method>
+        <method name="channels">
+            <arglist>
+                <arg name="address" type="int" optional="0" />
+                <arg name="value" type="int" optional="0" />
+            </arglist>
+            <description>Set repeated raw DMX address/value pairs in the selected universe.</description>
+        </method>
+        <method name="uchannels">
+            <arglist>
+                <arg name="universe" type="int" optional="0" />
+                <arg name="address" type="int" optional="0" />
+                <arg name="value" type="int" optional="0" />
+            </arglist>
+            <description>Set repeated raw DMX universe/address/value triples directly, without changing the selected universe.</description>
+        </method>
     </methodlist>
     <attributelist>
         <attribute name="patch" get="1" set="1" type="symbol">
@@ -256,6 +284,12 @@
         </attribute>
         <attribute name="groups" get="1" set="1" type="symbol">
             <description>Optional groups JSON path to read after object initialization and whenever the attribute changes. Groups are explicit fixture id arrays validated against the loaded patch.</description>
+        </attribute>
+        <attribute name="group" get="1" set="1" type="symbol">
+            <description>Alias for groups. Useful for patchers that read better as @group path.json.</description>
+        </attribute>
+        <attribute name="semantic_overrides" get="1" set="1" type="symbol">
+            <description>Optional semantic overrides JSON path to read after object initialization and whenever the attribute changes. Overrides are validated against matching loaded patch fixtures.</description>
         </attribute>
         <attribute name="universe" get="1" set="1" type="int">
             <description>Selected output universe for single-universe output.</description>

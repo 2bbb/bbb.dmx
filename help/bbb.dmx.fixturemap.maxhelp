@@ -79,7 +79,7 @@
             760,
             52
           ],
-          "text": "Load a patch JSON file with read or @patch, then send semantic fixture updates. Default output is a selected 512 integer list; bangall / @universe_mode all outputs universe id plus 512 values for each known universe."
+          "text": "Load a patch JSON file with read or @patch, optional @group/@groups and @semantic_overrides JSON files, then send semantic fixture updates. bangall / @universe_mode all outputs universe id plus 512 values for each known universe."
         }
       },
       {
@@ -256,7 +256,7 @@
             260,
             22
           ],
-          "text": "bbb.dmx.fixturemap @patch patches/example.json @universe 1",
+          "text": "bbb.dmx.fixturemap @patch patches/example.json @group groups/example.json @semantic_overrides fixtures/semantic-overrides.json @universe 1",
           "outlettype": [
             "list",
             ""
@@ -380,7 +380,7 @@
             190,
             22
           ],
-          "text": "channels 1 255 2 128 3 0"
+          "text": "uchannels 13 1 255 13 2 128 13 3 0"
         }
       },
       {
@@ -445,7 +445,7 @@
             760,
             48
           ],
-          "text": "Current API: read/reload/dump/clear/reset/bang/bangall, set/setall/nset/nsetall, color/colorall, shutter/shutterall, track/trackall/trackrel/trackallrel/trackreset, ptbytes, raw channel/channels, @patch, @autobang, @universe_mode, color/tracking attrs."
+          "text": "Current API: read/readgroups/readoverrides/reload/dump/clear/reset/bang/bangall, set/rawset/nset with all/group variants, color/dimmer/shutter with all/group variants, track/trackrel with all/group variants, raw channel/channels/uchannels, @patch, @group/@groups, @semantic_overrides, color/tracking attrs."
         }
       },
       {
