@@ -69,6 +69,7 @@
         "patches/rgb-grid.example.json": {},
         "maps/rgb-grid.example.json": {},
         "docs/SPEC.matrixmap.md": {},
+        "docs/bbb.dmx.matrixmap.maxref.xml": {},
         "docs/SPEC.utilities.md": {},
         "docs/SPEC.fixturemap.md": {},
         "docs/bbb.dmx.fixturemap.maxref.xml": {},

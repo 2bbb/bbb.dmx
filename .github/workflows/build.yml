@@ -138,6 +138,9 @@ jobs:
       - name: Validate package JSON files against schemas
         run: scripts/validate-json-schemas.sh
 
+      - name: Validate Max reference XML files
+        run: scripts/validate-maxref-xml.sh
+
   package:
     permissions:
       contents: write

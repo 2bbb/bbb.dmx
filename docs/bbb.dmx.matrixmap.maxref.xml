@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<c74object name="bbb.dmx.matrixmap" category="bbb.dmx">
+    <digest>Sample jit.matrix colors into fixture parameters across multiple DMX universes.</digest>
+    <description>Loads a bbb.dmx fixture patch and a matrix map JSON file, samples color data from a Jitter matrix, writes mapped fixture parameters, and outputs 512-channel DMX universe lists. It can target fixture ids directly or resolve fixture groups from an optional groups JSON file.</description>
+    <metadatalist>
+        <metadata name="author">2bit</metadata>
+        <metadata name="tag">dmx</metadata>
+        <metadata name="tag">jitter</metadata>
+        <metadata name="tag">matrix</metadata>
+        <metadata name="tag">fixture</metadata>
+        <metadata name="tag">mapping</metadata>
+    </metadatalist>
+    <inlets>
+        <inlet id="0" type="anything">jit_matrix, file loading, bang, reload, and dump input.</inlet>
+    </inlets>
+    <outlets>
+        <outlet id="0" type="list">DMX data. In selected-universe mode this is a 512-value list. In all or changed mode this is universe id followed by 512 values.</outlet>
+        <outlet id="1" type="anything">Status and diagnostic messages.</outlet>
+    </outlets>
+    <methodlist>
+        <method name="readpatch">
+            <arglist>
+                <arg name="path" type="symbol" optional="0" />
+            </arglist>
+            <description>Read a fixture patch JSON file immediately. Relative paths are resolved by Max against the patch/search path.</description>
+        </method>
+        <method name="readmap">
+            <arglist>
+                <arg name="path" type="symbol" optional="0" />
+            </arglist>
+            <description>Read a matrix map JSON file immediately. The map describes fixture ids or groups, sample points or regions, and parameter bindings.</description>
+        </method>
+        <method name="readgroups">
+            <arglist>
+                <arg name="path" type="symbol" optional="0" />
+            </arglist>
+            <description>Read an optional bbb.dmx groups JSON file. Matrix map entries may target group names when groups are loaded.</description>
+        </method>
+        <method name="readoverrides">
+            <arglist>
+                <arg name="path" type="symbol" optional="0" />
+            </arglist>
+            <description>Read an optional semantic overrides JSON file. Overrides add parameter aliases and profile/mode-specific semantic color behavior.</description>
+        </method>
+        <method name="jit_matrix">
+            <arglist>
+                <arg name="matrix_name" type="symbol" optional="0" />
+            </arglist>
+            <description>Process a registered Jitter matrix by name. char and float32 matrices are supported.</description>
+        </method>
+        <method name="bang">
+            <description>Output the current mapped universe buffers.</description>
+        </method>
+        <method name="reload">
+            <description>Reload the current patch, matrix map, groups, and semantic overrides files when their paths are set.</description>
+        </method>
+        <method name="dump">
+            <description>Output load status, validation status, fixture count, and universe mode from the status outlet.</description>
+        </method>
+    </methodlist>
+    <attributelist>
+        <attribute name="patch" get="1" set="1" type="symbol">
+            <description>Fixture patch JSON path to read after object initialization and whenever the attribute changes. Attribute loading is deferred; use readpatch for immediate explicit loading.</description>
+        </attribute>
+        <attribute name="map" get="1" set="1" type="symbol">
+            <description>Matrix map JSON path to read after object initialization and whenever the attribute changes. Attribute loading is deferred; use readmap for immediate explicit loading.</description>
+        </attribute>
+        <attribute name="groups" get="1" set="1" type="symbol">
+            <description>Optional groups JSON path to read after object initialization and whenever the attribute changes.</description>
+        </attribute>
+        <attribute name="group" get="1" set="1" type="symbol">
+            <description>Alias for groups. Useful for patchers that read better as @group path.json.</description>
+        </attribute>
+        <attribute name="semantic_overrides" get="1" set="1" type="symbol">
+            <description>Optional semantic overrides JSON path to read after object initialization and whenever the attribute changes.</description>
+        </attribute>
+        <attribute name="universe" get="1" set="1" type="int">
+            <description>Selected output universe for selected universe output mode.</description>
+        </attribute>
+        <attribute name="universe_mode" get="1" set="1" type="symbol">
+            <description>Output mode: all, selected, or changed.</description>
+        </attribute>
+        <attribute name="plane_order" get="1" set="1" type="symbol">
+            <description>Matrix plane order: rgba, argb, bgra, or gray.</description>
+        </attribute>
+        <attribute name="gamma" get="1" set="1" type="float">
+            <description>Gamma applied to sampled values. 1.0 leaves values unchanged.</description>
+        </attribute>
+        <attribute name="brightness" get="1" set="1" type="float">
+            <description>Brightness multiplier applied after gamma.</description>
+        </attribute>
+        <attribute name="autobang" get="1" set="1" type="int">
+            <description>When non-zero, output automatically after a jit_matrix is processed.</description>
+        </attribute>
+        <attribute name="invert_x" get="1" set="1" type="int">
+            <description>When non-zero, mirror normalized sample coordinates horizontally.</description>
+        </attribute>
+        <attribute name="invert_y" get="1" set="1" type="int">
+            <description>When non-zero, mirror normalized sample coordinates vertically.</description>
+        </attribute>
+        <attribute name="color_use_white" get="1" set="1" type="int">
+            <description>RGBW semantic matrix color behavior. When zero, RGBW white parameters are left untouched.</description>
+        </attribute>
+        <attribute name="color_wheel_fallback" get="1" set="1" type="int">
+            <description>When non-zero, semantic RGB mappings may drive nearest color-wheel slots when no RGB, RGBW, or CMY model exists.</description>
+        </attribute>
+    </attributelist>
+    <seealsolist>
+        <seealso name="bbb.dmx.fixturemap" />
+        <seealso name="bbb.dmx.fixtureinfo" />
+        <seealso name="bbb.dmx.patchcheck" />
+    </seealsolist>
+</c74object>
