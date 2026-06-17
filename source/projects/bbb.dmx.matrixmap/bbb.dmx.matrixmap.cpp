@@ -61,6 +61,15 @@ private:
     bool groups_validated_{false};
     bool semantic_overrides_loaded_{false};
     bool semantic_overrides_validated_{false};
+    bool patch_load_pending_{false};
+    bool map_load_pending_{false};
+    bool groups_load_pending_{false};
+    bool semantic_overrides_load_pending_{false};
+    bool suppress_patch_attribute_load_{false};
+    bool suppress_map_attribute_load_{false};
+    bool suppress_groups_attribute_load_{false};
+    bool suppress_group_attribute_load_{false};
+    bool suppress_semantic_overrides_attribute_load_{false};
     std::map<int, bbb::dmx::dmx_universe> previous_output_{};
 
 public:
@@ -73,15 +82,59 @@ public:
     c74::min::outlet<> output{this, "(anything) universe id and 512 DMX bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
+    c74::min::timer<c74::min::timer_options::defer_delivery> patch_load_timer{this,
+        MIN_FUNCTION {
+            if(patch_load_pending_ && !patch_path_value_.empty()) {
+                patch_load_pending_ = false;
+                load_patch(patch_path_value_);
+            }
+            return {};
+        }
+    };
+
+    c74::min::timer<c74::min::timer_options::defer_delivery> map_load_timer{this,
+        MIN_FUNCTION {
+            if(map_load_pending_ && !map_path_value_.empty()) {
+                map_load_pending_ = false;
+                load_map(map_path_value_);
+            }
+            return {};
+        }
+    };
+
+    c74::min::timer<c74::min::timer_options::defer_delivery> groups_load_timer{this,
+        MIN_FUNCTION {
+            if(groups_load_pending_ && !groups_path_value_.empty()) {
+                groups_load_pending_ = false;
+                load_groups(groups_path_value_);
+            }
+            return {};
+        }
+    };
+
+    c74::min::timer<c74::min::timer_options::defer_delivery> semantic_overrides_load_timer{this,
+        MIN_FUNCTION {
+            if(semantic_overrides_load_pending_ && !semantic_overrides_path_value_.empty()) {
+                semantic_overrides_load_pending_ = false;
+                load_semantic_overrides(semantic_overrides_path_value_);
+            }
+            return {};
+        }
+    };
+
     c74::min::attribute<c74::min::symbol> patch{this, "patch", "",
         c74::min::description{"Fixture patch JSON path."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             if(args.empty()) {
                 patch_path_value_.clear();
+                patch_load_pending_ = false;
                 return {c74::min::symbol("")};
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             patch_path_value_ = symbol_value.c_str();
+            if(!suppress_patch_attribute_load_) {
+                schedule_patch_load();
+            }
             return {symbol_value};
         }}
     };
@@ -91,10 +144,14 @@ public:
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             if(args.empty()) {
                 map_path_value_.clear();
+                map_load_pending_ = false;
                 return {c74::min::symbol("")};
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             map_path_value_ = symbol_value.c_str();
+            if(!suppress_map_attribute_load_) {
+                schedule_map_load();
+            }
             return {symbol_value};
         }}
     };
@@ -108,6 +165,9 @@ public:
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             groups_path_value_ = symbol_value.c_str();
+            if(!suppress_groups_attribute_load_) {
+                schedule_groups_load();
+            }
             return {symbol_value};
         }}
     };
@@ -121,6 +181,9 @@ public:
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             groups_path_value_ = symbol_value.c_str();
+            if(!suppress_group_attribute_load_) {
+                schedule_groups_load();
+            }
             return {symbol_value};
         }}
     };
@@ -130,6 +193,7 @@ public:
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             if(args.empty()) {
                 semantic_overrides_path_value_.clear();
+                semantic_overrides_load_pending_ = false;
                 semantic_overrides_ = bbb::dmx::fixture_semantic_overrides{};
                 semantic_overrides_loaded_ = false;
                 semantic_overrides_validated_ = false;
@@ -137,6 +201,9 @@ public:
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             semantic_overrides_path_value_ = symbol_value.c_str();
+            if(!suppress_semantic_overrides_attribute_load_) {
+                schedule_semantic_overrides_load();
+            }
             return {symbol_value};
         }}
     };
@@ -248,27 +315,8 @@ public:
         }}
     };
 
-    c74::min::timer<c74::min::timer_options::defer_delivery> init_timer{this,
-        MIN_FUNCTION {
-            if(!patch_path_value_.empty()) {
-                load_patch(patch_path_value_);
-            }
-            if(!map_path_value_.empty()) {
-                load_map(map_path_value_);
-            }
-            if(!groups_path_value_.empty()) {
-                load_groups(groups_path_value_);
-            }
-            if(!semantic_overrides_path_value_.empty()) {
-                load_semantic_overrides(semantic_overrides_path_value_);
-            }
-            return {};
-        }
-    };
-
     bbb_dmx_matrixmap() {
         bbb::dmx::report_external_build_info(cout, "bbb.dmx.matrixmap");
-        init_timer.delay(0);
     }
 
     c74::min::message<> readpatch_message{this, "readpatch", "readpatch patch_json_path",
@@ -279,7 +327,10 @@ public:
             }
             const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
             patch_path_value_ = path_symbol.c_str();
+            suppress_patch_attribute_load_ = true;
             patch = path_symbol;
+            suppress_patch_attribute_load_ = false;
+            patch_load_pending_ = false;
             load_patch(patch_path_value_);
             return {};
         }
@@ -293,7 +344,10 @@ public:
             }
             const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
             map_path_value_ = path_symbol.c_str();
+            suppress_map_attribute_load_ = true;
             map = path_symbol;
+            suppress_map_attribute_load_ = false;
+            map_load_pending_ = false;
             load_map(map_path_value_);
             return {};
         }
@@ -307,8 +361,13 @@ public:
             }
             const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
             groups_path_value_ = path_symbol.c_str();
+            suppress_groups_attribute_load_ = true;
             groups = path_symbol;
+            suppress_groups_attribute_load_ = false;
+            suppress_group_attribute_load_ = true;
             group = path_symbol;
+            suppress_group_attribute_load_ = false;
+            groups_load_pending_ = false;
             load_groups(groups_path_value_);
             return {};
         }
@@ -322,7 +381,10 @@ public:
             }
             const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
             semantic_overrides_path_value_ = path_symbol.c_str();
+            suppress_semantic_overrides_attribute_load_ = true;
             semantic_overrides = path_symbol;
+            suppress_semantic_overrides_attribute_load_ = false;
+            semantic_overrides_load_pending_ = false;
             load_semantic_overrides(semantic_overrides_path_value_);
             return {};
         }
@@ -443,8 +505,45 @@ private:
         report_status("map_loaded");
     }
 
+    void schedule_patch_load() {
+        if(patch_path_value_.empty()) {
+            patch_load_pending_ = false;
+            return;
+        }
+        patch_load_pending_ = true;
+        patch_load_timer.delay(0);
+    }
+
+    void schedule_map_load() {
+        if(map_path_value_.empty()) {
+            map_load_pending_ = false;
+            return;
+        }
+        map_load_pending_ = true;
+        map_load_timer.delay(0);
+    }
+
+    void schedule_groups_load() {
+        if(groups_path_value_.empty()) {
+            groups_load_pending_ = false;
+            return;
+        }
+        groups_load_pending_ = true;
+        groups_load_timer.delay(0);
+    }
+
+    void schedule_semantic_overrides_load() {
+        if(semantic_overrides_path_value_.empty()) {
+            semantic_overrides_load_pending_ = false;
+            return;
+        }
+        semantic_overrides_load_pending_ = true;
+        semantic_overrides_load_timer.delay(0);
+    }
+
     void clear_groups() {
         groups_path_value_.clear();
+        groups_load_pending_ = false;
         groups_ = bbb::dmx::fixture_group_set{};
         groups_loaded_ = false;
         groups_validated_ = false;
