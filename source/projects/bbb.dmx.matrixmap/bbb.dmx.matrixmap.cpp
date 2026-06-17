@@ -3,10 +3,13 @@
 #include <bbb/dmx/build_info.hpp>
 #include "c74_jitter.h"
 
+#include <bbb/dmx/color_mapping.hpp>
+#include <bbb/dmx/fixture_groups.hpp>
 #include <bbb/dmx/fixture_json.hpp>
 #include <bbb/dmx/frame_set.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 #include <bbb/dmx/matrix_map.hpp>
+#include <bbb/dmx/semantic_overrides.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -17,9 +20,11 @@
 using bbb::dmx::matrixmap::clamp_normalized;
 using bbb::dmx::matrixmap::color_source_value;
 using bbb::dmx::matrixmap::color_value;
+using bbb::dmx::matrixmap::fixture_mapping;
 using bbb::dmx::matrixmap::matrix_map_config;
 using bbb::dmx::matrixmap::matrix_read_view;
 using bbb::dmx::matrixmap::matrix_value_kind;
+using bbb::dmx::matrixmap::parameter_binding;
 using bbb::dmx::matrixmap::parse_matrix_map_text;
 using bbb::dmx::matrixmap::parse_plane_order;
 using bbb::dmx::matrixmap::parse_universe_output_mode;
@@ -34,8 +39,12 @@ class bbb_dmx_matrixmap : public c74::min::object<bbb_dmx_matrixmap> {
 private:
     bbb::dmx::fixture_mapper mapper_{};
     matrix_map_config matrix_map_{};
+    bbb::dmx::fixture_group_set groups_{};
+    bbb::dmx::fixture_semantic_overrides semantic_overrides_{};
     std::string patch_path_value_{};
     std::string map_path_value_{};
+    std::string groups_path_value_{};
+    std::string semantic_overrides_path_value_{};
     int universe_value_{1};
     plane_order_kind plane_order_value_{plane_order_kind::rgba};
     universe_output_mode output_mode_value_{universe_output_mode::all};
@@ -44,8 +53,14 @@ private:
     bool autobang_value_{true};
     bool invert_x_value_{false};
     bool invert_y_value_{false};
+    bool color_use_white_value_{true};
+    bool color_wheel_fallback_value_{false};
     bool patch_loaded_{false};
     bool map_loaded_{false};
+    bool groups_loaded_{false};
+    bool groups_validated_{false};
+    bool semantic_overrides_loaded_{false};
+    bool semantic_overrides_validated_{false};
     std::map<int, bbb::dmx::dmx_universe> previous_output_{};
 
 public:
@@ -54,7 +69,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.fixturemap, bbb.dmx.merge, bbb.dmx.safety"};
 
-    c74::min::inlet<> input{this, "(jit_matrix/readpatch/readmap/bang) matrix-to-DMX mapper input"};
+    c74::min::inlet<> input{this, "(jit_matrix/readpatch/readmap/readgroups/readoverrides/bang) matrix-to-DMX mapper input"};
     c74::min::outlet<> output{this, "(anything) universe id and 512 DMX bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -84,6 +99,48 @@ public:
         }}
     };
 
+    c74::min::attribute<c74::min::symbol> groups{this, "groups", "",
+        c74::min::description{"Optional bbb.dmx groups JSON path. Explicit matrix map entries may target group names with \"group\"."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                clear_groups();
+                return {c74::min::symbol("")};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            groups_path_value_ = symbol_value.c_str();
+            return {symbol_value};
+        }}
+    };
+
+    c74::min::attribute<c74::min::symbol> group{this, "group", "",
+        c74::min::description{"Alias for @groups."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                clear_groups();
+                return {c74::min::symbol("")};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            groups_path_value_ = symbol_value.c_str();
+            return {symbol_value};
+        }}
+    };
+
+    c74::min::attribute<c74::min::symbol> semantic_overrides{this, "semantic_overrides", "",
+        c74::min::description{"Optional bbb.dmx semantic overrides JSON path. Enables aliases and semantic RGB/CMY/color-wheel matrix mapping."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                semantic_overrides_path_value_.clear();
+                semantic_overrides_ = bbb::dmx::fixture_semantic_overrides{};
+                semantic_overrides_loaded_ = false;
+                semantic_overrides_validated_ = false;
+                return {c74::min::symbol("")};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            semantic_overrides_path_value_ = symbol_value.c_str();
+            return {symbol_value};
+        }}
+    };
+
     c74::min::attribute<int> universe{this, "universe", 1,
         c74::min::description{"Selected universe for universe_mode selected."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
@@ -92,6 +149,22 @@ public:
             }
             universe_value_ = bbb::dmx::sanitize_universe_id((int)args[0]);
             return {universe_value_};
+        }}
+    };
+
+    c74::min::attribute<bool> color_use_white{this, "color_use_white", true,
+        c74::min::description{"RGBW semantic matrix color behavior. When false, RGBW white parameters are left untouched."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            color_use_white_value_ = args.empty() || ((int)args[0] != 0);
+            return {color_use_white_value_};
+        }}
+    };
+
+    c74::min::attribute<bool> color_wheel_fallback{this, "color_wheel_fallback", false,
+        c74::min::description{"Allow semantic matrix RGB mappings to drive nearest color-wheel slots when no RGB/CMY model exists."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            color_wheel_fallback_value_ = !args.empty() && ((int)args[0] != 0);
+            return {color_wheel_fallback_value_};
         }}
     };
 
@@ -183,6 +256,12 @@ public:
             if(!map_path_value_.empty()) {
                 load_map(map_path_value_);
             }
+            if(!groups_path_value_.empty()) {
+                load_groups(groups_path_value_);
+            }
+            if(!semantic_overrides_path_value_.empty()) {
+                load_semantic_overrides(semantic_overrides_path_value_);
+            }
             return {};
         }
     };
@@ -220,6 +299,35 @@ public:
         }
     };
 
+    c74::min::message<> readgroups_message{this, "readgroups", "readgroups groups_json_path",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("readgroups requires groups JSON path");
+                return {};
+            }
+            const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
+            groups_path_value_ = path_symbol.c_str();
+            groups = path_symbol;
+            group = path_symbol;
+            load_groups(groups_path_value_);
+            return {};
+        }
+    };
+
+    c74::min::message<> readoverrides_message{this, "readoverrides", "readoverrides semantic_overrides_json_path",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("readoverrides requires semantic overrides JSON path");
+                return {};
+            }
+            const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
+            semantic_overrides_path_value_ = path_symbol.c_str();
+            semantic_overrides = path_symbol;
+            load_semantic_overrides(semantic_overrides_path_value_);
+            return {};
+        }
+    };
+
     c74::min::message<> jit_matrix_message{this, "jit_matrix", "Process a Jitter matrix by name.",
         MIN_FUNCTION {
             if(args.empty()) {
@@ -247,6 +355,12 @@ public:
             if(!map_path_value_.empty()) {
                 load_map(map_path_value_);
             }
+            if(!groups_path_value_.empty()) {
+                load_groups(groups_path_value_);
+            }
+            if(!semantic_overrides_path_value_.empty()) {
+                load_semantic_overrides(semantic_overrides_path_value_);
+            }
             return {};
         }
     };
@@ -259,6 +373,14 @@ public:
             atoms.push_back(patch_loaded_ ? 1 : 0);
             atoms.push_back(c74::min::symbol("map_loaded"));
             atoms.push_back(map_loaded_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("groups_loaded"));
+            atoms.push_back(groups_loaded_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("groups_validated"));
+            atoms.push_back(groups_validated_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("semantic_overrides_loaded"));
+            atoms.push_back(semantic_overrides_loaded_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("semantic_overrides_validated"));
+            atoms.push_back(semantic_overrides_validated_ ? 1 : 0);
             atoms.push_back(c74::min::symbol("fixtures"));
             atoms.push_back((int)matrix_map_.fixtures.size());
             atoms.push_back(c74::min::symbol("universe_mode"));
@@ -281,6 +403,22 @@ private:
         mapper_ = loaded_mapper;
         patch_loaded_ = true;
         previous_output_.clear();
+        groups_validated_ = false;
+        semantic_overrides_validated_ = false;
+        if(groups_loaded_) {
+            const bbb::dmx::mapper_result groups_result{validate_loaded_groups()};
+            if(!groups_result.ok) {
+                report_error(groups_result.message.c_str());
+                return;
+            }
+        }
+        if(semantic_overrides_loaded_) {
+            const bbb::dmx::mapper_result overrides_result{validate_loaded_semantic_overrides()};
+            if(!overrides_result.ok) {
+                report_error(overrides_result.message.c_str());
+                return;
+            }
+        }
         report_status("patch_loaded");
     }
 
@@ -303,6 +441,105 @@ private:
         matrix_map_ = loaded;
         map_loaded_ = true;
         report_status("map_loaded");
+    }
+
+    void clear_groups() {
+        groups_path_value_.clear();
+        groups_ = bbb::dmx::fixture_group_set{};
+        groups_loaded_ = false;
+        groups_validated_ = false;
+    }
+
+    void load_groups(const std::string &path) {
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        bbb::dmx::fixture_group_set loaded_groups{};
+        const bbb::dmx::mapper_result result{bbb::dmx::read_fixture_groups_file(resolved_path, loaded_groups)};
+        if(!result.ok) {
+            groups_loaded_ = false;
+            groups_validated_ = false;
+            report_error(result.message.c_str());
+            return;
+        }
+        groups_ = loaded_groups;
+        groups_loaded_ = true;
+        groups_validated_ = false;
+        if(patch_loaded_) {
+            const bbb::dmx::mapper_result validate_result{validate_loaded_groups()};
+            if(!validate_result.ok) {
+                report_error(validate_result.message.c_str());
+                return;
+            }
+        }
+        report_status("groups_loaded");
+    }
+
+    void load_semantic_overrides(const std::string &path) {
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        bbb::dmx::fixture_semantic_overrides loaded_overrides{};
+        const bbb::dmx::mapper_result result{bbb::dmx::read_fixture_semantic_overrides_file(resolved_path, loaded_overrides)};
+        if(!result.ok) {
+            semantic_overrides_loaded_ = false;
+            semantic_overrides_validated_ = false;
+            report_error(result.message.c_str());
+            return;
+        }
+        semantic_overrides_ = loaded_overrides;
+        semantic_overrides_loaded_ = true;
+        semantic_overrides_validated_ = false;
+        if(patch_loaded_) {
+            const bbb::dmx::mapper_result validate_result{validate_loaded_semantic_overrides()};
+            if(!validate_result.ok) {
+                report_error(validate_result.message.c_str());
+                return;
+            }
+        }
+        report_status("semantic_overrides_loaded");
+    }
+
+    bbb::dmx::mapper_result validate_loaded_groups() {
+        if(!groups_loaded_) {
+            return bbb::dmx::mapper_result::failure("no groups loaded");
+        }
+        if(!patch_loaded_) {
+            groups_validated_ = false;
+            return bbb::dmx::mapper_result::success();
+        }
+        const bbb::dmx::mapper_result result{bbb::dmx::validate_fixture_groups_for_patch(groups_, mapper_.patch())};
+        groups_validated_ = result.ok;
+        return result;
+    }
+
+    bbb::dmx::mapper_result validate_loaded_semantic_overrides() {
+        if(!semantic_overrides_loaded_) {
+            return bbb::dmx::mapper_result::failure("no semantic overrides loaded");
+        }
+        if(!patch_loaded_) {
+            semantic_overrides_validated_ = false;
+            return bbb::dmx::mapper_result::success();
+        }
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_override_for_fixture(fixture)};
+            if(!mode_override) {
+                continue;
+            }
+            const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture.profile)};
+            if(!profile) {
+                semantic_overrides_validated_ = false;
+                return bbb::dmx::mapper_result::failure("semantic_overrides missing profile: " + fixture.profile);
+            }
+            const bbb::dmx::fixture_mode *mode{profile->find_mode(fixture.mode)};
+            if(!mode) {
+                semantic_overrides_validated_ = false;
+                return bbb::dmx::mapper_result::failure("semantic_overrides missing mode: " + fixture.profile + ":" + fixture.mode);
+            }
+            bbb::dmx::mapper_result result{validate_semantic_override_parameters(fixture, *mode, *mode_override)};
+            if(!result.ok) {
+                semantic_overrides_validated_ = false;
+                return result;
+            }
+        }
+        semantic_overrides_validated_ = true;
+        return bbb::dmx::mapper_result::success();
     }
 
     void process_jit_matrix(c74::min::symbol matrix_name) {
@@ -374,14 +611,131 @@ private:
                 region.y = 1.0 - region.y;
             }
             const color_value sampled{adjust_color(sample_region_color(view, region))};
-            for(const auto &binding : mapping.parameters) {
-                const double value{color_source_value(binding.source, sampled)};
-                const bbb::dmx::mapper_result result{mapper_.set_normalized(mapping.fixture_id, binding.parameter, value)};
+            std::vector<std::string> fixture_ids{};
+            bbb::dmx::mapper_result result{resolve_mapping_fixture_ids(mapping, fixture_ids)};
+            if(!result.ok) {
+                report_error(result.message.c_str());
+                continue;
+            }
+            for(const auto &fixture_id : fixture_ids) {
+                result = apply_matrix_mapping_to_fixture(fixture_id, mapping, sampled);
                 if(!result.ok) {
                     report_error(result.message.c_str());
                 }
             }
         }
+    }
+
+    bbb::dmx::mapper_result resolve_mapping_fixture_ids(const fixture_mapping &mapping, std::vector<std::string> &fixture_ids) {
+        fixture_ids.clear();
+        if(!mapping.fixture_id.empty()) {
+            fixture_ids.push_back(mapping.fixture_id);
+            return bbb::dmx::mapper_result::success();
+        }
+        if(mapping.group_id.empty()) {
+            return bbb::dmx::mapper_result::failure("matrix mapping has no fixture id or group");
+        }
+        if(!groups_loaded_) {
+            return bbb::dmx::mapper_result::failure("matrix mapping group requires loaded groups: " + mapping.group_id);
+        }
+        if(!groups_validated_) {
+            const bbb::dmx::mapper_result validate_result{validate_loaded_groups()};
+            if(!validate_result.ok) {
+                return validate_result;
+            }
+        }
+        return bbb::dmx::resolve_fixture_group_fixture_ids(groups_, mapper_.patch(), mapping.group_id, fixture_ids);
+    }
+
+    bbb::dmx::mapper_result apply_matrix_mapping_to_fixture(const std::string &fixture_id, const fixture_mapping &mapping, const color_value &sampled) {
+        bool semantic_color_applied{false};
+        const bbb::dmx::mapper_result semantic_result{apply_semantic_matrix_color_if_present(fixture_id, mapping, sampled, semantic_color_applied)};
+        if(!semantic_result.ok) {
+            return semantic_result;
+        }
+        for(const auto &binding : mapping.parameters) {
+            if(semantic_color_applied && semantic_color_binding_parameter(binding.parameter)) {
+                continue;
+            }
+            const std::string parameter{resolve_parameter_alias(fixture_id, binding.parameter)};
+            const double value{color_source_value(binding.source, sampled)};
+            const bbb::dmx::mapper_result result{mapper_.set_normalized(fixture_id, parameter, value)};
+            if(!result.ok) {
+                return result;
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    static bool semantic_color_binding_parameter(const std::string &parameter) {
+        return parameter == "red" || parameter == "green" || parameter == "blue";
+    }
+
+    const parameter_binding *find_parameter_binding(const fixture_mapping &mapping, const std::string &parameter) const {
+        for(const auto &binding : mapping.parameters) {
+            if(binding.parameter == parameter) {
+                return &binding;
+            }
+        }
+        return nullptr;
+    }
+
+    bbb::dmx::mapper_result apply_semantic_matrix_color_if_present(
+        const std::string &fixture_id,
+        const fixture_mapping &mapping,
+        const color_value &sampled,
+        bool &applied
+    ) {
+        applied = false;
+        const parameter_binding *red_binding{find_parameter_binding(mapping, "red")};
+        const parameter_binding *green_binding{find_parameter_binding(mapping, "green")};
+        const parameter_binding *blue_binding{find_parameter_binding(mapping, "blue")};
+        if(!red_binding || !green_binding || !blue_binding) {
+            return bbb::dmx::mapper_result::success();
+        }
+
+        const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
+        if(!fixture) {
+            return bbb::dmx::mapper_result::failure("unknown fixture: " + fixture_id);
+        }
+        const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture->profile)};
+        if(!profile) {
+            return bbb::dmx::mapper_result::failure("missing profile: " + fixture->profile);
+        }
+        const bbb::dmx::fixture_mode *mode{profile->find_mode(fixture->mode)};
+        if(!mode) {
+            return bbb::dmx::mapper_result::failure("missing mode: " + fixture->mode);
+        }
+
+        std::vector<std::pair<std::string, int>> current_color_wheel_values;
+        if(color_wheel_fallback_value_) {
+            current_color_wheel_values = current_color_wheel_parameter_values(fixture_id, *mode);
+        }
+        const bbb::dmx::semantic_color_request color{bbb::dmx::make_semantic_color_request(
+            color_source_value(red_binding->source, sampled),
+            color_source_value(green_binding->source, sampled),
+            color_source_value(blue_binding->source, sampled)
+        )};
+        const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_override_for_fixture(*fixture)};
+        const bbb::dmx::semantic_color_mapping color_mapping{bbb::dmx::semantic_color_parameters_for_mode(
+            profile,
+            *mode,
+            color,
+            bbb::dmx::semantic_color_options{color_use_white_value_, color_wheel_fallback_value_},
+            current_color_wheel_values,
+            mode_override
+        )};
+        if(!color_mapping.ok) {
+            return bbb::dmx::mapper_result::success();
+        }
+        for(const auto &parameter : color_mapping.parameters) {
+            const bbb::dmx::mapper_result result{mapper_.set_normalized(fixture_id, parameter.first, parameter.second)};
+            if(!result.ok) {
+                return result;
+            }
+        }
+        applied = true;
+        return bbb::dmx::mapper_result::success();
     }
 
     color_value adjust_color(const color_value &color) const {
@@ -397,6 +751,108 @@ private:
         const double normalized{clamp_normalized(value)};
         const double corrected{std::pow(normalized, gamma_value_) * brightness_value_};
         return clamp_normalized(corrected);
+    }
+
+    const bbb::dmx::fixture_instance *find_fixture_instance(const std::string &fixture_id) const {
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            if(fixture.id == fixture_id) {
+                return &fixture;
+            }
+        }
+        return nullptr;
+    }
+
+    const bbb::dmx::fixture_semantic_mode_override *semantic_override_for_fixture(const bbb::dmx::fixture_instance &fixture) const {
+        if(!semantic_overrides_loaded_) {
+            return nullptr;
+        }
+        return semantic_overrides_.find_mode_override(fixture.profile, fixture.mode);
+    }
+
+    std::string resolve_parameter_alias(const std::string &fixture_id, const std::string &parameter_key) const {
+        const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
+        if(!fixture) {
+            return parameter_key;
+        }
+        const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_override_for_fixture(*fixture)};
+        if(!mode_override) {
+            return parameter_key;
+        }
+        return mode_override->resolve_alias(parameter_key);
+    }
+
+    std::vector<std::pair<std::string, int>> current_color_wheel_parameter_values(const std::string &fixture_id, const bbb::dmx::fixture_mode &mode) const {
+        std::vector<std::pair<std::string, int>> values;
+        for(const auto &parameter : mode.parameters) {
+            if(!bbb::dmx::parameter_is_likely_color_wheel(parameter)) {
+                continue;
+            }
+            int value{0};
+            const bbb::dmx::mapper_result result{mapper_.current_raw_value(fixture_id, parameter.key, value)};
+            if(result.ok) {
+                values.push_back({parameter.key, value});
+            }
+        }
+        return values;
+    }
+
+    bbb::dmx::mapper_result validate_semantic_override_parameter(
+        const bbb::dmx::fixture_instance &fixture,
+        const bbb::dmx::fixture_mode &mode,
+        const std::string &parameter_key,
+        const std::string &usage
+    ) const
+    {
+        if(parameter_key.empty()) {
+            return bbb::dmx::mapper_result::success();
+        }
+        if(!mode.find_parameter(parameter_key)) {
+            return bbb::dmx::mapper_result::failure(
+                "semantic_overrides " + fixture.profile + ":" + fixture.mode + " " + usage + " references unknown parameter: " + parameter_key
+            );
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result validate_semantic_override_parameters(
+        const bbb::dmx::fixture_instance &fixture,
+        const bbb::dmx::fixture_mode &mode,
+        const bbb::dmx::fixture_semantic_mode_override &mode_override
+    ) const
+    {
+        for(const auto &alias : mode_override.aliases) {
+            bbb::dmx::mapper_result result{validate_semantic_override_parameter(fixture, mode, alias.second, "alias " + alias.first)};
+            if(!result.ok) {
+                return result;
+            }
+        }
+        for(const auto &parameter_key : mode_override.intensity_parameters) {
+            bbb::dmx::mapper_result result{validate_semantic_override_parameter(fixture, mode, parameter_key, "intensity")};
+            if(!result.ok) {
+                return result;
+            }
+        }
+        bbb::dmx::mapper_result result{validate_semantic_override_parameter(fixture, mode, mode_override.primary_intensity_parameter, "primary_intensity")};
+        if(!result.ok) {
+            return result;
+        }
+        for(const auto &block : mode_override.rgb_blocks) {
+            for(const auto &parameter_key : {block.red, block.green, block.blue, block.white, block.dimmer}) {
+                result = validate_semantic_override_parameter(fixture, mode, parameter_key, "rgb");
+                if(!result.ok) {
+                    return result;
+                }
+            }
+        }
+        for(const auto &block : mode_override.cmy_blocks) {
+            for(const auto &parameter_key : {block.cyan, block.magenta, block.yellow, block.dimmer}) {
+                result = validate_semantic_override_parameter(fixture, mode, parameter_key, "cmy");
+                if(!result.ok) {
+                    return result;
+                }
+            }
+        }
+        return bbb::dmx::mapper_result::success();
     }
 
     void output_universes() {
