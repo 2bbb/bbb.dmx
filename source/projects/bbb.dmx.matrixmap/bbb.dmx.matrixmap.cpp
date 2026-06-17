@@ -676,7 +676,8 @@ private:
             return;
         }
         c74::max::t_atom_long savelock{(c74::max::t_atom_long)c74::max::jit_object_method(matrix, c74::max::gensym("lock"), (void *)1)};
-        char *data{(char *)c74::max::jit_object_method(matrix, c74::max::gensym("getdata"))};
+        char *data{nullptr};
+        c74::max::jit_object_method(matrix, c74::max::gensym("getdata"), &data);
         if(!data) {
             c74::max::jit_object_method(matrix, c74::max::gensym("lock"), (void *)savelock);
             report_error("jit.matrix has no readable data");
@@ -690,6 +691,11 @@ private:
         view.plane_count = info.planecount;
         view.stride_x = info.dimstride[0];
         view.stride_y = info.dimcount < 2 ? 0 : info.dimstride[1];
+        if(view.stride_x <= 0 || (1 < view.height && view.stride_y <= 0)) {
+            c74::max::jit_object_method(matrix, c74::max::gensym("lock"), (void *)savelock);
+            report_error("jit.matrix has invalid data strides");
+            return;
+        }
         view.plane_order = plane_order_value_;
         view.value_kind = value_kind;
 
