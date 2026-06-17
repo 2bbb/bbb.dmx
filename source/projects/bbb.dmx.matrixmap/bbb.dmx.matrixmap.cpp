@@ -71,6 +71,9 @@ private:
     bool suppress_group_attribute_load_{false};
     bool suppress_semantic_overrides_attribute_load_{false};
     std::map<int, bbb::dmx::dmx_universe> previous_output_{};
+    std::map<int, std::set<int>> owned_output_channels_{};
+    std::map<int, std::set<int>> pending_output_channels_{};
+    bool collecting_output_channels_{false};
 
 public:
     MIN_DESCRIPTION{"Sample jit.matrix color data and patch it into multi-universe DMX fixture parameters."};
@@ -465,6 +468,9 @@ private:
         mapper_ = loaded_mapper;
         patch_loaded_ = true;
         previous_output_.clear();
+        owned_output_channels_.clear();
+        pending_output_channels_.clear();
+        collecting_output_channels_ = false;
         groups_validated_ = false;
         semantic_overrides_validated_ = false;
         if(groups_loaded_) {
@@ -707,6 +713,8 @@ private:
     }
 
     void apply_matrix(const matrix_read_view &view) {
+        pending_output_channels_.clear();
+        collecting_output_channels_ = true;
         for(const auto &mapping : matrix_map_.fixtures) {
             sample_region region{mapping.sample};
             if(invert_x_value_) {
@@ -729,6 +737,9 @@ private:
                 }
             }
         }
+        collecting_output_channels_ = false;
+        owned_output_channels_ = pending_output_channels_;
+        pending_output_channels_.clear();
     }
 
     bbb::dmx::mapper_result resolve_mapping_fixture_ids(const fixture_mapping &mapping, std::vector<std::string> &fixture_ids) {
@@ -767,6 +778,10 @@ private:
             const bbb::dmx::mapper_result result{mapper_.set_normalized(fixture_id, parameter, value)};
             if(!result.ok) {
                 return result;
+            }
+            const bbb::dmx::mapper_result owned_result{mark_parameter_owned(fixture_id, parameter)};
+            if(!owned_result.ok) {
+                return owned_result;
             }
         }
         return bbb::dmx::mapper_result::success();
@@ -831,12 +846,20 @@ private:
             mode_override
         )};
         if(!color_mapping.ok) {
-            return bbb::dmx::mapper_result::success();
+            return bbb::dmx::mapper_result::failure(
+                "fixture " + fixture_id + " " + fixture->profile + ":" + fixture->mode
+                + " cannot map semantic RGB from matrix: " + color_mapping.message
+                + ". Enable @color_wheel_fallback 1 for color-wheel fixtures or provide semantic_overrides."
+            );
         }
         for(const auto &parameter : color_mapping.parameters) {
             const bbb::dmx::mapper_result result{mapper_.set_normalized(fixture_id, parameter.first, parameter.second)};
             if(!result.ok) {
                 return result;
+            }
+            const bbb::dmx::mapper_result owned_result{mark_parameter_owned(fixture_id, parameter.first)};
+            if(!owned_result.ok) {
+                return owned_result;
             }
         }
         applied = true;
@@ -892,6 +915,9 @@ private:
             if(!bbb::dmx::parameter_is_likely_color_wheel(parameter)) {
                 continue;
             }
+            if(!parameter_owned(fixture_id, parameter.key)) {
+                continue;
+            }
             int value{0};
             const bbb::dmx::mapper_result result{mapper_.current_raw_value(fixture_id, parameter.key, value)};
             if(result.ok) {
@@ -899,6 +925,37 @@ private:
             }
         }
         return values;
+    }
+
+    bbb::dmx::mapper_result mark_parameter_owned(const std::string &fixture_id, const std::string &parameter_key) {
+        std::vector<std::pair<int, int>> addresses;
+        const bbb::dmx::mapper_result result{mapper_.parameter_channel_addresses(fixture_id, parameter_key, addresses)};
+        if(!result.ok) {
+            return result;
+        }
+        std::map<int, std::set<int>> &target_channels = collecting_output_channels_ ? pending_output_channels_ : owned_output_channels_;
+        for(const auto &address : addresses) {
+            target_channels[address.first].insert(address.second);
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bool parameter_owned(const std::string &fixture_id, const std::string &parameter_key) const {
+        std::vector<std::pair<int, int>> addresses;
+        const bbb::dmx::mapper_result result{mapper_.parameter_channel_addresses(fixture_id, parameter_key, addresses)};
+        if(!result.ok) {
+            return false;
+        }
+        for(const auto &address : addresses) {
+            const auto universe_found = owned_output_channels_.find(address.first);
+            if(universe_found == owned_output_channels_.end()) {
+                return false;
+            }
+            if(universe_found->second.find(address.second) == universe_found->second.end()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     bbb::dmx::mapper_result validate_semantic_override_parameter(
@@ -966,18 +1023,21 @@ private:
             return;
         }
         if(output_mode_value_ == universe_output_mode::selected) {
-            output_universe(universe_value_);
+            if(owned_output_channels_.find(universe_value_) != owned_output_channels_.end()) {
+                output_universe(universe_value_);
+            }
             return;
         }
         std::set<int> universe_ids;
-        for(const auto &fixture : mapper_.patch().fixtures) {
-            universe_ids.insert(bbb::dmx::sanitize_universe_id(fixture.universe));
+        for(const auto &entry : owned_output_channels_) {
+            universe_ids.insert(bbb::dmx::sanitize_universe_id(entry.first));
         }
         for(const int universe_id : universe_ids) {
             if(output_mode_value_ == universe_output_mode::changed) {
                 const auto found = previous_output_.find(universe_id);
                 if(found != previous_output_.end()) {
-                    const std::vector<int> changes{bbb::dmx::changed_channels(found->second, mapper_.universe(universe_id))};
+                    const bbb::dmx::dmx_universe universe_ref{owned_universe(universe_id)};
+                    const std::vector<int> changes{bbb::dmx::changed_channels(found->second, universe_ref)};
                     if(changes.empty()) {
                         continue;
                     }
@@ -989,9 +1049,22 @@ private:
 
     void output_universe(int universe_id) {
         const int sanitized_universe{bbb::dmx::sanitize_universe_id(universe_id)};
-        const bbb::dmx::dmx_universe &universe_ref = mapper_.universe(sanitized_universe);
+        const bbb::dmx::dmx_universe universe_ref{owned_universe(sanitized_universe)};
         output.send(bbb::dmx::maxutil::universe_atoms(sanitized_universe, universe_ref));
         previous_output_[sanitized_universe] = universe_ref;
+    }
+
+    bbb::dmx::dmx_universe owned_universe(int universe_id) const {
+        bbb::dmx::dmx_universe output_universe{};
+        const auto owned_found = owned_output_channels_.find(universe_id);
+        if(owned_found == owned_output_channels_.end()) {
+            return output_universe;
+        }
+        const bbb::dmx::dmx_universe &mapped_universe = mapper_.universe(universe_id);
+        for(const int address : owned_found->second) {
+            output_universe.set_channel(address, mapped_universe.channel(address));
+        }
+        return output_universe;
     }
 
 
