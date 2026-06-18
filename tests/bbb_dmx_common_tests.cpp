@@ -631,7 +631,7 @@ int main() {
     map_result = bbb::dmx::resolve_fixture_group_fixture_ids(group_set, group_patch, "front", resolved_group_fixture_ids);
     require(map_result.ok, "fixture group resolves");
     require(resolved_group_fixture_ids.size() == 2, "fixture group de-duplicates fixture ids");
-    require(resolved_group_fixture_ids[0] == "fixture_01" && resolved_group_fixture_ids[1] == "fixture_02", "fixture group resolves in patch order");
+    require(resolved_group_fixture_ids[0] == "fixture_02" && resolved_group_fixture_ids[1] == "fixture_01", "fixture group resolves in group JSON order");
     map_result = bbb::dmx::parse_fixture_groups_text(R"json({
         "schema": "bbb.dmx.groups.v1",
         "groups": {

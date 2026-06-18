@@ -369,9 +369,9 @@ setgroup front dimmer 1.0
 setgroup front dimmer values 0.0 0.5 1.0 shutter values 1 0
 ```
 
-`set` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`. Loaded semantic override aliases are resolved before parameter lookup. `setall` applies to every fixture in patch order. `setgroup` applies to the named loaded group in patch order. `nset`, `nsetall`, and `nsetgroup` remain aliases for normalized writes.
+`set` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`. Loaded semantic override aliases are resolved before parameter lookup. `setall` applies to every fixture in patch order. `setgroup` applies to the named loaded group in group JSON array order, after de-duplicating repeated fixture ids by first occurrence. `nset`, `nsetall`, and `nsetgroup` remain aliases for normalized writes.
 
-For `setgroup` / `nsetgroup`, a group parameter may use the reserved `values` marker to distribute multiple values over the group in patch order: fixture index `i` receives `values[floor(i / group_size * values_size)]`. Each parameter may have a different value count. Without `values`, the parameter still takes exactly one value; extra bare numeric values are errors instead of implicit lists. Fixtures in mixed groups that do not expose a requested parameter are skipped, but a group parameter that matches no fixture in the group is an error. Unknown fixture ids in the groups file are errors.
+For `setgroup` / `nsetgroup`, a group parameter may use the reserved `values` marker to distribute multiple values over the group in group JSON array order: fixture index `i` receives `values[floor(i / group_size * values_size)]`. Each parameter may have a different value count. Without `values`, the parameter still takes exactly one value; extra bare numeric values are errors instead of implicit lists. Fixtures in mixed groups that do not expose a requested parameter are skipped, but a group parameter that matches no fixture in the group is an error. Unknown fixture ids in the groups file are errors.
 
 #### Raw fixture parameter
 

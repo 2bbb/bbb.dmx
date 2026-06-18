@@ -474,7 +474,7 @@ Typical path: `groups/*.json`.
 
 Group arrays are explicit fixture ids only. Wildcards are intentionally unsupported in v1. Numeric ids are accepted for imported patches and canonicalized to decimal strings by runtime consumers.
 
-Groups are meaningful only with a loaded patch. Unknown fixture ids are errors, not silent skips. Runtime group operations resolve fixtures in patch order and de-duplicate repeated ids so output behavior remains deterministic regardless of group array ordering.
+Groups are meaningful only with a loaded patch. Unknown fixture ids are errors, not silent skips. Runtime group operations resolve fixtures in group JSON array order and de-duplicate repeated ids by first occurrence, so the authored array order controls distributed group value mapping.
 
 ## 6. Palette set: `bbb.dmx.palette.v1`
 
