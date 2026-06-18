@@ -772,7 +772,7 @@ public:
                 report_error("track requires fixture_id target_x target_y target_z");
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_universes = mapper_.universe_snapshot();
             const auto previous_tracking_engines = tracking_engines_;
             const bbb::dmx::mapper_result result{track_fixture(
                 symbol_arg(args[0]),
@@ -781,7 +781,7 @@ public:
                 false
             )};
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 tracking_engines_ = previous_tracking_engines;
                 return {};
             }
@@ -796,7 +796,7 @@ public:
                 report_error("trackrel requires fixture_id rel_x rel_y rel_z");
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_universes = mapper_.universe_snapshot();
             const auto previous_tracking_engines = tracking_engines_;
             const bbb::dmx::mapper_result result{track_fixture(
                 symbol_arg(args[0]),
@@ -805,7 +805,7 @@ public:
                 false
             )};
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 tracking_engines_ = previous_tracking_engines;
                 return {};
             }
@@ -820,14 +820,14 @@ public:
                 report_error("trackall requires target_x target_y target_z");
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_universes = mapper_.universe_snapshot();
             const auto previous_tracking_engines = tracking_engines_;
             const bbb::dmx::mapper_result result{track_all(
                 bbb::dmx::vec3{(double)args[0], (double)args[1], (double)args[2]},
                 false
             )};
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 tracking_engines_ = previous_tracking_engines;
                 return {};
             }
@@ -838,7 +838,7 @@ public:
 
     c74::min::message<> trackgroup_message{this, "trackgroup", "trackgroup group_id target_x target_y target_z OR trackgroup group_id x [values] x_values... y [values] y_values... z [values] z_values...",
         MIN_FUNCTION {
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_universes = mapper_.universe_snapshot();
             const auto previous_tracking_engines = tracking_engines_;
             bbb::dmx::mapper_result result{bbb::dmx::mapper_result::failure("trackgroup requires group_id target_x target_y target_z")};
             if(args.size() == 4 && finite_atoms(args, 1, 3)) {
@@ -857,7 +857,7 @@ public:
                 result = bbb::dmx::mapper_result::failure("trackgroup requires either group_id target_x target_y target_z or group_id x [values] ... y [values] ... z [values] ...");
             }
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 tracking_engines_ = previous_tracking_engines;
                 return {};
             }
@@ -872,14 +872,14 @@ public:
                 report_error("trackallrel requires rel_x rel_y rel_z");
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_universes = mapper_.universe_snapshot();
             const auto previous_tracking_engines = tracking_engines_;
             const bbb::dmx::mapper_result result{track_all(
                 bbb::dmx::vec3{(double)args[0], (double)args[1], (double)args[2]},
                 true
             )};
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 tracking_engines_ = previous_tracking_engines;
                 return {};
             }
@@ -890,7 +890,7 @@ public:
 
     c74::min::message<> trackgrouprel_message{this, "trackgrouprel", "trackgrouprel group_id rel_x rel_y rel_z OR trackgrouprel group_id x [values] x_values... y [values] y_values... z [values] z_values...",
         MIN_FUNCTION {
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const auto previous_universes = mapper_.universe_snapshot();
             const auto previous_tracking_engines = tracking_engines_;
             bbb::dmx::mapper_result result{bbb::dmx::mapper_result::failure("trackgrouprel requires group_id rel_x rel_y rel_z")};
             if(args.size() == 4 && finite_atoms(args, 1, 3)) {
@@ -909,7 +909,7 @@ public:
                 result = bbb::dmx::mapper_result::failure("trackgrouprel requires either group_id rel_x rel_y rel_z or group_id x [values] ... y [values] ... z [values] ...");
             }
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 tracking_engines_ = previous_tracking_engines;
                 return {};
             }
@@ -1717,10 +1717,9 @@ private:
     }
 
     bbb::dmx::mapper_result apply_tracking_output(const std::string &fixture_id, const bbb::dmx::movertrack_output &output, bool ignore_unknown_parameters) {
-        bbb::dmx::fixture_mapper trial_mapper{mapper_};
-        bbb::dmx::mapper_result result{trial_mapper.set_normalized(fixture_id, "pan", normalized_from_u16(output.pan))};
+        bbb::dmx::mapper_result result{mapper_.set_normalized(fixture_id, "pan", normalized_from_u16(output.pan))};
         if(result.ok) {
-            result = trial_mapper.set_normalized(fixture_id, "tilt", normalized_from_u16(output.tilt));
+            result = mapper_.set_normalized(fixture_id, "tilt", normalized_from_u16(output.tilt));
         }
         if(!result.ok) {
             if(ignore_unknown_parameters && is_unknown_parameter_result(result)) {
@@ -1728,7 +1727,6 @@ private:
             }
             return result;
         }
-        mapper_ = trial_mapper;
         return bbb::dmx::mapper_result::success();
     }
 
@@ -2142,18 +2140,18 @@ private:
     }
 
     bbb::dmx::mapper_result set_pan_tilt_values(const std::string &fixture_id, int pan_value, int tilt_value, bool ignore_unknown_parameters) {
-        bbb::dmx::fixture_mapper trial_mapper{mapper_};
-        bbb::dmx::mapper_result result{trial_mapper.set_u16(fixture_id, "pan", (std::uint16_t)pan_value)};
+        const auto previous_universes = mapper_.universe_snapshot();
+        bbb::dmx::mapper_result result{mapper_.set_u16(fixture_id, "pan", (std::uint16_t)pan_value)};
         if(result.ok) {
-            result = trial_mapper.set_u16(fixture_id, "tilt", (std::uint16_t)tilt_value);
+            result = mapper_.set_u16(fixture_id, "tilt", (std::uint16_t)tilt_value);
         }
         if(!result.ok) {
+            mapper_.restore_universes(previous_universes);
             if(ignore_unknown_parameters && is_unknown_parameter_result(result)) {
                 return bbb::dmx::mapper_result::success();
             }
             return result;
         }
-        mapper_ = trial_mapper;
         return bbb::dmx::mapper_result::success();
     }
 
