@@ -50,6 +50,25 @@ private:
     bool suppress_group_attribute_load_{false};
     bool suppress_semantic_overrides_attribute_load_{false};
 
+    struct normalized_group_assignment {
+        std::string parameter{};
+        std::vector<double> values{};
+    };
+
+    struct raw_group_assignment {
+        std::string parameter{};
+        std::vector<int> values{};
+        bool pan_tilt{false};
+        int pan{0};
+        int tilt{0};
+    };
+
+    struct group_axis_values {
+        std::vector<double> x{};
+        std::vector<double> y{};
+        std::vector<double> z{};
+    };
+
 public:
     MIN_DESCRIPTION{"Map semantic fixture parameters into one or more 512-channel DMX universe lists."};
     MIN_TAGS{"dmx, lighting, fixture, patch, universe, mapping"};
@@ -417,7 +436,7 @@ public:
         }
     };
 
-    c74::min::message<> setgroup_message{this, "setgroup", "setgroup group_id parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
+    c74::min::message<> setgroup_message{this, "setgroup", "setgroup group_id parameter normalized_0_to_1 OR parameter values normalized_values...",
         MIN_FUNCTION {
             if(args.size() < 3) {
                 report_error("setgroup requires group_id parameter normalized_0_to_1");
@@ -469,7 +488,7 @@ public:
         }
     };
 
-    c74::min::message<> rawsetgroup_message{this, "rawsetgroup", "rawsetgroup group_id parameter value [parameter value ...]",
+    c74::min::message<> rawsetgroup_message{this, "rawsetgroup", "rawsetgroup group_id parameter value OR parameter values raw_values...",
         MIN_FUNCTION {
             if(args.size() < 3) {
                 report_error("rawsetgroup requires group_id parameter value");
@@ -520,7 +539,7 @@ public:
         }
     };
 
-    c74::min::message<> nsetgroup_message{this, "nsetgroup", "nsetgroup group_id parameter normalized_0_to_1 [parameter normalized_0_to_1 ...]",
+    c74::min::message<> nsetgroup_message{this, "nsetgroup", "nsetgroup group_id parameter normalized_0_to_1 OR parameter values normalized_values...",
         MIN_FUNCTION {
             if(args.size() < 3) {
                 report_error("nsetgroup requires group_id parameter normalized_0_to_1");
@@ -817,19 +836,26 @@ public:
         }
     };
 
-    c74::min::message<> trackgroup_message{this, "trackgroup", "trackgroup group_id target_x target_y target_z",
+    c74::min::message<> trackgroup_message{this, "trackgroup", "trackgroup group_id target_x target_y target_z OR trackgroup group_id x [values] x_values... y [values] y_values... z [values] z_values...",
         MIN_FUNCTION {
-            if(args.size() < 4 || !finite_atoms(args, 1, 3)) {
-                report_error("trackgroup requires group_id target_x target_y target_z");
-                return {};
-            }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
             const auto previous_tracking_engines = tracking_engines_;
-            const bbb::dmx::mapper_result result{track_group(
-                symbol_arg(args[0]),
-                bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]},
-                false
-            )};
+            bbb::dmx::mapper_result result{bbb::dmx::mapper_result::failure("trackgroup requires group_id target_x target_y target_z")};
+            if(args.size() == 4 && finite_atoms(args, 1, 3)) {
+                result = track_group(
+                    symbol_arg(args[0]),
+                    bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]},
+                    false
+                );
+            } else if(2 <= args.size() && !finite_atom(args[1])) {
+                group_axis_values axes{};
+                result = parse_group_axis_values(args, 1, "trackgroup", axes);
+                if(result.ok) {
+                    result = track_group(symbol_arg(args[0]), axes, false);
+                }
+            } else {
+                result = bbb::dmx::mapper_result::failure("trackgroup requires either group_id target_x target_y target_z or group_id x [values] ... y [values] ... z [values] ...");
+            }
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 tracking_engines_ = previous_tracking_engines;
@@ -862,19 +888,26 @@ public:
         }
     };
 
-    c74::min::message<> trackgrouprel_message{this, "trackgrouprel", "trackgrouprel group_id rel_x rel_y rel_z",
+    c74::min::message<> trackgrouprel_message{this, "trackgrouprel", "trackgrouprel group_id rel_x rel_y rel_z OR trackgrouprel group_id x [values] x_values... y [values] y_values... z [values] z_values...",
         MIN_FUNCTION {
-            if(args.size() < 4 || !finite_atoms(args, 1, 3)) {
-                report_error("trackgrouprel requires group_id rel_x rel_y rel_z");
-                return {};
-            }
             const bbb::dmx::fixture_mapper previous_mapper{mapper_};
             const auto previous_tracking_engines = tracking_engines_;
-            const bbb::dmx::mapper_result result{track_group(
-                symbol_arg(args[0]),
-                bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]},
-                true
-            )};
+            bbb::dmx::mapper_result result{bbb::dmx::mapper_result::failure("trackgrouprel requires group_id rel_x rel_y rel_z")};
+            if(args.size() == 4 && finite_atoms(args, 1, 3)) {
+                result = track_group(
+                    symbol_arg(args[0]),
+                    bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]},
+                    true
+                );
+            } else if(2 <= args.size() && !finite_atom(args[1])) {
+                group_axis_values axes{};
+                result = parse_group_axis_values(args, 1, "trackgrouprel", axes);
+                if(result.ok) {
+                    result = track_group(symbol_arg(args[0]), axes, true);
+                }
+            } else {
+                result = bbb::dmx::mapper_result::failure("trackgrouprel requires either group_id rel_x rel_y rel_z or group_id x [values] ... y [values] ... z [values] ...");
+            }
             if(!handle_result(result)) {
                 mapper_ = previous_mapper;
                 tracking_engines_ = previous_tracking_engines;
@@ -1293,6 +1326,25 @@ private:
         return bbb::dmx::maxutil::symbol_arg(atom);
     }
 
+    static bool values_marker(const c74::min::atom &atom) {
+        return !finite_atom(atom) && symbol_arg(atom) == "values";
+    }
+
+    static std::size_t distributed_value_index(std::size_t fixture_index, std::size_t fixture_count, std::size_t value_count) {
+        if(fixture_count == 0 || value_count == 0) {
+            return 0;
+        }
+        return std::min(value_count - 1, (fixture_index * value_count) / fixture_count);
+    }
+
+    static double distributed_value(const std::vector<double> &values, std::size_t fixture_index, std::size_t fixture_count) {
+        return values[distributed_value_index(fixture_index, fixture_count, values.size())];
+    }
+
+    static int distributed_value(const std::vector<int> &values, std::size_t fixture_index, std::size_t fixture_count) {
+        return values[distributed_value_index(fixture_index, fixture_count, values.size())];
+    }
+
     bbb::dmx::mapper_result parse_color_args(const c74::min::atoms &args, std::size_t start_index, const char *message_name, bbb::dmx::semantic_color_request &color) const {
         if(args.size() <= start_index) {
             return bbb::dmx::mapper_result::failure(std::string(message_name) + " requires rgb r g b");
@@ -1680,6 +1732,157 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
+    bbb::dmx::mapper_result parse_group_axis_values(const c74::min::atoms &args, std::size_t start_index, const std::string &operation_name, group_axis_values &axes) const {
+        bool has_x{false};
+        bool has_y{false};
+        bool has_z{false};
+        std::size_t index{start_index};
+        while(index < args.size()) {
+            if(finite_atom(args[index])) {
+                return bbb::dmx::mapper_result::failure(operation_name + " axis name expected before numeric value");
+            }
+            const std::string axis{symbol_arg(args[index])};
+            std::vector<double> *target_values{nullptr};
+            bool *has_axis{nullptr};
+            if(axis == "x") {
+                target_values = &axes.x;
+                has_axis = &has_x;
+            } else if(axis == "y") {
+                target_values = &axes.y;
+                has_axis = &has_y;
+            } else if(axis == "z") {
+                target_values = &axes.z;
+                has_axis = &has_z;
+            } else {
+                return bbb::dmx::mapper_result::failure(operation_name + " axis must be x, y, or z: " + axis);
+            }
+            if(*has_axis) {
+                return bbb::dmx::mapper_result::failure(operation_name + " duplicate axis: " + axis);
+            }
+            *has_axis = true;
+            index++;
+            if(args.size() <= index) {
+                return bbb::dmx::mapper_result::failure(operation_name + " axis requires a numeric value or values marker: " + axis);
+            }
+            if(values_marker(args[index])) {
+                index++;
+                while(index < args.size() && finite_atom(args[index])) {
+                    target_values->push_back((double)args[index]);
+                    index++;
+                }
+                if(target_values->empty()) {
+                    return bbb::dmx::mapper_result::failure(operation_name + " values marker requires at least one numeric value: " + axis);
+                }
+            } else if(finite_atom(args[index])) {
+                target_values->push_back((double)args[index]);
+                index++;
+            } else {
+                return bbb::dmx::mapper_result::failure(operation_name + " axis requires a numeric value or values marker: " + axis);
+            }
+        }
+        if(!has_x || !has_y || !has_z) {
+            return bbb::dmx::mapper_result::failure(operation_name + " keyed mode requires x, y, and z axes");
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result parse_group_normalized_assignments(
+        const c74::min::atoms &args,
+        std::size_t start_index,
+        const std::string &operation_name,
+        std::vector<normalized_group_assignment> &assignments
+    ) const {
+        std::size_t index{start_index};
+        while(index < args.size()) {
+            if(finite_atom(args[index])) {
+                return bbb::dmx::mapper_result::failure(operation_name + " parameter name expected before numeric value");
+            }
+            normalized_group_assignment assignment{};
+            assignment.parameter = symbol_arg(args[index]);
+            if(assignment.parameter == "values") {
+                return bbb::dmx::mapper_result::failure(operation_name + " values is reserved and cannot be used as a parameter name");
+            }
+            index++;
+            if(args.size() <= index) {
+                return bbb::dmx::mapper_result::failure(operation_name + " requires a numeric value or values marker: " + assignment.parameter);
+            }
+            if(values_marker(args[index])) {
+                index++;
+                while(index < args.size() && finite_atom(args[index])) {
+                    assignment.values.push_back((double)args[index]);
+                    index++;
+                }
+                if(assignment.values.empty()) {
+                    return bbb::dmx::mapper_result::failure(operation_name + " values marker requires at least one numeric value: " + assignment.parameter);
+                }
+            } else if(finite_atom(args[index])) {
+                assignment.values.push_back((double)args[index]);
+                index++;
+            } else {
+                return bbb::dmx::mapper_result::failure(operation_name + " value must be numeric or values marker: " + assignment.parameter);
+            }
+            assignments.push_back(assignment);
+        }
+        if(assignments.empty()) {
+            return bbb::dmx::mapper_result::failure(operation_name + " requires parameter/value pairs");
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result parse_group_raw_assignments(
+        const c74::min::atoms &args,
+        std::size_t start_index,
+        const std::string &operation_name,
+        std::vector<raw_group_assignment> &assignments
+    ) const {
+        std::size_t index{start_index};
+        while(index < args.size()) {
+            if(finite_atom(args[index])) {
+                return bbb::dmx::mapper_result::failure(operation_name + " parameter name expected before numeric value");
+            }
+            raw_group_assignment assignment{};
+            assignment.parameter = symbol_arg(args[index]);
+            if(assignment.parameter == "values") {
+                return bbb::dmx::mapper_result::failure(operation_name + " values is reserved and cannot be used as a parameter name");
+            }
+            index++;
+            if(assignment.parameter == "pan_tilt") {
+                if(args.size() <= index + 1 || !finite_atom(args[index]) || !finite_atom(args[index + 1])) {
+                    return bbb::dmx::mapper_result::failure(operation_name + " pan_tilt requires two numeric u16 values");
+                }
+                assignment.pan_tilt = true;
+                assignment.pan = clamp_int((int)args[index], 0, 65535);
+                assignment.tilt = clamp_int((int)args[index + 1], 0, 65535);
+                index += 2;
+                assignments.push_back(assignment);
+                continue;
+            }
+            if(args.size() <= index) {
+                return bbb::dmx::mapper_result::failure(operation_name + " requires a numeric value or values marker: " + assignment.parameter);
+            }
+            if(values_marker(args[index])) {
+                index++;
+                while(index < args.size() && finite_atom(args[index])) {
+                    assignment.values.push_back((int)args[index]);
+                    index++;
+                }
+                if(assignment.values.empty()) {
+                    return bbb::dmx::mapper_result::failure(operation_name + " values marker requires at least one numeric value: " + assignment.parameter);
+                }
+            } else if(finite_atom(args[index])) {
+                assignment.values.push_back((int)args[index]);
+                index++;
+            } else {
+                return bbb::dmx::mapper_result::failure(operation_name + " value must be numeric or values marker: " + assignment.parameter);
+            }
+            assignments.push_back(assignment);
+        }
+        if(assignments.empty()) {
+            return bbb::dmx::mapper_result::failure(operation_name + " requires parameter/value pairs");
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
     bbb::dmx::mapper_result track_fixture(const std::string &fixture_id, const bbb::dmx::vec3 &target, bool relative, bool ignore_non_movers) {
         const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
         if(!fixture) {
@@ -1734,6 +1937,31 @@ private:
         return bbb::dmx::mapper_result::success();
     }
 
+    bbb::dmx::mapper_result track_group(const std::string &group_id, const group_axis_values &axes, bool relative) {
+        std::vector<std::string> fixture_ids{};
+        bbb::dmx::mapper_result result{resolve_group_fixture_ids(group_id, fixture_ids)};
+        if(!result.ok) {
+            return result;
+        }
+        if(fixture_ids.empty()) {
+            return bbb::dmx::mapper_result::failure("trackgroup requires a non-empty group: " + group_id);
+        }
+        const bool ignore_non_movers{!track_strict_value_};
+        const std::size_t fixture_count{fixture_ids.size()};
+        for(std::size_t fixture_index{0}; fixture_index < fixture_count; fixture_index++) {
+            const bbb::dmx::vec3 target{
+                distributed_value(axes.x, fixture_index, fixture_count),
+                distributed_value(axes.y, fixture_index, fixture_count),
+                distributed_value(axes.z, fixture_index, fixture_count)
+            };
+            result = track_fixture(fixture_ids[fixture_index], target, relative, ignore_non_movers);
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure("trackgroup fixture " + fixture_ids[fixture_index] + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
     bbb::dmx::mapper_result set_all_parameter_args(const c74::min::atoms &args, const std::string &operation_name = "setall") {
         if(mapper_.patch().fixtures.empty()) {
             return bbb::dmx::mapper_result::failure(operation_name + " requires a loaded patch with fixtures");
@@ -1753,10 +1981,43 @@ private:
         if(!result.ok) {
             return result;
         }
-        for(const auto &fixture_id : fixture_ids) {
-            result = set_parameter_args(fixture_id, args, 1, true, operation_name);
-            if(!result.ok) {
-                return bbb::dmx::mapper_result::failure(operation_name + " fixture " + fixture_id + ": " + result.message);
+        if(fixture_ids.empty()) {
+            return bbb::dmx::mapper_result::failure(operation_name + " requires a non-empty group: " + group_id);
+        }
+        std::vector<raw_group_assignment> assignments{};
+        result = parse_group_raw_assignments(args, 1, operation_name, assignments);
+        if(!result.ok) {
+            return result;
+        }
+        std::vector<int> applied_counts(assignments.size(), 0);
+        const std::size_t fixture_count{fixture_ids.size()};
+        for(std::size_t fixture_index{0}; fixture_index < fixture_count; fixture_index++) {
+            const std::string &fixture_id{fixture_ids[fixture_index]};
+            for(std::size_t assignment_index{0}; assignment_index < assignments.size(); assignment_index++) {
+                const raw_group_assignment &assignment{assignments[assignment_index]};
+                if(assignment.pan_tilt) {
+                    result = set_pan_tilt_values(fixture_id, assignment.pan, assignment.tilt, true);
+                    if(!result.ok) {
+                        return bbb::dmx::mapper_result::failure(operation_name + " fixture " + fixture_id + ": " + result.message);
+                    }
+                    applied_counts[assignment_index]++;
+                    continue;
+                }
+                const std::string parameter{resolve_parameter_alias(fixture_id, assignment.parameter)};
+                const int value{distributed_value(assignment.values, fixture_index, fixture_count)};
+                result = set_parameter_value(fixture_id, parameter, value);
+                if(!result.ok) {
+                    if(is_unknown_parameter_result(result)) {
+                        continue;
+                    }
+                    return bbb::dmx::mapper_result::failure(operation_name + " fixture " + fixture_id + ": " + result.message);
+                }
+                applied_counts[assignment_index]++;
+            }
+        }
+        for(std::size_t assignment_index{0}; assignment_index < assignments.size(); assignment_index++) {
+            if(applied_counts[assignment_index] == 0) {
+                return bbb::dmx::mapper_result::failure(operation_name + " unknown parameter for all group fixtures: " + assignments[assignment_index].parameter);
             }
         }
         return bbb::dmx::mapper_result::success();
@@ -1781,10 +2042,35 @@ private:
         if(!result.ok) {
             return result;
         }
-        for(const auto &fixture_id : fixture_ids) {
-            result = set_normalized_parameter_args(fixture_id, args, 1, true, operation_name);
-            if(!result.ok) {
-                return bbb::dmx::mapper_result::failure(operation_name + " fixture " + fixture_id + ": " + result.message);
+        if(fixture_ids.empty()) {
+            return bbb::dmx::mapper_result::failure(operation_name + " requires a non-empty group: " + group_id);
+        }
+        std::vector<normalized_group_assignment> assignments{};
+        result = parse_group_normalized_assignments(args, 1, operation_name, assignments);
+        if(!result.ok) {
+            return result;
+        }
+        std::vector<int> applied_counts(assignments.size(), 0);
+        const std::size_t fixture_count{fixture_ids.size()};
+        for(std::size_t fixture_index{0}; fixture_index < fixture_count; fixture_index++) {
+            const std::string &fixture_id{fixture_ids[fixture_index]};
+            for(std::size_t assignment_index{0}; assignment_index < assignments.size(); assignment_index++) {
+                const normalized_group_assignment &assignment{assignments[assignment_index]};
+                const std::string parameter{resolve_parameter_alias(fixture_id, assignment.parameter)};
+                const double value{distributed_value(assignment.values, fixture_index, fixture_count)};
+                result = mapper_.set_normalized(fixture_id, parameter, value);
+                if(!result.ok) {
+                    if(is_unknown_parameter_result(result)) {
+                        continue;
+                    }
+                    return bbb::dmx::mapper_result::failure(operation_name + " fixture " + fixture_id + ": " + result.message);
+                }
+                applied_counts[assignment_index]++;
+            }
+        }
+        for(std::size_t assignment_index{0}; assignment_index < assignments.size(); assignment_index++) {
+            if(applied_counts[assignment_index] == 0) {
+                return bbb::dmx::mapper_result::failure(operation_name + " unknown parameter for all group fixtures: " + assignments[assignment_index].parameter);
             }
         }
         return bbb::dmx::mapper_result::success();

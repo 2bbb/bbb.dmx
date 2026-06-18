@@ -366,9 +366,12 @@ set spot_01 pan 0.5
 set spot_01 tilt 0.5
 setall dimmer 1.0
 setgroup front dimmer 1.0
+setgroup front dimmer values 0.0 0.5 1.0 shutter values 1 0
 ```
 
-`set` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`. Loaded semantic override aliases are resolved before parameter lookup. `setall` applies to every fixture in patch order. `setgroup` applies to the named loaded group in patch order. Unknown parameters are skipped for broad `setall` / `setgroup` writes; unknown fixture ids in the groups file are errors. `nset`, `nsetall`, and `nsetgroup` remain aliases for normalized writes.
+`set` clamps `0.0..1.0` and maps onto the target parameter's DMX range: `u8` to `0..255`, `u16` to `0..65535`, and `u24` to `0..16777215`. Loaded semantic override aliases are resolved before parameter lookup. `setall` applies to every fixture in patch order. `setgroup` applies to the named loaded group in patch order. `nset`, `nsetall`, and `nsetgroup` remain aliases for normalized writes.
+
+For `setgroup` / `nsetgroup`, a group parameter may use the reserved `values` marker to distribute multiple values over the group in patch order: fixture index `i` receives `values[floor(i / group_size * values_size)]`. Each parameter may have a different value count. Without `values`, the parameter still takes exactly one value; extra bare numeric values are errors instead of implicit lists. Fixtures in mixed groups that do not expose a requested parameter are skipped, but a group parameter that matches no fixture in the group is an error. Unknown fixture ids in the groups file are errors.
 
 #### Raw fixture parameter
 
@@ -379,9 +382,10 @@ rawset spot_01 tilt 32768
 rawset spot_01 pan_tilt 32768 32768
 rawsetall dimmer 255
 rawsetgroup front dimmer 255
+rawsetgroup front dimmer values 0 128 255 shutter values 255 0
 ```
 
-`rawset` writes raw fixture parameter values. Loaded semantic override aliases are resolved before parameter lookup. It first attempts the parameter as a 16-bit value and falls back to 8-bit where appropriate. `pan_tilt` is a convenience pseudo-parameter for setting both 16-bit pan and tilt in one message. `rawsetall` and `rawsetgroup` are broad raw writes.
+`rawset` writes raw fixture parameter values. Loaded semantic override aliases are resolved before parameter lookup. It first attempts the parameter as a 16-bit value and falls back to 8-bit where appropriate. `pan_tilt` is a convenience pseudo-parameter for setting both 16-bit pan and tilt in one message. `rawsetall` and `rawsetgroup` are broad raw writes. `rawsetgroup` also accepts the reserved `values` marker with the same group distribution rule as `setgroup`; `pan_tilt` remains a fixed two-value pseudo-parameter and does not use `values`.
 
 #### Semantic color input
 
@@ -450,15 +454,17 @@ Raw override is implemented for testing and emergency control. It should stay vi
 track spot_01 target_x target_y target_z
 trackall target_x target_y target_z
 trackgroup front target_x target_y target_z
+trackgroup front x values -1.0 0.0 1.0 y 5.0 z values 0.0 2.0
 trackrel spot_01 relative_x relative_y relative_z
 trackallrel relative_x relative_y relative_z
 trackgrouprel front relative_x relative_y relative_z
+trackgrouprel front x values -0.5 0.5 y 0.0 z values 0.0 1.0
 trackreset [spot_01]
 ```
 
 `track` uses the loaded patch fixture `position`, `rotation`, and `calibration` values, plus the target fixture mode's semantic `pan` and `tilt` parameters. The pan/tilt ranges come from `parameters[].range_degrees`; missing ranges fall back to `@default_pan_range` and `@default_tilt_range`. The resulting 16-bit normalized pan/tilt values are written through the fixture profile, so `u8`, `u16`, and `u24` parameter widths keep their declared byte order.
 
-`trackall` applies the same world-space target to every mover in the patch. `trackgroup` applies it to a loaded group. Non-mover fixtures are skipped by default; set `@track_strict 1` to turn those skips into errors. `trackrel`, `trackallrel`, and `trackgrouprel` interpret the vector relative to each fixture origin. `trackreset` clears stored pan-continuity history used by `@tracking_mode smart|pan|off`.
+`trackall` applies the same world-space target to every mover in the patch. `trackgroup` applies it to a loaded group. `trackgroup` and `trackgrouprel` also support keyed axis distribution with `x`, `y`, and `z`; each axis may be a single number or `values` followed by one or more numbers, using the same group distribution rule as `setgroup`. Keyed track mode requires all three axes. Non-mover fixtures are skipped by default; set `@track_strict 1` to turn those skips into errors. `trackrel`, `trackallrel`, and `trackgrouprel` interpret the vector relative to each fixture origin. `trackreset` clears stored pan-continuity history used by `@tracking_mode smart|pan|off`.
 
 `bbb.dmx.movertrack` remains useful for small projects, tests, and hand-built Max patches. Its byte tuple can still be routed into fixturemap:
 

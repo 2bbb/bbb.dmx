@@ -135,7 +135,7 @@ Fixture groups are optional selection files, separate from fixture patches:
 ```
 
 `bbb.dmx.fixturemap` loads them with `readgroups groups/show.groups.json` or `@groups groups/show.groups.json`.
-Group operations are explicit: `setgroup`, `nsetgroup`, `colorgroup`, `shuttergroup`, `trackgroup`, and `trackgrouprel`. Unknown fixture ids in the groups file are validation errors. Fixtures are applied in patch order, not group array order.
+Group operations are explicit: `setgroup`, `nsetgroup`, `rawsetgroup`, `colorgroup`, `shuttergroup`, `trackgroup`, and `trackgrouprel`. Unknown fixture ids in the groups file are validation errors. Fixtures are applied in patch order, not group array order. `setgroup`, `nsetgroup`, `rawsetgroup`, `trackgroup`, and `trackgrouprel` may use the reserved `values` marker to distribute per-group values by fixture index.
 
 ### `bbb.dmx.scene`
 

@@ -70,7 +70,7 @@
                 <arg name="parameter" type="symbol" optional="0" />
                 <arg name="normalized" type="float" optional="0" />
             </arglist>
-            <description>Apply one or more normalized 0..1 parameter/value pairs to every fixture in a loaded group. Fixtures that do not expose a requested parameter are silently skipped.</description>
+            <description>Apply one or more normalized 0..1 parameter/value pairs to every fixture in a loaded group. Use parameter values v1 v2 ... to distribute values across the group in patch order. Fixtures that do not expose a requested parameter are skipped, but a parameter matching no group fixtures is an error.</description>
         </method>
         <method name="rawset">
             <arglist>
@@ -93,7 +93,7 @@
                 <arg name="parameter" type="symbol" optional="0" />
                 <arg name="value" type="int" optional="0" />
             </arglist>
-            <description>Apply one or more raw parameter/value pairs to every fixture in a loaded group. Fixtures that do not expose a requested parameter are silently skipped.</description>
+            <description>Apply one or more raw parameter/value pairs to every fixture in a loaded group. Use parameter values v1 v2 ... to distribute raw values across the group in patch order. Fixtures that do not expose a requested parameter are skipped, but a parameter matching no group fixtures is an error.</description>
         </method>
         <method name="nset">
             <arglist>
@@ -116,7 +116,7 @@
                 <arg name="parameter" type="symbol" optional="0" />
                 <arg name="normalized" type="float" optional="0" />
             </arglist>
-            <description>Apply one or more normalized 0..1 parameter/value pairs to every fixture in a loaded group. Fixtures that do not expose a requested parameter are silently skipped.</description>
+            <description>Apply one or more normalized 0..1 parameter/value pairs to every fixture in a loaded group. Use parameter values v1 v2 ... to distribute values across the group in patch order. Fixtures that do not expose a requested parameter are skipped, but a parameter matching no group fixtures is an error.</description>
         </method>
         <method name="color">
             <arglist>
@@ -211,7 +211,7 @@
                 <arg name="target_y" type="float" optional="0" />
                 <arg name="target_z" type="float" optional="0" />
             </arglist>
-            <description>Track mover fixtures in a loaded group toward one world-space target. Non-mover fixtures are skipped unless track_strict is enabled.</description>
+            <description>Track mover fixtures in a loaded group toward one world-space target. Also accepts x/y/z keyed axis values with optional values lists for group distribution. Non-mover fixtures are skipped unless track_strict is enabled.</description>
         </method>
         <method name="trackrel">
             <arglist>
@@ -237,7 +237,7 @@
                 <arg name="relative_y" type="float" optional="0" />
                 <arg name="relative_z" type="float" optional="0" />
             </arglist>
-            <description>Track mover fixtures in a loaded group using the same vector relative to each fixture origin.</description>
+            <description>Track mover fixtures in a loaded group using a vector relative to each fixture origin. Also accepts x/y/z keyed axis values with optional values lists for group distribution.</description>
         </method>
         <method name="trackreset">
             <arglist>
