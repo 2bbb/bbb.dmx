@@ -26,7 +26,7 @@
             <arglist>
                 <arg name="path" type="symbol" optional="0" />
             </arglist>
-            <description>Read an optional bbb.dmx groups JSON file. Groups are explicit fixture id arrays validated against the loaded patch.</description>
+            <description>Read an optional bbb.dmx groups JSON file. Groups may contain fixture ids, nested group references, and fixture_pattern ranges validated against the loaded patch.</description>
         </method>
         <method name="readoverrides">
             <arglist>
@@ -283,7 +283,7 @@
             <description>Patch JSON path to read after object initialization and whenever the attribute changes. Attribute loading is deferred; use the read message for immediate explicit loading.</description>
         </attribute>
         <attribute name="groups" get="1" set="1" type="symbol">
-            <description>Optional groups JSON path to read after object initialization and whenever the attribute changes. Groups are explicit fixture id arrays validated against the loaded patch.</description>
+            <description>Optional groups JSON path to read after object initialization and whenever the attribute changes. Groups may contain fixture ids, nested group references, and fixture_pattern ranges validated against the loaded patch.</description>
         </attribute>
         <attribute name="group" get="1" set="1" type="symbol">
             <description>Alias for groups. Useful for patchers that read better as @group path.json.</description>

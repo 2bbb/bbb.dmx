@@ -209,7 +209,7 @@ The left outlet outputs a 512-integer list for the selected universe: DMX channe
 Attributes:
 
 - `@patch` — patch JSON path. Loaded after object initialization and when the attribute changes; use `patch path.json`/attrui for deferred attribute loading or `read path.json` for immediate explicit loading.
-- `@groups` — optional `bbb.dmx.groups.v1` JSON path. Groups are explicit fixture id arrays loaded by `readgroups` and validated against the patch.
+- `@groups` — optional `bbb.dmx.groups.v1` JSON path. Groups are fixture id arrays with optional nested group references and `fixture_pattern` ranges, loaded by `readgroups` and validated against the patch.
 - `@universe` — selected universe, starting at `1`.
 - `@autobang` — if non-zero, successful updates immediately output according to `@universe_mode`. Default is `1`.
 - `@universe_mode` — `selected` outputs the selected bare 512-value list; `all` outputs explicit `universe <id> <512 values...>` messages.

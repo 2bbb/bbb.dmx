@@ -462,7 +462,9 @@ Typical path: `groups/*.json`.
   "schema": "bbb.dmx.groups.v1",
   "groups": {
     "front": ["pointe_01", "pointe_02"],
-    "back": ["pointe_03", "pointe_04"]
+    "back": ["pointe_03", "pointe_04"],
+    "all": [{"group": "front"}, {"group": "back"}],
+    "dimmers": [{"fixture_pattern": "D_%02d", "start_index": 100, "num": 16}]
   }
 }
 ```
@@ -470,11 +472,11 @@ Typical path: `groups/*.json`.
 | Field | Type | Required | Meaning |
 |---|---:|---:|---|
 | `schema` | string | yes | Must be `bbb.dmx.groups.v1`. |
-| `groups` | object | yes | Map of `group_name -> fixture id array`. |
+| `groups` | object | yes | Map of `group_name -> fixture id / group reference / fixture_pattern array`. |
 
-Group arrays are explicit fixture ids only. Wildcards are intentionally unsupported in v1. Numeric ids are accepted for imported patches and canonicalized to decimal strings by runtime consumers.
+Group arrays accept explicit fixture ids (`"pointe_01"` or integer ids), nested references (`{"group":"front"}`), and sequential fixture id ranges (`{"fixture_pattern":"D_%02d","start_index":100,"num":16}`). `fixture_pattern` supports exactly one printf-style integer conversion such as `%02d`; the old shorthand `D_%02` is not supported. Wildcards are intentionally unsupported in v1. Numeric ids are accepted for imported patches and canonicalized to decimal strings by runtime consumers.
 
-Groups are meaningful only with a loaded patch. Unknown fixture ids are errors, not silent skips. Runtime group operations resolve fixtures in group JSON array order and de-duplicate repeated ids by first occurrence, so the authored array order controls distributed group value mapping.
+Groups are meaningful only with a loaded patch. Unknown fixture ids, unknown nested groups, and cyclic group references are errors, not silent skips. Runtime group operations resolve fixtures in expanded group JSON array order and de-duplicate repeated ids by first occurrence, so the authored array order controls distributed group value mapping.
 
 ## 6. Palette set: `bbb.dmx.palette.v1`
 

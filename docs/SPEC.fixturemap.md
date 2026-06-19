@@ -311,7 +311,7 @@ bangall
 ```
 
 - `read` loads a patch JSON path.
-- `readgroups` loads a `bbb.dmx.groups.v1` file whose explicit fixture ids are validated against the loaded patch.
+- `readgroups` loads a `bbb.dmx.groups.v1` file whose explicit fixture ids, nested group references, and `fixture_pattern` ranges are expanded and validated against the loaded patch.
 - `readoverrides` loads a `bbb.dmx.semantic_overrides.v1` file. Overrides are validated against matching loaded patch fixtures.
 - `reload` reloads the current patch, current groups file, and current semantic overrides file when set.
 - `dump` reports current load status, selected universe, `universe_mode`, tracking settings, color white/fallback modes, group status, semantic override status, group ids, and known universe ids from the right outlet.
