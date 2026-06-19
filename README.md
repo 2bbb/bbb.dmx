@@ -426,7 +426,7 @@ Output is either full `universe <id> ...` frames or `changed <id> address value 
 ### `bbb.dmx.merge`
 
 ```max
-[bbb.dmx.merge @mode priority]
+[bbb.dmx.merge @mode htp @patch patch-from-mvr.json @semantic_overrides semantic-overrides.json]
 ```
 
 Messages:
@@ -437,6 +437,9 @@ layer layer_b 2 <512 values>
 priority layer_a 10
 channel layer_a 1 42 255
 channels layer_b 2 1 255 2 128
+readpatch patch-from-mvr.json
+readoverrides semantic-overrides.json
+reload
 clear layer_a
 clear all
 bangall
@@ -447,6 +450,12 @@ Modes:
 - `priority` — highest layer priority wins per channel.
 - `htp` — highest byte value wins per channel.
 - `ltp` — most recently updated layer wins per channel.
+
+When `@patch` is loaded, `htp` mode treats native `cyan`/`magenta`/`yellow` CMY parameters as
+parameter-aware lowest-wins groups. If `@semantic_overrides` is also loaded, explicit `color.cmy`
+blocks such as `colorsub.c`/`colorsub.m`/`colorsub.y` are treated the same way. Multi-byte CMY
+parameters are compared as whole u16/u24 values and the winning layer's bytes are copied intact;
+associated CMY dimmer entries gate inactive zero-dimmer layers out of the lowest comparison.
 
 ### `bbb.dmx.fade`
 

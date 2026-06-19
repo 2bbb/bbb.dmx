@@ -3,10 +3,14 @@
 #include <bbb/dmx/build_info.hpp>
 
 #include <bbb/dmx/frame_set.hpp>
+#include <bbb/dmx/fixture_json.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
+#include <bbb/dmx/semantic_merge.hpp>
+#include <bbb/dmx/semantic_overrides.hpp>
 
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <set>
 #include <string>
@@ -43,6 +47,14 @@ private:
     int universe_value_{1};
     merge_mode mode_value_{merge_mode::priority};
     bbb::dmx::dmx_frame_set merged_{};
+    bbb::dmx::fixture_mapper semantic_mapper_{};
+    bbb::dmx::fixture_semantic_overrides semantic_overrides_{};
+    bbb::dmx::semantic_merge_policy semantic_policy_{};
+    std::string patch_path_value_{};
+    std::string semantic_overrides_path_value_{};
+    bool patch_loaded_{false};
+    bool semantic_overrides_loaded_{false};
+    std::map<int, std::map<int, std::size_t>> cmy_lowest_group_by_address_{};
 
 public:
     MIN_DESCRIPTION{"Merge multiple multi-universe DMX layers using priority, HTP, or LTP rules."};
@@ -86,6 +98,38 @@ public:
             }
             recompute_and_output_all();
             return {c74::min::symbol(mode_to_string(mode_value_))};
+        }}
+    };
+
+    c74::min::attribute<c74::min::symbol> patch{this, "patch", "",
+        c74::min::description{"Optional fixture patch JSON. Native CMY parameters, plus CMY semantic overrides when provided, are merged with parameter-aware lowest in HTP mode."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            const c74::min::symbol symbol_value = args.empty() ? c74::min::symbol("") : c74::min::symbol(bbb::dmx::maxutil::symbol_arg(args[0]).c_str());
+            patch_path_value_ = symbol_value.c_str();
+            if(patch_path_value_.empty()) {
+                patch_loaded_ = false;
+                semantic_mapper_.clear();
+                rebuild_semantic_policy();
+            } else {
+                load_patch_file(patch_path_value_);
+            }
+            return {symbol_value};
+        }}
+    };
+
+    c74::min::attribute<c74::min::symbol> semantic_overrides{this, "semantic_overrides", "",
+        c74::min::description{"Optional semantic overrides JSON. Explicit CMY blocks are used as parameter-aware lowest merge groups in HTP mode."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            const c74::min::symbol symbol_value = args.empty() ? c74::min::symbol("") : c74::min::symbol(bbb::dmx::maxutil::symbol_arg(args[0]).c_str());
+            semantic_overrides_path_value_ = symbol_value.c_str();
+            if(semantic_overrides_path_value_.empty()) {
+                semantic_overrides_loaded_ = false;
+                semantic_overrides_ = bbb::dmx::fixture_semantic_overrides{};
+                rebuild_semantic_policy();
+            } else {
+                load_semantic_overrides_file(semantic_overrides_path_value_);
+            }
+            return {symbol_value};
         }}
     };
 
@@ -164,6 +208,42 @@ public:
         }
     };
 
+    c74::min::message<> readpatch_message{this, "readpatch", "readpatch patch_json_path",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("readpatch requires patch JSON path");
+                return {};
+            }
+            patch_path_value_ = bbb::dmx::maxutil::symbol_arg(args[0]);
+            load_patch_file(patch_path_value_);
+            return {};
+        }
+    };
+
+    c74::min::message<> readoverrides_message{this, "readoverrides", "readoverrides semantic_overrides_json_path",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("readoverrides requires semantic overrides JSON path");
+                return {};
+            }
+            semantic_overrides_path_value_ = bbb::dmx::maxutil::symbol_arg(args[0]);
+            load_semantic_overrides_file(semantic_overrides_path_value_);
+            return {};
+        }
+    };
+
+    c74::min::message<> reload_message{this, "reload", "Reload configured patch and semantic overrides files.",
+        MIN_FUNCTION {
+            if(!patch_path_value_.empty()) {
+                load_patch_file(patch_path_value_);
+            }
+            if(!semantic_overrides_path_value_.empty()) {
+                load_semantic_overrides_file(semantic_overrides_path_value_);
+            }
+            return {};
+        }
+    };
+
     c74::min::message<> clear_message{this, "clear", "clear [layer_name|all]",
         MIN_FUNCTION {
             if(args.empty() || bbb::dmx::maxutil::symbol_arg(args[0]) == "all") {
@@ -197,6 +277,12 @@ public:
             for(const auto &entry : layers_) {
                 atoms.push_back(c74::min::symbol(entry.first.c_str()));
             }
+            atoms.push_back(c74::min::symbol("patch_loaded"));
+            atoms.push_back(patch_loaded_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("semantic_overrides_loaded"));
+            atoms.push_back(semantic_overrides_loaded_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("cmy_lowest_groups"));
+            atoms.push_back((int)semantic_policy_.cmy_lowest_groups.size());
             status_output.send(atoms);
             return {};
         }
@@ -272,10 +358,134 @@ private:
         for(const int universe_id : known_universes()) {
             bbb::dmx::dmx_universe &merged_universe = merged_.ensure_universe(universe_id);
             for(int address = 1; address <= bbb::dmx::universe_channel_count; address++) {
+                const bbb::dmx::semantic_lowest_parameter_group *lowest_group{semantic_lowest_group_at(universe_id, address)};
+                if(lowest_group) {
+                    if(group_first_channel_is(*lowest_group, universe_id, address)) {
+                        write_semantic_lowest_group(merged_universe, *lowest_group);
+                    }
+                    continue;
+                }
                 merged_universe.set_channel(address, merged_value(universe_id, address));
             }
         }
         output_all();
+    }
+
+    const bbb::dmx::semantic_lowest_parameter_group *semantic_lowest_group_at(int universe_id, int address) const {
+        if(mode_value_ != merge_mode::htp) {
+            return nullptr;
+        }
+        const auto universe_found = cmy_lowest_group_by_address_.find(bbb::dmx::sanitize_universe_id(universe_id));
+        if(universe_found == cmy_lowest_group_by_address_.end()) {
+            return nullptr;
+        }
+        const auto address_found = universe_found->second.find(address);
+        if(address_found == universe_found->second.end()) {
+            return nullptr;
+        }
+        if(semantic_policy_.cmy_lowest_groups.size() <= address_found->second) {
+            return nullptr;
+        }
+        return &semantic_policy_.cmy_lowest_groups[address_found->second];
+    }
+
+    static bool group_first_channel_is(const bbb::dmx::semantic_lowest_parameter_group &group, int universe_id, int address) {
+        return !group.parameter.channels.empty() &&
+            group.parameter.channels.front().universe == universe_id &&
+            group.parameter.channels.front().address == address;
+    }
+
+    bool layer_parameter_values(
+        const merge_layer &layer,
+        const bbb::dmx::semantic_merge_parameter_reference &reference,
+        std::vector<int> &values
+    ) const
+    {
+        values.clear();
+        values.reserve(reference.channels.size());
+        for(const auto &channel : reference.channels) {
+            const auto universe_found = layer.universes.find(channel.universe);
+            if(universe_found == layer.universes.end()) {
+                return false;
+            }
+            const int address{channel.address};
+            if(address < 1 || bbb::dmx::universe_channel_count < address) {
+                return false;
+            }
+            const std::size_t index{(std::size_t)(address - 1)};
+            if(!universe_found->second.valid[index]) {
+                return false;
+            }
+            values.push_back((int)universe_found->second.values[index]);
+        }
+        return true;
+    }
+
+    bool layer_parameter_raw_value(
+        const merge_layer &layer,
+        const bbb::dmx::semantic_merge_parameter_reference &reference,
+        std::uint32_t &value
+    ) const
+    {
+        std::vector<int> values{};
+        if(!layer_parameter_values(layer, reference, values)) {
+            return false;
+        }
+        value = bbb::dmx::semantic_merge_parameter_raw_value(reference, values);
+        return true;
+    }
+
+    bool layer_semantic_gate_is_active(
+        const merge_layer &layer,
+        const bbb::dmx::semantic_lowest_parameter_group &group
+    ) const
+    {
+        if(!group.has_gate) {
+            return true;
+        }
+        std::uint32_t value{0};
+        if(!layer_parameter_raw_value(layer, group.gate, value)) {
+            return false;
+        }
+        return 0 < value;
+    }
+
+    void write_semantic_lowest_group(
+        bbb::dmx::dmx_universe &merged_universe,
+        const bbb::dmx::semantic_lowest_parameter_group &group
+    ) const
+    {
+        const merge_layer *best_layer{nullptr};
+        std::uint32_t best_value{std::numeric_limits<std::uint32_t>::max()};
+        std::vector<int> best_values{};
+        for(const auto &layer_entry : layers_) {
+            const merge_layer &layer = layer_entry.second;
+            if(!layer_semantic_gate_is_active(layer, group)) {
+                continue;
+            }
+            std::uint32_t value{0};
+            std::vector<int> values{};
+            if(!layer_parameter_values(layer, group.parameter, values)) {
+                continue;
+            }
+            value = bbb::dmx::semantic_merge_parameter_raw_value(group.parameter, values);
+            if(!best_layer || value < best_value) {
+                best_layer = &layer;
+                best_value = value;
+                best_values = values;
+            }
+        }
+
+        if(!best_layer) {
+            for(const auto &channel : group.parameter.channels) {
+                merged_universe.set_channel(channel.address, merged_value(channel.universe, channel.address));
+            }
+            return;
+        }
+
+        for(std::size_t index{0}; index < group.parameter.channels.size() && index < best_values.size(); index++) {
+            merged_universe.set_channel(group.parameter.channels[index].address, best_values[index]);
+        }
     }
 
     int merged_value(int universe_id, int address) const {
@@ -319,6 +529,67 @@ private:
         return value;
     }
 
+    void load_patch_file(const std::string &path) {
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        bbb::dmx::fixture_mapper loaded_mapper{};
+        const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(resolved_path, loaded_mapper)};
+        if(!result.ok) {
+            patch_loaded_ = false;
+            semantic_mapper_.clear();
+            rebuild_semantic_policy();
+            report_error(result.message.c_str());
+            return;
+        }
+        semantic_mapper_ = loaded_mapper;
+        patch_loaded_ = true;
+        if(rebuild_semantic_policy()) {
+            recompute_and_output_all();
+        }
+        report_status("patch_loaded");
+    }
+
+    void load_semantic_overrides_file(const std::string &path) {
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        bbb::dmx::fixture_semantic_overrides loaded_overrides{};
+        const bbb::dmx::mapper_result result{bbb::dmx::read_fixture_semantic_overrides_file(resolved_path, loaded_overrides)};
+        if(!result.ok) {
+            semantic_overrides_loaded_ = false;
+            semantic_overrides_ = bbb::dmx::fixture_semantic_overrides{};
+            rebuild_semantic_policy();
+            report_error(result.message.c_str());
+            return;
+        }
+        semantic_overrides_ = loaded_overrides;
+        semantic_overrides_loaded_ = true;
+        if(rebuild_semantic_policy()) {
+            recompute_and_output_all();
+        }
+        report_status("semantic_overrides_loaded");
+    }
+
+    bool rebuild_semantic_policy() {
+        semantic_policy_ = bbb::dmx::semantic_merge_policy{};
+        cmy_lowest_group_by_address_.clear();
+        if(!patch_loaded_) {
+            return true;
+        }
+
+        bbb::dmx::semantic_merge_policy built_policy{};
+        const bbb::dmx::mapper_result result{bbb::dmx::build_semantic_cmy_lowest_merge_policy(semantic_mapper_, semantic_overrides_, built_policy)};
+        if(!result.ok) {
+            report_error(result.message.c_str());
+            return false;
+        }
+        semantic_policy_ = built_policy;
+        for(std::size_t group_index{0}; group_index < semantic_policy_.cmy_lowest_groups.size(); group_index++) {
+            const auto &group = semantic_policy_.cmy_lowest_groups[group_index];
+            for(const auto &channel : group.parameter.channels) {
+                cmy_lowest_group_by_address_[channel.universe][channel.address] = group_index;
+            }
+        }
+        return true;
+    }
+
     void output_all() {
         const std::vector<int> ids{merged_.universe_ids()};
         if(ids.empty()) {
@@ -328,6 +599,10 @@ private:
         for(const int universe_id : ids) {
             output.send(bbb::dmx::maxutil::universe_atoms(universe_id, merged_.universe(universe_id)));
         }
+    }
+
+    void report_status(const char *message) {
+        status_output.send(bbb::dmx::maxutil::status_atoms("status", message));
     }
 
     void report_error(const char *message) {
