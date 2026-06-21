@@ -33,20 +33,33 @@ bbb::dmx::fixture_parameter make_u16_parameter(const std::string &key, const std
     return parameter;
 }
 
+bbb::dmx::fixture_parameter make_u8_parameter(const std::string &key, const std::string &channel_key) {
+    bbb::dmx::fixture_parameter parameter{};
+    parameter.key = key;
+    parameter.type = bbb::dmx::fixture_parameter_type::u8;
+    parameter.channels = {channel_key};
+    return parameter;
+}
+
 bbb::dmx::fixture_profile make_mover_profile() {
+    constexpr int dummy_parameter_count{48};
+
     bbb::dmx::fixture_mode mode{};
     mode.key = "mover";
-    mode.footprint = 4;
-    mode.channels = {
-        make_channel(1, "pan.coarse"),
-        make_channel(2, "pan.fine"),
-        make_channel(3, "tilt.coarse"),
-        make_channel(4, "tilt.fine")
-    };
-    mode.parameters = {
-        make_u16_parameter("pan", "pan.coarse", "pan.fine", 540.0),
-        make_u16_parameter("tilt", "tilt.coarse", "tilt.fine", 270.0)
-    };
+    mode.footprint = dummy_parameter_count + 4;
+    mode.channels.reserve((std::size_t)mode.footprint);
+    mode.parameters.reserve((std::size_t)dummy_parameter_count + 2);
+    for(int index{0}; index < dummy_parameter_count; index++) {
+        const std::string key{"dummy_" + std::to_string(index)};
+        mode.channels.push_back(make_channel(index + 1, key));
+        mode.parameters.push_back(make_u8_parameter(key, key));
+    }
+    mode.channels.push_back(make_channel(dummy_parameter_count + 1, "pan.coarse"));
+    mode.channels.push_back(make_channel(dummy_parameter_count + 2, "pan.fine"));
+    mode.channels.push_back(make_channel(dummy_parameter_count + 3, "tilt.coarse"));
+    mode.channels.push_back(make_channel(dummy_parameter_count + 4, "tilt.fine"));
+    mode.parameters.push_back(make_u16_parameter("pan", "pan.coarse", "pan.fine", 540.0));
+    mode.parameters.push_back(make_u16_parameter("tilt", "tilt.coarse", "tilt.fine", 270.0));
 
     bbb::dmx::fixture_profile profile{};
     profile.key = "perf.mover";
@@ -57,6 +70,9 @@ bbb::dmx::fixture_profile make_mover_profile() {
 }
 
 bbb::dmx::fixture_patch make_patch(int fixture_count) {
+    constexpr int footprint{52};
+    constexpr int fixtures_per_universe{bbb::dmx::universe_channel_count / footprint};
+
     bbb::dmx::fixture_patch patch{};
     patch.coordinates = "gdtf";
     patch.fixtures.reserve((std::size_t)fixture_count);
@@ -65,8 +81,8 @@ bbb::dmx::fixture_patch make_patch(int fixture_count) {
         fixture.id = "fixture_" + std::to_string(index);
         fixture.profile = "perf.mover";
         fixture.mode = "mover";
-        fixture.universe = 1 + index / 128;
-        fixture.address = 1 + (index % 128) * 4;
+        fixture.universe = 1 + index / fixtures_per_universe;
+        fixture.address = 1 + (index % fixtures_per_universe) * footprint;
         patch.fixtures.push_back(fixture);
     }
     return patch;
