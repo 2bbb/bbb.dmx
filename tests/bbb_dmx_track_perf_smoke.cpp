@@ -277,6 +277,14 @@ std::map<std::string, std::size_t> fixture_index_map(const bbb::dmx::fixture_pat
     return indices;
 }
 
+struct cached_track_config {
+public:
+    bbb::dmx::vec3 position{};
+    bbb::dmx::vec3 rotation{};
+    double pan_range{0.0};
+    double tilt_range{0.0};
+};
+
 const bbb::dmx::fixture_instance *find_fixture_indexed(
     const bbb::dmx::fixture_patch &patch,
     const std::map<std::string, std::size_t> &indices,
@@ -312,6 +320,57 @@ lookup_result run_lookup(bool indexed, int fixture_count, int group_size, int it
                 : find_fixture_linear(patch, fixture_id)};
             require(fixture != nullptr, "lookup fixture");
             checksum ^= (std::uint64_t)(fixture->universe * 257 + fixture->address * 17 + iteration);
+            checksum *= 1099511628211ull;
+        }
+    }
+    const auto end = std::chrono::steady_clock::now();
+    const long long elapsed_microseconds{std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()};
+    return lookup_result{elapsed_microseconds, checksum};
+}
+
+lookup_result run_config_lookup(bool cached, int fixture_count, int group_size, int iterations) {
+    const bbb::dmx::fixture_patch patch{make_patch(fixture_count)};
+    const bbb::dmx::fixture_profile profile{make_mover_profile()};
+    const std::map<std::string, std::size_t> indices{fixture_index_map(patch)};
+    const std::vector<int> group{group_indices(fixture_count, group_size)};
+    std::vector<std::string> fixture_ids{};
+    fixture_ids.reserve(group.size());
+    for(const int fixture_index : group) {
+        fixture_ids.push_back("fixture_" + std::to_string(fixture_index));
+    }
+
+    std::map<std::string, cached_track_config> config_cache{};
+    std::uint64_t checksum{1469598103934665603ull};
+    const auto start = std::chrono::steady_clock::now();
+    for(int iteration{0}; iteration < iterations; iteration++) {
+        for(const std::string &fixture_id : fixture_ids) {
+            const bbb::dmx::fixture_instance *fixture{find_fixture_indexed(patch, indices, fixture_id)};
+            require(fixture != nullptr, "config fixture lookup");
+            cached_track_config config{};
+            const auto found_config = config_cache.find(fixture_id);
+            if(cached && found_config != config_cache.end()) {
+                config = found_config->second;
+            } else {
+                const bbb::dmx::fixture_mode *mode{profile.find_mode(fixture->mode)};
+                require(mode != nullptr, "config mode lookup");
+                const bbb::dmx::fixture_parameter *pan_parameter{mode->find_parameter("pan")};
+                const bbb::dmx::fixture_parameter *tilt_parameter{mode->find_parameter("tilt")};
+                require(pan_parameter != nullptr && tilt_parameter != nullptr, "config parameter lookup");
+                config.position = fixture->position;
+                config.rotation = fixture->rotation;
+                config.pan_range = 0.0 < pan_parameter->range_degrees ? pan_parameter->range_degrees : 540.0;
+                config.tilt_range = 0.0 < tilt_parameter->range_degrees ? tilt_parameter->range_degrees : 270.0;
+                if(cached) {
+                    config_cache[fixture_id] = config;
+                }
+            }
+            checksum ^= (std::uint64_t)(
+                config.position.x * 13.0
+                + config.rotation.z * 17.0
+                + config.pan_range * 19.0
+                + config.tilt_range * 23.0
+                + iteration
+            );
             checksum *= 1099511628211ull;
         }
     }
@@ -382,6 +441,9 @@ int main() {
     const lookup_result linear_lookup{run_lookup(false, fixture_count, group_size, iterations * 16)};
     const lookup_result indexed_lookup{run_lookup(true, fixture_count, group_size, iterations * 16)};
     require(linear_lookup.checksum == indexed_lookup.checksum, "linear and indexed lookup checksums match");
+    const lookup_result uncached_config{run_config_lookup(false, fixture_count, group_size, iterations * 16)};
+    const lookup_result cached_config{run_config_lookup(true, fixture_count, group_size, iterations * 16)};
+    require(uncached_config.checksum == cached_config.checksum, "uncached and cached config checksums match");
     const run_result full_snapshot{run_tracking(true, fixture_count, group_size, iterations)};
     const run_result touched_snapshot{run_tracking(false, fixture_count, group_size, iterations)};
     require(full_snapshot.checksum == touched_snapshot.checksum, "full and touched tracking checksums match");
@@ -392,6 +454,8 @@ int main() {
               << " iterations=" << iterations
               << " linear_lookup_elapsed_us=" << linear_lookup.elapsed_microseconds
               << " indexed_lookup_elapsed_us=" << indexed_lookup.elapsed_microseconds
+              << " uncached_config_elapsed_us=" << uncached_config.elapsed_microseconds
+              << " cached_config_elapsed_us=" << cached_config.elapsed_microseconds
               << " full_snapshot_elapsed_us=" << full_snapshot.elapsed_microseconds
               << " touched_snapshot_elapsed_us=" << touched_snapshot.elapsed_microseconds
               << " checksum=" << touched_snapshot.checksum

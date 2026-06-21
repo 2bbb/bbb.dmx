@@ -18,6 +18,14 @@
 
 class bbb_dmx_fixturemap : public c74::min::object<bbb_dmx_fixturemap> {
 private:
+    struct track_fixture_config {
+        bbb::dmx::vec3 position{};
+        bbb::dmx::vec3 rotation{};
+        bbb::dmx::fixture_calibration calibration{};
+        double pan_range{0.0};
+        double tilt_range{0.0};
+    };
+
     bbb::dmx::fixture_mapper mapper_{};
     std::string setup_path_value_{};
     std::string patch_path_value_{};
@@ -26,6 +34,7 @@ private:
     std::string semantic_overrides_path_value_{};
     bbb::dmx::fixture_semantic_overrides semantic_overrides_{};
     std::map<std::string, std::size_t> fixture_indices_{};
+    std::map<std::string, track_fixture_config> track_fixture_configs_{};
     int universe_value_{1};
     bool autobang_value_{true};
     bool output_all_universes_{false};
@@ -326,6 +335,7 @@ public:
                 return {default_pan_range_value_};
             }
             default_pan_range_value_ = (double)args[0];
+            track_fixture_configs_.clear();
             return {default_pan_range_value_};
         }}
     };
@@ -341,6 +351,7 @@ public:
                 return {default_tilt_range_value_};
             }
             default_tilt_range_value_ = (double)args[0];
+            track_fixture_configs_.clear();
             return {default_tilt_range_value_};
         }}
     };
@@ -467,6 +478,7 @@ public:
         MIN_FUNCTION {
             mapper_.clear();
             fixture_indices_.clear();
+            track_fixture_configs_.clear();
             groups_ = bbb::dmx::fixture_group_set{};
             groups_loaded_ = false;
             groups_validated_ = false;
@@ -1300,6 +1312,7 @@ private:
         }
         mapper_ = loaded_mapper;
         rebuild_fixture_indices();
+        track_fixture_configs_.clear();
         tracking_engines_.clear();
         groups_validated_ = false;
         if(groups_loaded_) {
@@ -1909,7 +1922,13 @@ private:
         return mode_override->resolve_alias(parameter_key);
     }
 
-    bbb::dmx::mapper_result configure_tracking_engine(const bbb::dmx::fixture_instance &fixture, bbb::dmx::movertrack_engine &engine) const {
+    bbb::dmx::mapper_result track_config_for_fixture(const bbb::dmx::fixture_instance &fixture, track_fixture_config &config) {
+        const auto cached_config = track_fixture_configs_.find(fixture.id);
+        if(cached_config != track_fixture_configs_.end()) {
+            config = cached_config->second;
+            return bbb::dmx::mapper_result::success();
+        }
+
         const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture.profile)};
         if(!profile) {
             return bbb::dmx::mapper_result::failure("missing profile: " + fixture.profile);
@@ -1930,23 +1949,39 @@ private:
             return bbb::dmx::mapper_result::failure("invalid pan/tilt range for fixture: " + fixture.id);
         }
 
-        if(!engine.set_fixture_position(fixture.position)) {
+        config.position = fixture.position;
+        config.rotation = fixture.rotation;
+        config.calibration = fixture.calibration;
+        config.pan_range = pan_range;
+        config.tilt_range = tilt_range;
+        track_fixture_configs_[fixture.id] = config;
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result configure_tracking_engine(const bbb::dmx::fixture_instance &fixture, bbb::dmx::movertrack_engine &engine) {
+        track_fixture_config config{};
+        bbb::dmx::mapper_result result{track_config_for_fixture(fixture, config)};
+        if(!result.ok) {
+            return result;
+        }
+
+        if(!engine.set_fixture_position(config.position)) {
             return bbb::dmx::mapper_result::failure("invalid fixture position: " + fixture.id);
         }
-        if(!engine.set_rotation_degrees(fixture.rotation)) {
+        if(!engine.set_rotation_degrees(config.rotation)) {
             return bbb::dmx::mapper_result::failure("invalid fixture rotation: " + fixture.id);
         }
-        if(!engine.set_ranges(pan_range, tilt_range)) {
+        if(!engine.set_ranges(config.pan_range, config.tilt_range)) {
             return bbb::dmx::mapper_result::failure("invalid pan/tilt range for fixture: " + fixture.id);
         }
-        if(!engine.set_pan_offset(fixture.calibration.pan_offset)) {
+        if(!engine.set_pan_offset(config.calibration.pan_offset)) {
             return bbb::dmx::mapper_result::failure("invalid pan offset for fixture: " + fixture.id);
         }
-        if(!engine.set_tilt_offset(fixture.calibration.tilt_offset)) {
+        if(!engine.set_tilt_offset(config.calibration.tilt_offset)) {
             return bbb::dmx::mapper_result::failure("invalid tilt offset for fixture: " + fixture.id);
         }
-        engine.set_pan_invert(fixture.calibration.pan_invert);
-        engine.set_tilt_invert(fixture.calibration.tilt_invert);
+        engine.set_pan_invert(config.calibration.pan_invert);
+        engine.set_tilt_invert(config.calibration.tilt_invert);
         engine.set_tracking_mode(tracking_mode_value_);
         return bbb::dmx::mapper_result::success();
     }
