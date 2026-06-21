@@ -7,6 +7,7 @@
 #include <bbb/dmx/max_external_utils.hpp>
 #include <bbb/dmx/movertrack.hpp>
 #include <bbb/dmx/semantic_overrides.hpp>
+#include <bbb/dmx/setup.hpp>
 
 #include <algorithm>
 
@@ -18,6 +19,7 @@
 class bbb_dmx_fixturemap : public c74::min::object<bbb_dmx_fixturemap> {
 private:
     bbb::dmx::fixture_mapper mapper_{};
+    std::string setup_path_value_{};
     std::string patch_path_value_{};
     std::string groups_path_value_{};
     bbb::dmx::fixture_group_set groups_{};
@@ -38,6 +40,7 @@ private:
     bool warn_invalid_tracking_mode_{false};
     bool warn_invalid_range_{false};
     bool warn_runtime_error_{false};
+    bool setup_load_pending_{false};
     bool patch_load_pending_{false};
     bool groups_load_pending_{false};
     bool semantic_overrides_load_pending_{false};
@@ -45,10 +48,24 @@ private:
     bool groups_validated_{false};
     bool semantic_overrides_loaded_{false};
     bool semantic_overrides_validated_{false};
+    bool applying_setup_{false};
+    bool suppress_setup_attribute_load_{false};
     bool suppress_patch_attribute_load_{false};
     bool suppress_groups_attribute_load_{false};
     bool suppress_group_attribute_load_{false};
     bool suppress_semantic_overrides_attribute_load_{false};
+    bool patch_attribute_overridden_{false};
+    bool groups_attribute_overridden_{false};
+    bool semantic_overrides_attribute_overridden_{false};
+    bool universe_attribute_overridden_{false};
+    bool autobang_attribute_overridden_{false};
+    bool universe_mode_attribute_overridden_{false};
+    bool tracking_mode_attribute_overridden_{false};
+    bool default_pan_range_attribute_overridden_{false};
+    bool default_tilt_range_attribute_overridden_{false};
+    bool track_strict_attribute_overridden_{false};
+    bool color_use_white_attribute_overridden_{false};
+    bool color_wheel_fallback_attribute_overridden_{false};
 
     struct normalized_group_assignment {
         std::string parameter{};
@@ -75,9 +92,19 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(read/readgroups/readoverrides/set/setall/setgroup/rawset/rawsetall/rawsetgroup/nset/nsetall/nsetgroup/color/colorall/colorgroup/dimmer/dimmerall/dimmergroup/shutter/shutterall/shuttergroup/track/trackall/trackgroup/trackrel/trackallrel/trackgrouprel/ptbytes/channel/channels/uchannels/bang/bangall) fixture mapping control"};
+    c74::min::inlet<> input{this, "(readsetup/read/readgroups/readoverrides/set/setall/setgroup/rawset/rawsetall/rawsetgroup/nset/nsetall/nsetgroup/color/colorall/colorgroup/dimmer/dimmerall/dimmergroup/shutter/shutterall/shuttergroup/track/trackall/trackgroup/trackrel/trackallrel/trackgrouprel/ptbytes/channel/channels/uchannels/bang/bangall) fixture mapping control"};
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
+
+    c74::min::timer<c74::min::timer_options::defer_delivery> setup_load_timer{this,
+        MIN_FUNCTION {
+            if(setup_load_pending_ && !setup_path_value_.empty()) {
+                setup_load_pending_ = false;
+                load_setup_file(setup_path_value_);
+            }
+            return {};
+        }
+    };
 
     c74::min::timer<c74::min::timer_options::defer_delivery> patch_load_timer{this,
         MIN_FUNCTION {
@@ -113,9 +140,31 @@ public:
         bbb::dmx::report_external_build_info(cout, "bbb.dmx.fixturemap");
     }
 
+    c74::min::attribute<c74::min::symbol> setup{this, "setup", "",
+        c74::min::description{"Optional bbb.dmx setup JSON path. Loads shared paths and defaults unless explicit object attributes override them."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                if(!applying_setup_ && !suppress_setup_attribute_load_) {
+                    setup_path_value_.clear();
+                    setup_load_pending_ = false;
+                }
+                return {c74::min::symbol("")};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            setup_path_value_ = symbol_value.c_str();
+            if(!suppress_setup_attribute_load_) {
+                schedule_setup_load();
+            }
+            return {symbol_value};
+        }}
+    };
+
     c74::min::attribute<c74::min::symbol> patch{this, "patch", "",
         c74::min::description{"Patch JSON file path to load on object initialization."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_ && !suppress_patch_attribute_load_) {
+                patch_attribute_overridden_ = true;
+            }
             if(args.empty()) {
                 patch_path_value_.clear();
                 patch_load_pending_ = false;
@@ -133,6 +182,9 @@ public:
     c74::min::attribute<c74::min::symbol> groups{this, "groups", "",
         c74::min::description{"Optional bbb.dmx groups JSON path. Groups are validated against the loaded patch and used by *group messages."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_ && !suppress_groups_attribute_load_) {
+                groups_attribute_overridden_ = true;
+            }
             if(args.empty()) {
                 groups_path_value_.clear();
                 groups_load_pending_ = false;
@@ -153,6 +205,9 @@ public:
     c74::min::attribute<c74::min::symbol> group{this, "group", "",
         c74::min::description{"Alias for @groups. Optional bbb.dmx groups JSON path."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_ && !suppress_group_attribute_load_) {
+                groups_attribute_overridden_ = true;
+            }
             if(args.empty()) {
                 clear_groups();
                 return {c74::min::symbol("")};
@@ -169,6 +224,9 @@ public:
     c74::min::attribute<c74::min::symbol> semantic_overrides{this, "semantic_overrides", "",
         c74::min::description{"Optional bbb.dmx semantic overrides JSON path. Overrides per-profile/mode parameter aliases and semantic color/intensity behavior."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_ && !suppress_semantic_overrides_attribute_load_) {
+                semantic_overrides_attribute_overridden_ = true;
+            }
             if(args.empty()) {
                 semantic_overrides_path_value_.clear();
                 semantic_overrides_load_pending_ = false;
@@ -189,6 +247,9 @@ public:
     c74::min::attribute<int> universe{this, "universe", 1,
         c74::min::description{"Universe id to output."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_) {
+                universe_attribute_overridden_ = true;
+            }
             if(args.empty() || !finite_atom(args[0])) {
                 warn_once(warn_invalid_numeric_, "invalid universe ignored");
                 return {universe_value_};
@@ -201,6 +262,9 @@ public:
     c74::min::attribute<bool> autobang{this, "autobang", true,
         c74::min::description{"Output the full universe immediately after successful updates."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_) {
+                autobang_attribute_overridden_ = true;
+            }
             autobang_value_ = args.empty() || ((int)args[0] != 0);
             return {autobang_value_};
         }}
@@ -210,6 +274,9 @@ public:
         c74::min::description{"Autobang and bang output mode: selected or all. selected outputs a bare 512-byte list; all outputs universe id 512-byte messages."},
         c74::min::enum_map{"selected", "all"},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_) {
+                universe_mode_attribute_overridden_ = true;
+            }
             if(args.empty()) {
                 return {c74::min::symbol(output_all_universes_ ? "all" : "selected")};
             }
@@ -231,6 +298,9 @@ public:
         c74::min::description{"Pan continuity mode for track/trackall messages: smart, pan, or off."},
         c74::min::enum_map{"smart", "pan", "off"},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_) {
+                tracking_mode_attribute_overridden_ = true;
+            }
             if(args.empty()) {
                 return {c74::min::symbol(bbb::dmx::tracking_mode_to_string(tracking_mode_value_))};
             }
@@ -247,6 +317,9 @@ public:
     c74::min::attribute<double> default_pan_range{this, "default_pan_range", 540.0,
         c74::min::description{"Fallback pan range in degrees when the fixture profile omits pan.range_degrees."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_) {
+                default_pan_range_attribute_overridden_ = true;
+            }
             if(args.empty() || !finite_atom(args[0]) || (double)args[0] <= 0.0) {
                 warn_once(warn_invalid_range_, "invalid default_pan_range ignored");
                 return {default_pan_range_value_};
@@ -259,6 +332,9 @@ public:
     c74::min::attribute<double> default_tilt_range{this, "default_tilt_range", 270.0,
         c74::min::description{"Fallback tilt range in degrees when the fixture profile omits tilt.range_degrees."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_) {
+                default_tilt_range_attribute_overridden_ = true;
+            }
             if(args.empty() || !finite_atom(args[0]) || (double)args[0] <= 0.0) {
                 warn_once(warn_invalid_range_, "invalid default_tilt_range ignored");
                 return {default_tilt_range_value_};
@@ -271,6 +347,9 @@ public:
     c74::min::attribute<bool> track_strict{this, "track_strict", false,
         c74::min::description{"When non-zero, trackall reports fixtures without pan/tilt as errors instead of skipping them."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_) {
+                track_strict_attribute_overridden_ = true;
+            }
             track_strict_value_ = !args.empty() && ((int)args[0] != 0);
             return {track_strict_value_};
         }}
@@ -279,6 +358,9 @@ public:
     c74::min::attribute<bool> color_use_white{this, "color_use_white", true,
         c74::min::description{"When non-zero, semantic color extracts RGBW white from min(r,g,b). When zero, semantic color leaves white untouched and RGB channels carry the full color."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_) {
+                color_use_white_attribute_overridden_ = true;
+            }
             color_use_white_value_ = args.empty() || ((int)args[0] != 0);
             return {color_use_white_value_};
         }}
@@ -287,9 +369,29 @@ public:
     c74::min::attribute<bool> color_wheel_fallback{this, "color_wheel_fallback", false,
         c74::min::description{"When non-zero, fixtures without RGB/RGBW/CMY use color wheel hue plus dimmer brightness when available."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_) {
+                color_wheel_fallback_attribute_overridden_ = true;
+            }
             color_wheel_fallback_value_ = !args.empty() && ((int)args[0] != 0);
             return {color_wheel_fallback_value_};
         }}
+    };
+
+    c74::min::message<> readsetup_message{this, "readsetup", "readsetup setup_json_path",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("readsetup requires a setup JSON path");
+                return {};
+            }
+            const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
+            setup_path_value_ = path_symbol.c_str();
+            suppress_setup_attribute_load_ = true;
+            setup = path_symbol;
+            suppress_setup_attribute_load_ = false;
+            setup_load_pending_ = false;
+            load_setup_file(setup_path_value_);
+            return {};
+        }
     };
 
     c74::min::message<> read_message{this, "read", "read patch_json_path",
@@ -1028,6 +1130,130 @@ public:
     };
 
 private:
+    void schedule_setup_load() {
+        if(setup_path_value_.empty()) {
+            setup_load_pending_ = false;
+            return;
+        }
+        setup_load_pending_ = true;
+        setup_load_timer.delay(0);
+    }
+
+    std::string setup_relative_path(const std::string &base_directory, const std::string &path) const {
+        if(path.empty()) {
+            return path;
+        }
+        if(bbb::dmx::path_is_absolute(path)) {
+            const std::string system_path{bbb::dmx::maxutil::max_path_to_system_path(path)};
+            if(!system_path.empty()) {
+                return system_path;
+            }
+            return path;
+        }
+        return bbb::dmx::join_relative_path(base_directory, path);
+    }
+
+    void set_symbol_attribute_from_setup(c74::min::attribute<c74::min::symbol> &attribute, const std::string &value) {
+        applying_setup_ = true;
+        attribute = c74::min::symbol(value.c_str());
+        applying_setup_ = false;
+    }
+
+    void set_int_attribute_from_setup(c74::min::attribute<int> &attribute, int value) {
+        applying_setup_ = true;
+        attribute = value;
+        applying_setup_ = false;
+    }
+
+    void set_double_attribute_from_setup(c74::min::attribute<double> &attribute, double value) {
+        applying_setup_ = true;
+        attribute = value;
+        applying_setup_ = false;
+    }
+
+    void set_bool_attribute_from_setup(c74::min::attribute<bool> &attribute, bool value) {
+        applying_setup_ = true;
+        attribute = value;
+        applying_setup_ = false;
+    }
+
+    void apply_setup_file_path(
+        c74::min::attribute<c74::min::symbol> &attribute,
+        bool &suppress_attribute_load,
+        std::string &path_value,
+        const std::string &resolved_path
+    ) {
+        suppress_attribute_load = true;
+        set_symbol_attribute_from_setup(attribute, resolved_path);
+        suppress_attribute_load = false;
+        path_value = resolved_path;
+    }
+
+    void apply_setup_values(const bbb::dmx::dmx_setup_values &values, const std::string &base_directory) {
+        if(values.universe.has_value() && !universe_attribute_overridden_) {
+            set_int_attribute_from_setup(universe, values.universe.value());
+        }
+        if(values.autobang.has_value() && !autobang_attribute_overridden_) {
+            set_bool_attribute_from_setup(autobang, values.autobang.value());
+        }
+        if(values.universe_mode.has_value() && !universe_mode_attribute_overridden_) {
+            set_symbol_attribute_from_setup(universe_mode, values.universe_mode.value());
+        }
+        if(values.tracking_mode.has_value() && !tracking_mode_attribute_overridden_) {
+            set_symbol_attribute_from_setup(tracking_mode, values.tracking_mode.value());
+        }
+        if(values.default_pan_range.has_value() && !default_pan_range_attribute_overridden_) {
+            set_double_attribute_from_setup(default_pan_range, values.default_pan_range.value());
+        }
+        if(values.default_tilt_range.has_value() && !default_tilt_range_attribute_overridden_) {
+            set_double_attribute_from_setup(default_tilt_range, values.default_tilt_range.value());
+        }
+        if(values.track_strict.has_value() && !track_strict_attribute_overridden_) {
+            set_bool_attribute_from_setup(track_strict, values.track_strict.value());
+        }
+        if(values.color_use_white.has_value() && !color_use_white_attribute_overridden_) {
+            set_bool_attribute_from_setup(color_use_white, values.color_use_white.value());
+        }
+        if(values.color_wheel_fallback.has_value() && !color_wheel_fallback_attribute_overridden_) {
+            set_bool_attribute_from_setup(color_wheel_fallback, values.color_wheel_fallback.value());
+        }
+
+        if(values.patch.has_value() && !patch_attribute_overridden_) {
+            const std::string resolved_path{setup_relative_path(base_directory, values.patch.value())};
+            apply_setup_file_path(patch, suppress_patch_attribute_load_, patch_path_value_, resolved_path);
+            patch_load_pending_ = false;
+            load_patch_file(patch_path_value_);
+        }
+        if(values.groups.has_value() && !groups_attribute_overridden_) {
+            const std::string resolved_path{setup_relative_path(base_directory, values.groups.value())};
+            apply_setup_file_path(groups, suppress_groups_attribute_load_, groups_path_value_, resolved_path);
+            suppress_group_attribute_load_ = true;
+            set_symbol_attribute_from_setup(group, resolved_path);
+            suppress_group_attribute_load_ = false;
+            groups_load_pending_ = false;
+            load_groups_file(groups_path_value_);
+        }
+        if(values.semantic_overrides.has_value() && !semantic_overrides_attribute_overridden_) {
+            const std::string resolved_path{setup_relative_path(base_directory, values.semantic_overrides.value())};
+            apply_setup_file_path(semantic_overrides, suppress_semantic_overrides_attribute_load_, semantic_overrides_path_value_, resolved_path);
+            semantic_overrides_load_pending_ = false;
+            load_semantic_overrides_file(semantic_overrides_path_value_);
+        }
+    }
+
+    void load_setup_file(const std::string &path) {
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        bbb::dmx::dmx_setup_document setup_document{};
+        const bbb::dmx::mapper_result result{bbb::dmx::read_dmx_setup_file(resolved_path, setup_document)};
+        if(!handle_result(result)) {
+            return;
+        }
+        const std::string base_directory{bbb::dmx::parent_directory(resolved_path)};
+        const bbb::dmx::dmx_setup_values values{bbb::dmx::merge_setup_values(setup_document.common, setup_document.fixturemap)};
+        apply_setup_values(values, base_directory);
+        report_status("setup_loaded");
+    }
+
     void schedule_patch_load() {
         if(patch_path_value_.empty()) {
             patch_load_pending_ = false;

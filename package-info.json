@@ -99,6 +99,7 @@
         "externals/bbb.dmx.assert.mxe64": {},
         "help/bbb.dmx.assert.maxhelp": {},
         "asserts/example.json": {},
+        "setups/example.json": {},
         "docs/SPEC.convert.md": {},
         "docs/SPEC.json.md": {},
         "schemas/bbb.dmx.assert.v1.schema.json": {},
@@ -108,6 +109,7 @@
         "schemas/bbb.dmx.matrixmap.v1.schema.json": {},
         "schemas/bbb.dmx.palette.v1.schema.json": {},
         "schemas/bbb.dmx.scene.v1.schema.json": {},
+        "schemas/bbb.dmx.setup.v1.schema.json": {},
         "schemas/bbb.dmx.patch.v2.schema.json": {}
     }
 }

@@ -12,3 +12,4 @@ ${AJV} validate --spec=draft2020 --strict=true -s "${SCHEMA_DIR}/bbb.dmx.scene.v
 ${AJV} validate --spec=draft2020 --strict=true -s "${SCHEMA_DIR}/bbb.dmx.curve.v1.schema.json" -d 'curves/*.json'
 ${AJV} validate --spec=draft2020 --strict=true -s "${SCHEMA_DIR}/bbb.dmx.mask.v1.schema.json" -d 'masks/*.json'
 ${AJV} validate --spec=draft2020 --strict=true -s "${SCHEMA_DIR}/bbb.dmx.assert.v1.schema.json" -d 'asserts/*.json'
+${AJV} validate --spec=draft2020 --strict=true -s "${SCHEMA_DIR}/bbb.dmx.setup.v1.schema.json" -d 'setups/*.json'

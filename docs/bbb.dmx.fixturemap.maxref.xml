@@ -16,6 +16,12 @@
         <outlet id="1" type="anything">Status and diagnostic messages.</outlet>
     </outlets>
     <methodlist>
+        <method name="readsetup">
+            <arglist>
+                <arg name="path" type="symbol" optional="0" />
+            </arglist>
+            <description>Read a shared bbb.dmx.setup.v1 JSON file immediately. Paths inside setup are resolved relative to the setup file, and explicit object attributes override setup values.</description>
+        </method>
         <method name="read">
             <arglist>
                 <arg name="path" type="symbol" optional="0" />
@@ -279,6 +285,9 @@
         </method>
     </methodlist>
     <attributelist>
+        <attribute name="setup" get="1" set="1" type="symbol">
+            <description>Optional shared bbb.dmx.setup.v1 JSON path. Loaded after object initialization and whenever the attribute changes.</description>
+        </attribute>
         <attribute name="patch" get="1" set="1" type="symbol">
             <description>Patch JSON path to read after object initialization and whenever the attribute changes. Attribute loading is deferred; use the read message for immediate explicit loading.</description>
         </attribute>

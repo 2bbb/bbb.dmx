@@ -35,6 +35,7 @@ Current schema ids:
 | Curve rules | `bbb.dmx.curve.v1` | `schemas/bbb.dmx.curve.v1.schema.json` |
 | Mask rules | `bbb.dmx.mask.v1` | `schemas/bbb.dmx.mask.v1.schema.json` |
 | Assertion rules | `bbb.dmx.assert.v1` | `schemas/bbb.dmx.assert.v1.schema.json` |
+| Shared setup | `bbb.dmx.setup.v1` | `schemas/bbb.dmx.setup.v1.schema.json` |
 
 Rules for future versions:
 
@@ -627,7 +628,33 @@ Rule fields:
 
 Canonical assertion rules should include at least one of `min`, `max`, or `equals`. A rule without predicates only increments pass counts and is usually useless.
 
-## 11. Validation workflow for external applications
+## 11. Shared setup: `bbb.dmx.setup.v1`
+
+A setup file collects paths and object defaults that are otherwise easy to mistype in Max object boxes. It is loaded by `bbb.dmx.fixturemap` and `bbb.dmx.matrixmap` through `@setup` or `readsetup`. `@config` is intentionally not reused because other bbb.dmx objects already use it for object-specific rule files.
+
+Top-level fields are common defaults. The `fixturemap` and `matrixmap` objects may override those defaults in their own sections. Explicit attributes on the Max object override all setup values. Paths inside setup are resolved relative to the setup file itself, whether the setup file was loaded by absolute path or Max search path.
+
+```json
+{
+  "schema": "bbb.dmx.setup.v1",
+  "patch": "../patches/rgb-grid.example.json",
+  "universe_mode": "all",
+  "color_wheel_fallback": true,
+  "fixturemap": {
+    "universe": 1,
+    "tracking_mode": "smart"
+  },
+  "matrixmap": {
+    "map": "../maps/rgb-grid.example.json",
+    "plane_order": "rgba",
+    "gamma": 1.0
+  }
+}
+```
+
+Supported path fields: `patch`, `map`, `groups`/`group`, and `semantic_overrides`. Supported scalar fields mirror existing object attributes: `universe`, `universe_mode`, `autobang`, fixture tracking fields, color semantic fields, matrix plane/gamma/brightness/invert fields. Unknown fields are rejected.
+
+## 12. Validation workflow for external applications
 
 External producers should validate in three layers:
 
@@ -644,7 +671,7 @@ npx ajv-cli validate -s schemas/bbb.dmx.patch.v2.schema.json -d patches/rgb-grid
 
 Schema validation catches shape errors. It cannot catch fixture-specific mistakes like a `profile` key that exists in another repository but not in your runtime package, or pan/tilt calibration that is physically wrong.
 
-## 12. CLI validation
+## 13. CLI validation
 
 Use `bbb-dmx-lint` from `tools/bbb-dmx-convert` to validate files generated outside Max:
 

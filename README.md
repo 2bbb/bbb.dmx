@@ -199,7 +199,7 @@ bang              // recomputes the last target, or outputs neutral center befor
 ## `bbb.dmx.fixturemap`
 
 ```max
-[bbb.dmx.fixturemap @patch patches/example.json @universe 1 @autobang 1]
+[bbb.dmx.fixturemap @setup setups/example.json @patch patches/example.json @universe 1 @autobang 1]
 ```
 
 The left outlet outputs a 512-integer list for the selected universe: DMX channel 1 first, channel 512 last. The right outlet outputs status/error messages such as load failures and `dump` status. Fixture profiles live in `fixtures/`; show patch files live in `patches/`. Profile paths inside patch JSON are resolved relative to the patch file. Patch paths passed to `read` or `@patch` are resolved through Max's file/path system, so patcher-relative paths work when the patcher is saved.
@@ -208,6 +208,7 @@ The left outlet outputs a 512-integer list for the selected universe: DMX channe
 
 Attributes:
 
+- `@setup` — optional `bbb.dmx.setup.v1` JSON path. Loaded after object initialization and by `readsetup`; paths inside setup are relative to the setup file, and explicit object attributes override setup values.
 - `@patch` — patch JSON path. Loaded after object initialization and when the attribute changes; use `patch path.json`/attrui for deferred attribute loading or `read path.json` for immediate explicit loading.
 - `@groups` — optional `bbb.dmx.groups.v1` JSON path. Groups are fixture id arrays with optional nested group references and `fixture_pattern` ranges, loaded by `readgroups` and validated against the patch.
 - `@universe` — selected universe, starting at `1`.
@@ -282,7 +283,7 @@ Semantic shutter messages solve the shutter/strobe naming mess: `shutter fixture
 ## `bbb.dmx.matrixmap`
 
 ```max
-[bbb.dmx.matrixmap @patch patches/rgb-grid.example.json @map maps/rgb-grid.example.json @universe_mode all]
+[bbb.dmx.matrixmap @setup setups/example.json @patch patches/rgb-grid.example.json @map maps/rgb-grid.example.json @universe_mode all]
 ```
 
 `matrixmap` reads a `char` or `float32` `jit.matrix`, samples colors at normalized positions, writes normalized values into fixture parameters (`u8`, `u16`, or `u24`), and outputs explicit multi-universe frames:
@@ -294,9 +295,12 @@ universe 2 <512 values>
 
 It does not send Art-Net. Treat it as a fixture-aware matrix-to-DMX translator before `merge` / `fade` / `safety` / sender.
 
+`@setup` / `readsetup` use `bbb.dmx.setup.v1`, shared with `fixturemap`. Do not overload `@config` for this: it already has object-specific semantics elsewhere in the package.
+
 Messages:
 
 ```max
+readsetup setups/example.json
 readpatch patches/rgb-grid.example.json
 readmap maps/rgb-grid.example.json
 jit_matrix mymatrix

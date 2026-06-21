@@ -1,0 +1,23 @@
+{
+  "schema": "bbb.dmx.setup.v1",
+  "patch": "../patches/rgb-grid.example.json",
+  "universe_mode": "all",
+  "color_use_white": false,
+  "color_wheel_fallback": true,
+  "fixturemap": {
+    "universe": 1,
+    "tracking_mode": "smart",
+    "default_pan_range": 540,
+    "default_tilt_range": 270,
+    "track_strict": true
+  },
+  "matrixmap": {
+    "map": "../maps/rgb-grid.example.json",
+    "plane_order": "rgba",
+    "gamma": 1,
+    "brightness": 1,
+    "autobang": true,
+    "invert_x": false,
+    "invert_y": false
+  }
+}

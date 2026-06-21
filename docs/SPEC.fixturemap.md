@@ -276,6 +276,7 @@ Attributes implemented today:
 
 | Attribute | Type | Default | Description |
 |---|---|---:|---|
+| `@setup` | symbol/string | empty | Optional `bbb.dmx.setup.v1` path. Loaded on initialization and by `readsetup`; explicit object attributes override setup values. |
 | `@patch` | symbol/string | empty | Patch JSON path. Loaded on initialization and by `read`. |
 | `@groups` / `@group` | symbol/string | empty | Optional groups JSON path. Loaded on initialization and by `readgroups`. `@group` is a singular alias for Max patch readability. |
 | `@semantic_overrides` | symbol/string | empty | Optional semantic overrides JSON path. Loaded on initialization and by `readoverrides`; affects parameter aliases plus semantic color/intensity behavior. |
@@ -299,6 +300,7 @@ Outlets:
 #### Load / inspect
 
 ```max
+readsetup setups/show.json
 read patches/show.json
 readgroups groups/show.groups.json
 readoverrides fixtures/show.semantic-overrides.json
