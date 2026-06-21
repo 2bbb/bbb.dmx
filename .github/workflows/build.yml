@@ -134,6 +134,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
+          cache: npm
+
+      - name: Install validation tools
+        run: npm ci
 
       - name: Validate package JSON files against schemas
         run: scripts/validate-json-schemas.sh

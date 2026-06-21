@@ -1,0 +1,13 @@
+{
+  "name": "bbb-dmx-package-tools",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Development validation tooling for bbb.dmx Max package assets.",
+  "scripts": {
+    "validate:json": "scripts/validate-json-schemas.sh",
+    "validate:maxref": "scripts/validate-maxref-xml.sh"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0"
+  }
+}

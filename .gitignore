@@ -3,3 +3,5 @@ build-*/
 externals/
 .DS_Store
 build-external/
+
+node_modules/
