@@ -25,6 +25,7 @@ private:
     bbb::dmx::fixture_group_set groups_{};
     std::string semantic_overrides_path_value_{};
     bbb::dmx::fixture_semantic_overrides semantic_overrides_{};
+    std::map<std::string, std::size_t> fixture_indices_{};
     int universe_value_{1};
     bool autobang_value_{true};
     bool output_all_universes_{false};
@@ -465,6 +466,7 @@ public:
     c74::min::message<> clear_message{this, "clear", "Clear all loaded profiles, patch data, and universe buffers.",
         MIN_FUNCTION {
             mapper_.clear();
+            fixture_indices_.clear();
             groups_ = bbb::dmx::fixture_group_set{};
             groups_loaded_ = false;
             groups_validated_ = false;
@@ -1297,6 +1299,7 @@ private:
             return;
         }
         mapper_ = loaded_mapper;
+        rebuild_fixture_indices();
         tracking_engines_.clear();
         groups_validated_ = false;
         if(groups_loaded_) {
@@ -1865,12 +1868,26 @@ private:
     }
 
     const bbb::dmx::fixture_instance *find_fixture_instance(const std::string &fixture_id) const {
+        const auto indexed_fixture = fixture_indices_.find(fixture_id);
+        if(indexed_fixture != fixture_indices_.end() && indexed_fixture->second < mapper_.patch().fixtures.size()) {
+            const bbb::dmx::fixture_instance &fixture{mapper_.patch().fixtures[indexed_fixture->second]};
+            if(fixture.id == fixture_id) {
+                return &fixture;
+            }
+        }
         for(const auto &fixture : mapper_.patch().fixtures) {
             if(fixture.id == fixture_id) {
                 return &fixture;
             }
         }
         return nullptr;
+    }
+
+    void rebuild_fixture_indices() {
+        fixture_indices_.clear();
+        for(std::size_t fixture_index{0}; fixture_index < mapper_.patch().fixtures.size(); fixture_index++) {
+            fixture_indices_[mapper_.patch().fixtures[fixture_index].id] = fixture_index;
+        }
     }
 
     const bbb::dmx::fixture_semantic_mode_override *semantic_override_for_fixture(const bbb::dmx::fixture_instance &fixture) const {
