@@ -41,6 +41,11 @@ add_executable(bbb_dmx_common_tests
 target_link_libraries(bbb_dmx_common_tests PRIVATE bbb_dmx_common)
 add_test(NAME bbb_dmx_common_tests COMMAND bbb_dmx_common_tests)
 
+add_executable(bbb_dmx_perf_smoke
+    tests/bbb_dmx_perf_smoke.cpp
+)
+target_link_libraries(bbb_dmx_perf_smoke PRIVATE bbb_dmx_common)
+
 set(BBB_DMX_EXTERNALS_DEFAULT OFF)
 if(DEFINED C74_MIN_API_DIR OR EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/min-api")
     set(BBB_DMX_EXTERNALS_DEFAULT ON)
