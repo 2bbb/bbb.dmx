@@ -125,7 +125,8 @@ int main() {
     const auto end = std::chrono::steady_clock::now();
     const auto elapsed_microseconds = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
     const std::uint64_t checksum{checksum_mapper(mapper)};
-    require(checksum != 0, "checksum non-zero");
+    constexpr std::uint64_t expected_checksum{13398139248665761861ull};
+    require(checksum == expected_checksum, "fixture mapper performance smoke checksum");
 
     std::cout << "bbb_dmx_perf_smoke fixture_mapper_set_normalized fixtures=" << fixture_count
               << " iterations=" << iterations

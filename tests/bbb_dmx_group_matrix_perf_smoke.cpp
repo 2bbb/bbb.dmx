@@ -126,8 +126,14 @@ bbb::dmx::fixture_group_set make_groups(int group_size) {
 
 std::uint64_t checksum_ids(const std::vector<std::string> &fixture_ids, int iteration) {
     std::uint64_t checksum{1469598103934665603ull};
+    checksum ^= (std::uint64_t)fixture_ids.size();
+    checksum *= 1099511628211ull;
     for(const std::string &fixture_id : fixture_ids) {
-        checksum ^= (std::uint64_t)(fixture_id.size() * 257 + iteration * 17);
+        for(const char character : fixture_id) {
+            checksum ^= (std::uint64_t)(unsigned char)character;
+            checksum *= 1099511628211ull;
+        }
+        checksum ^= (std::uint64_t)iteration * 17;
         checksum *= 1099511628211ull;
     }
     return checksum;
@@ -184,8 +190,12 @@ run_result run_raw_mapper(int fixture_count, int group_size, int iterations) {
             require(mapper.set_pan_tilt_bytes(fixture_id, (pan >> 8) & 255, pan & 255, (tilt >> 8) & 255, tilt & 255).ok, "set pan tilt bytes");
             std::vector<std::pair<int, int>> addresses{};
             require(mapper.parameter_channel_addresses(fixture_id, "pan", addresses).ok, "pan addresses");
+            require(addresses.size() == 2, "pan address count");
             int value{0};
             require(mapper.current_raw_value(fixture_id, "pan", value).ok, "pan current raw");
+            require(value == pan, "pan current raw matches written value");
+            require(mapper.current_raw_value(fixture_id, "tilt", value).ok, "tilt current raw");
+            require(value == tilt, "tilt current raw matches written value");
             checksum ^= (std::uint64_t)(value + addresses.size() * 257 + fixture_index * 17);
             checksum *= 1099511628211ull;
         }
@@ -206,7 +216,9 @@ int main() {
     require(uncached_group.checksum == cached_group.checksum, "group checksums match");
 
     const run_result raw_mapper{run_raw_mapper(fixture_count, group_size, iterations / 4)};
-    require(raw_mapper.checksum != 0, "raw mapper checksum non-zero");
+    constexpr std::uint64_t expected_checksum{13771189737396447034ull};
+    const std::uint64_t checksum{cached_group.checksum ^ raw_mapper.checksum};
+    require(checksum == expected_checksum, "group/matrix performance smoke checksum");
 
     std::cout << "bbb_dmx_group_matrix_perf_smoke fixtures=" << fixture_count
               << " group_size=" << group_size
@@ -214,7 +226,7 @@ int main() {
               << " uncached_group_elapsed_us=" << uncached_group.elapsed_microseconds
               << " cached_group_elapsed_us=" << cached_group.elapsed_microseconds
               << " raw_mapper_elapsed_us=" << raw_mapper.elapsed_microseconds
-              << " checksum=" << (cached_group.checksum ^ raw_mapper.checksum)
+              << " checksum=" << checksum
               << std::endl;
     return 0;
 }

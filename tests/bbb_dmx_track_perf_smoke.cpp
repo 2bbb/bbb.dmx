@@ -447,7 +447,8 @@ int main() {
     const run_result full_snapshot{run_tracking(true, fixture_count, group_size, iterations)};
     const run_result touched_snapshot{run_tracking(false, fixture_count, group_size, iterations)};
     require(full_snapshot.checksum == touched_snapshot.checksum, "full and touched tracking checksums match");
-    require(full_snapshot.checksum != 0, "checksum non-zero");
+    constexpr std::uint64_t expected_checksum{8463366930703447533ull};
+    require(full_snapshot.checksum == expected_checksum, "tracking performance smoke checksum");
 
     std::cout << "bbb_dmx_track_perf_smoke fixtures=" << fixture_count
               << " group_size=" << group_size
