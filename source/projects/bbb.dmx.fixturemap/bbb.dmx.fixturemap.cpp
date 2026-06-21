@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,12 @@ private:
         double tilt_range{0.0};
     };
 
+    struct tracking_engine_state {
+        std::string fixture_id{};
+        bool existed{false};
+        bbb::dmx::movertrack_engine engine{};
+    };
+
     bbb::dmx::fixture_mapper mapper_{};
     std::string setup_path_value_{};
     std::string patch_path_value_{};
@@ -34,6 +41,8 @@ private:
     std::string semantic_overrides_path_value_{};
     bbb::dmx::fixture_semantic_overrides semantic_overrides_{};
     std::map<std::string, std::size_t> fixture_indices_{};
+    std::map<std::string, std::vector<std::string>> group_fixture_ids_cache_{};
+    mutable std::map<std::pair<std::string, std::string>, std::string> parameter_alias_cache_{};
     std::map<std::string, track_fixture_config> track_fixture_configs_{};
     int universe_value_{1};
     bool autobang_value_{true};
@@ -478,6 +487,8 @@ public:
         MIN_FUNCTION {
             mapper_.clear();
             fixture_indices_.clear();
+            group_fixture_ids_cache_.clear();
+            parameter_alias_cache_.clear();
             track_fixture_configs_.clear();
             groups_ = bbb::dmx::fixture_group_set{};
             groups_loaded_ = false;
@@ -954,27 +965,35 @@ public:
 
     c74::min::message<> trackgroup_message{this, "trackgroup", "trackgroup group_id target_x target_y target_z OR trackgroup group_id x [values] x_values... y [values] y_values... z [values] z_values...",
         MIN_FUNCTION {
-            const auto previous_universes = mapper_.universe_snapshot();
-            const auto previous_tracking_engines = tracking_engines_;
+            std::vector<std::string> fixture_ids{};
             bbb::dmx::mapper_result result{bbb::dmx::mapper_result::failure("trackgroup requires group_id target_x target_y target_z")};
-            if(args.size() == 4 && finite_atoms(args, 1, 3)) {
-                result = track_group(
-                    symbol_arg(args[0]),
-                    bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]},
-                    false
-                );
-            } else if(2 <= args.size() && !finite_atom(args[1])) {
-                group_axis_values axes{};
-                result = parse_group_axis_values(args, 1, "trackgroup", axes);
-                if(result.ok) {
-                    result = track_group(symbol_arg(args[0]), axes, false);
+            if(!args.empty()) {
+                result = resolve_group_fixture_ids(symbol_arg(args[0]), fixture_ids);
+            }
+            bool keyed_mode{false};
+            bbb::dmx::vec3 target{};
+            group_axis_values axes{};
+            if(result.ok) {
+                if(args.size() == 4 && finite_atoms(args, 1, 3)) {
+                    target = bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]};
+                } else if(2 <= args.size() && !finite_atom(args[1])) {
+                    keyed_mode = true;
+                    result = parse_group_axis_values(args, 1, "trackgroup", axes);
+                } else {
+                    result = bbb::dmx::mapper_result::failure("trackgroup requires either group_id target_x target_y target_z or group_id x [values] ... y [values] ... z [values] ...");
                 }
-            } else {
-                result = bbb::dmx::mapper_result::failure("trackgroup requires either group_id target_x target_y target_z or group_id x [values] ... y [values] ... z [values] ...");
             }
             if(!handle_result(result)) {
+                return {};
+            }
+            const auto previous_universes = mapper_.universe_snapshot();
+            const std::vector<tracking_engine_state> previous_tracking_engines{snapshot_tracking_engines(fixture_ids)};
+            result = keyed_mode
+                ? track_fixture_ids(fixture_ids, axes, false, "trackgroup")
+                : track_fixture_ids(fixture_ids, target, false, "trackgroup");
+            if(!handle_result(result)) {
                 mapper_.restore_universes(previous_universes);
-                tracking_engines_ = previous_tracking_engines;
+                restore_tracking_engines(previous_tracking_engines);
                 return {};
             }
             output_if_autobang();
@@ -1006,27 +1025,35 @@ public:
 
     c74::min::message<> trackgrouprel_message{this, "trackgrouprel", "trackgrouprel group_id rel_x rel_y rel_z OR trackgrouprel group_id x [values] x_values... y [values] y_values... z [values] z_values...",
         MIN_FUNCTION {
-            const auto previous_universes = mapper_.universe_snapshot();
-            const auto previous_tracking_engines = tracking_engines_;
+            std::vector<std::string> fixture_ids{};
             bbb::dmx::mapper_result result{bbb::dmx::mapper_result::failure("trackgrouprel requires group_id rel_x rel_y rel_z")};
-            if(args.size() == 4 && finite_atoms(args, 1, 3)) {
-                result = track_group(
-                    symbol_arg(args[0]),
-                    bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]},
-                    true
-                );
-            } else if(2 <= args.size() && !finite_atom(args[1])) {
-                group_axis_values axes{};
-                result = parse_group_axis_values(args, 1, "trackgrouprel", axes);
-                if(result.ok) {
-                    result = track_group(symbol_arg(args[0]), axes, true);
+            if(!args.empty()) {
+                result = resolve_group_fixture_ids(symbol_arg(args[0]), fixture_ids);
+            }
+            bool keyed_mode{false};
+            bbb::dmx::vec3 target{};
+            group_axis_values axes{};
+            if(result.ok) {
+                if(args.size() == 4 && finite_atoms(args, 1, 3)) {
+                    target = bbb::dmx::vec3{(double)args[1], (double)args[2], (double)args[3]};
+                } else if(2 <= args.size() && !finite_atom(args[1])) {
+                    keyed_mode = true;
+                    result = parse_group_axis_values(args, 1, "trackgrouprel", axes);
+                } else {
+                    result = bbb::dmx::mapper_result::failure("trackgrouprel requires either group_id rel_x rel_y rel_z or group_id x [values] ... y [values] ... z [values] ...");
                 }
-            } else {
-                result = bbb::dmx::mapper_result::failure("trackgrouprel requires either group_id rel_x rel_y rel_z or group_id x [values] ... y [values] ... z [values] ...");
             }
             if(!handle_result(result)) {
+                return {};
+            }
+            const auto previous_universes = mapper_.universe_snapshot();
+            const std::vector<tracking_engine_state> previous_tracking_engines{snapshot_tracking_engines(fixture_ids)};
+            result = keyed_mode
+                ? track_fixture_ids(fixture_ids, axes, true, "trackgrouprel")
+                : track_fixture_ids(fixture_ids, target, true, "trackgrouprel");
+            if(!handle_result(result)) {
                 mapper_.restore_universes(previous_universes);
-                tracking_engines_ = previous_tracking_engines;
+                restore_tracking_engines(previous_tracking_engines);
                 return {};
             }
             output_if_autobang();
@@ -1301,6 +1328,7 @@ private:
         groups_ = bbb::dmx::fixture_group_set{};
         groups_loaded_ = false;
         groups_validated_ = false;
+        group_fixture_ids_cache_.clear();
     }
 
     void load_patch_file(const std::string &path) {
@@ -1312,6 +1340,8 @@ private:
         }
         mapper_ = loaded_mapper;
         rebuild_fixture_indices();
+        group_fixture_ids_cache_.clear();
+        parameter_alias_cache_.clear();
         track_fixture_configs_.clear();
         tracking_engines_.clear();
         groups_validated_ = false;
@@ -1348,6 +1378,7 @@ private:
         groups_ = loaded_groups;
         groups_loaded_ = true;
         groups_validated_ = !mapper_.patch().fixtures.empty();
+        group_fixture_ids_cache_.clear();
         report_status("groups_loaded");
     }
 
@@ -1361,6 +1392,7 @@ private:
         semantic_overrides_ = loaded_overrides;
         semantic_overrides_loaded_ = true;
         semantic_overrides_validated_ = false;
+        parameter_alias_cache_.clear();
         if(!mapper_.patch().fixtures.empty()) {
             const bbb::dmx::mapper_result validate_result{validate_loaded_semantic_overrides()};
             if(!handle_result(validate_result)) {
@@ -1706,6 +1738,7 @@ private:
     }
 
     bbb::dmx::mapper_result resolve_group_fixture_ids(const std::string &group_id, std::vector<std::string> &fixture_ids) {
+        fixture_ids.clear();
         if(mapper_.patch().fixtures.empty()) {
             return bbb::dmx::mapper_result::failure("group operation requires a loaded patch with fixtures");
         }
@@ -1715,10 +1748,20 @@ private:
         if(!groups_validated_) {
             const bbb::dmx::mapper_result validate_result{validate_loaded_groups()};
             if(!validate_result.ok) {
+                group_fixture_ids_cache_.clear();
                 return validate_result;
             }
         }
-        return bbb::dmx::resolve_fixture_group_fixture_ids(groups_, mapper_.patch(), group_id, fixture_ids);
+        const auto cached_group = group_fixture_ids_cache_.find(group_id);
+        if(cached_group != group_fixture_ids_cache_.end()) {
+            fixture_ids = cached_group->second;
+            return bbb::dmx::mapper_result::success();
+        }
+        bbb::dmx::mapper_result result{bbb::dmx::resolve_fixture_group_fixture_ids(groups_, mapper_.patch(), group_id, fixture_ids)};
+        if(result.ok) {
+            group_fixture_ids_cache_[group_id] = fixture_ids;
+        }
+        return result;
     }
 
     bbb::dmx::mapper_result apply_semantic_color_group(const std::string &group_id, const bbb::dmx::semantic_color_request &color) {
@@ -1911,15 +1954,24 @@ private:
     }
 
     std::string resolve_parameter_alias(const std::string &fixture_id, const std::string &parameter_key) const {
+        const std::pair<std::string, std::string> cache_key{fixture_id, parameter_key};
+        const auto cached_alias = parameter_alias_cache_.find(cache_key);
+        if(cached_alias != parameter_alias_cache_.end()) {
+            return cached_alias->second;
+        }
         const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
         if(!fixture) {
+            parameter_alias_cache_[cache_key] = parameter_key;
             return parameter_key;
         }
         const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_override_for_fixture(*fixture)};
         if(!mode_override) {
+            parameter_alias_cache_[cache_key] = parameter_key;
             return parameter_key;
         }
-        return mode_override->resolve_alias(parameter_key);
+        const std::string resolved_alias{mode_override->resolve_alias(parameter_key)};
+        parameter_alias_cache_[cache_key] = resolved_alias;
+        return resolved_alias;
     }
 
     bbb::dmx::mapper_result track_config_for_fixture(const bbb::dmx::fixture_instance &fixture, track_fixture_config &config) {
@@ -1992,6 +2044,35 @@ private:
             return bbb::dmx::movertrack_engine{};
         }
         return found->second;
+    }
+
+
+    std::vector<tracking_engine_state> snapshot_tracking_engines(const std::vector<std::string> &fixture_ids) const {
+        std::vector<tracking_engine_state> states{};
+        states.reserve(fixture_ids.size());
+        std::set<std::string> captured_fixture_ids{};
+        for(const std::string &fixture_id : fixture_ids) {
+            if(!captured_fixture_ids.insert(fixture_id).second) {
+                continue;
+            }
+            const auto found = tracking_engines_.find(fixture_id);
+            if(found == tracking_engines_.end()) {
+                states.push_back(tracking_engine_state{fixture_id, false, bbb::dmx::movertrack_engine{}});
+            } else {
+                states.push_back(tracking_engine_state{fixture_id, true, found->second});
+            }
+        }
+        return states;
+    }
+
+    void restore_tracking_engines(const std::vector<tracking_engine_state> &states) {
+        for(const tracking_engine_state &state : states) {
+            if(state.existed) {
+                tracking_engines_[state.fixture_id] = state.engine;
+            } else {
+                tracking_engines_.erase(state.fixture_id);
+            }
+        }
     }
 
     bbb::dmx::mapper_result apply_tracking_output(const std::string &fixture_id, const bbb::dmx::movertrack_output &output, bool ignore_unknown_parameters) {
@@ -2180,6 +2261,40 @@ private:
             return result;
         }
         tracking_engines_[fixture_id] = trial_engine;
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result track_fixture_ids(const std::vector<std::string> &fixture_ids, const bbb::dmx::vec3 &target, bool relative, const std::string &operation_name) {
+        if(fixture_ids.empty()) {
+            return bbb::dmx::mapper_result::failure(operation_name + " requires a non-empty group");
+        }
+        const bool ignore_non_movers{!track_strict_value_};
+        for(const std::string &fixture_id : fixture_ids) {
+            const bbb::dmx::mapper_result result{track_fixture(fixture_id, target, relative, ignore_non_movers)};
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure(operation_name + " fixture " + fixture_id + ": " + result.message);
+            }
+        }
+        return bbb::dmx::mapper_result::success();
+    }
+
+    bbb::dmx::mapper_result track_fixture_ids(const std::vector<std::string> &fixture_ids, const group_axis_values &axes, bool relative, const std::string &operation_name) {
+        if(fixture_ids.empty()) {
+            return bbb::dmx::mapper_result::failure(operation_name + " requires a non-empty group");
+        }
+        const bool ignore_non_movers{!track_strict_value_};
+        const std::size_t fixture_count{fixture_ids.size()};
+        for(std::size_t fixture_index{0}; fixture_index < fixture_count; fixture_index++) {
+            const bbb::dmx::vec3 target{
+                distributed_value(axes.x, fixture_index, fixture_count),
+                distributed_value(axes.y, fixture_index, fixture_count),
+                distributed_value(axes.z, fixture_index, fixture_count)
+            };
+            const bbb::dmx::mapper_result result{track_fixture(fixture_ids[fixture_index], target, relative, ignore_non_movers)};
+            if(!result.ok) {
+                return bbb::dmx::mapper_result::failure(operation_name + " fixture " + fixture_ids[fixture_index] + ": " + result.message);
+            }
+        }
         return bbb::dmx::mapper_result::success();
     }
 

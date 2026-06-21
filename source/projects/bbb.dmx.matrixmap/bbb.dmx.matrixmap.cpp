@@ -17,6 +17,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <vector>
 
 using bbb::dmx::matrixmap::clamp_normalized;
 using bbb::dmx::matrixmap::color_source_value;
@@ -42,6 +43,9 @@ private:
     matrix_map_config matrix_map_{};
     bbb::dmx::fixture_group_set groups_{};
     bbb::dmx::fixture_semantic_overrides semantic_overrides_{};
+    std::map<std::string, std::size_t> fixture_indices_{};
+    std::map<std::string, std::vector<std::string>> group_fixture_ids_cache_{};
+    mutable std::map<std::pair<std::string, std::string>, std::string> parameter_alias_cache_{};
     std::string setup_path_value_{};
     std::string patch_path_value_{};
     std::string map_path_value_{};
@@ -710,7 +714,10 @@ private:
             return;
         }
         mapper_ = loaded_mapper;
+        rebuild_fixture_indices();
         patch_loaded_ = true;
+        group_fixture_ids_cache_.clear();
+        parameter_alias_cache_.clear();
         previous_output_.clear();
         owned_output_channels_.clear();
         pending_output_channels_.clear();
@@ -797,6 +804,7 @@ private:
         groups_ = bbb::dmx::fixture_group_set{};
         groups_loaded_ = false;
         groups_validated_ = false;
+        group_fixture_ids_cache_.clear();
     }
 
     void load_groups(const std::string &path) {
@@ -812,6 +820,7 @@ private:
         groups_ = loaded_groups;
         groups_loaded_ = true;
         groups_validated_ = false;
+        group_fixture_ids_cache_.clear();
         if(patch_loaded_) {
             const bbb::dmx::mapper_result validate_result{validate_loaded_groups()};
             if(!validate_result.ok) {
@@ -835,6 +844,7 @@ private:
         semantic_overrides_ = loaded_overrides;
         semantic_overrides_loaded_ = true;
         semantic_overrides_validated_ = false;
+        parameter_alias_cache_.clear();
         if(patch_loaded_) {
             const bbb::dmx::mapper_result validate_result{validate_loaded_semantic_overrides()};
             if(!validate_result.ok) {
@@ -1001,10 +1011,20 @@ private:
         if(!groups_validated_) {
             const bbb::dmx::mapper_result validate_result{validate_loaded_groups()};
             if(!validate_result.ok) {
+                group_fixture_ids_cache_.clear();
                 return validate_result;
             }
         }
-        return bbb::dmx::resolve_fixture_group_fixture_ids(groups_, mapper_.patch(), mapping.group_id, fixture_ids);
+        const auto cached_group = group_fixture_ids_cache_.find(mapping.group_id);
+        if(cached_group != group_fixture_ids_cache_.end()) {
+            fixture_ids = cached_group->second;
+            return bbb::dmx::mapper_result::success();
+        }
+        bbb::dmx::mapper_result result{bbb::dmx::resolve_fixture_group_fixture_ids(groups_, mapper_.patch(), mapping.group_id, fixture_ids)};
+        if(result.ok) {
+            group_fixture_ids_cache_[mapping.group_id] = fixture_ids;
+        }
+        return result;
     }
 
     bbb::dmx::mapper_result apply_matrix_mapping_to_fixture(const std::string &fixture_id, const fixture_mapping &mapping, const color_value &sampled) {
@@ -1126,12 +1146,26 @@ private:
     }
 
     const bbb::dmx::fixture_instance *find_fixture_instance(const std::string &fixture_id) const {
+        const auto indexed_fixture = fixture_indices_.find(fixture_id);
+        if(indexed_fixture != fixture_indices_.end() && indexed_fixture->second < mapper_.patch().fixtures.size()) {
+            const bbb::dmx::fixture_instance &fixture{mapper_.patch().fixtures[indexed_fixture->second]};
+            if(fixture.id == fixture_id) {
+                return &fixture;
+            }
+        }
         for(const auto &fixture : mapper_.patch().fixtures) {
             if(fixture.id == fixture_id) {
                 return &fixture;
             }
         }
         return nullptr;
+    }
+
+    void rebuild_fixture_indices() {
+        fixture_indices_.clear();
+        for(std::size_t fixture_index{0}; fixture_index < mapper_.patch().fixtures.size(); fixture_index++) {
+            fixture_indices_[mapper_.patch().fixtures[fixture_index].id] = fixture_index;
+        }
     }
 
     const bbb::dmx::fixture_semantic_mode_override *semantic_override_for_fixture(const bbb::dmx::fixture_instance &fixture) const {
@@ -1142,15 +1176,24 @@ private:
     }
 
     std::string resolve_parameter_alias(const std::string &fixture_id, const std::string &parameter_key) const {
+        const std::pair<std::string, std::string> cache_key{fixture_id, parameter_key};
+        const auto cached_alias = parameter_alias_cache_.find(cache_key);
+        if(cached_alias != parameter_alias_cache_.end()) {
+            return cached_alias->second;
+        }
         const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
         if(!fixture) {
+            parameter_alias_cache_[cache_key] = parameter_key;
             return parameter_key;
         }
         const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_override_for_fixture(*fixture)};
         if(!mode_override) {
+            parameter_alias_cache_[cache_key] = parameter_key;
             return parameter_key;
         }
-        return mode_override->resolve_alias(parameter_key);
+        const std::string resolved_alias{mode_override->resolve_alias(parameter_key)};
+        parameter_alias_cache_[cache_key] = resolved_alias;
+        return resolved_alias;
     }
 
     std::vector<std::pair<std::string, int>> current_color_wheel_parameter_values(const std::string &fixture_id, const bbb::dmx::fixture_mode &mode) const {
