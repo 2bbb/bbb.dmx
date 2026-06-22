@@ -680,6 +680,7 @@ int main() {
         "patch": "patch-from-mvr.json",
         "groups": "groups/show.groups.json",
         "semantic_overrides": "semantic_overrides.json",
+        "config": "masks/common.json",
         "universe": 3,
         "universe_mode": "all",
         "color_wheel_fallback": true,
@@ -693,6 +694,10 @@ int main() {
             "plane_order": "bgra",
             "gamma": 2.2,
             "invert_x": true
+        },
+        "mask": {
+            "config": "masks/show.mask.json",
+            "autobang": false
         }
     })json", setup_document);
     require(map_result.ok, "setup JSON parses");
@@ -709,6 +714,10 @@ int main() {
     require(matrixmap_setup.plane_order.has_value() && matrixmap_setup.plane_order.value() == "bgra", "setup matrixmap plane order parses");
     require(matrixmap_setup.gamma.has_value() && nearly_equal(matrixmap_setup.gamma.value(), 2.2), "setup matrixmap gamma parses");
     require(matrixmap_setup.invert_x.has_value() && matrixmap_setup.invert_x.value(), "setup matrixmap invert_x parses");
+    const bbb::dmx::dmx_setup_values mask_setup{bbb::dmx::merge_setup_values(setup_document.common, setup_document.mask)};
+    require(mask_setup.config.has_value() && mask_setup.config.value() == "masks/show.mask.json", "setup mask section overrides common config");
+    require(mask_setup.patch.has_value() && mask_setup.patch.value() == "patch-from-mvr.json", "setup mask inherits common patch");
+    require(mask_setup.autobang.has_value() && !mask_setup.autobang.value(), "setup mask autobang parses");
     map_result = bbb::dmx::parse_dmx_setup_text(R"json({
         "schema": "bbb.dmx.setup.v1",
         "fixturemap": { "patchh": "typo.json" }

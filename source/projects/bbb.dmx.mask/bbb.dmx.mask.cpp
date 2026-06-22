@@ -10,6 +10,7 @@
 #include <bbb/dmx/max_external_utils.hpp>
 #include <bbb/dmx/semantic_overrides.hpp>
 #include <bbb/dmx/shutter_mapping.hpp>
+#include <bbb/dmx/setup.hpp>
 
 #include <algorithm>
 #include <map>
@@ -27,18 +28,34 @@ private:
     std::map<std::string, std::size_t> fixture_indices_{};
     std::map<std::string, std::vector<std::string>> group_fixture_ids_cache_{};
     mutable std::map<std::pair<std::string, std::string>, std::string> parameter_alias_cache_{};
+    std::string setup_path_value_{};
     std::string config_path_value_{};
     std::string patch_path_value_{};
     std::string groups_path_value_{};
     std::string semantic_overrides_path_value_{};
     int universe_value_{1};
     bool autobang_value_{true};
+    bool setup_load_pending_{false};
+    bool setup_loaded_{false};
     bool patch_load_pending_{false};
     bool groups_load_pending_{false};
     bool semantic_overrides_load_pending_{false};
     bool groups_loaded_{false};
     bool groups_validated_{false};
     bool semantic_overrides_loaded_{false};
+    bool applying_setup_{false};
+    bool suppress_setup_attribute_load_{false};
+    bool suppress_config_attribute_load_{false};
+    bool suppress_patch_attribute_load_{false};
+    bool suppress_groups_attribute_load_{false};
+    bool suppress_group_attribute_load_{false};
+    bool suppress_semantic_overrides_attribute_load_{false};
+    bool config_attribute_overridden_{false};
+    bool patch_attribute_overridden_{false};
+    bool groups_attribute_overridden_{false};
+    bool semantic_overrides_attribute_overridden_{false};
+    bool universe_attribute_overridden_{false};
+    bool autobang_attribute_overridden_{false};
 
 public:
     MIN_DESCRIPTION{"Mute, hold, allow, or force channel ranges in multi-universe DMX frames."};
@@ -46,7 +63,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.curve, bbb.dmx.safety, bbb.dmx.merge"};
 
-    c74::min::inlet<> input{this, "(list/universe/channel/channels/read/readpatch/readgroups/readoverrides/mute/hold/allow/force/*group/bang) DMX mask input"};
+    c74::min::inlet<> input{this, "(list/universe/channel/channels/readsetup/read/readpatch/readgroups/readoverrides/mute/hold/allow/force/*group/bang) DMX mask input"};
     c74::min::outlet<> output{this, "(anything) masked universe data"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -54,6 +71,16 @@ public:
         MIN_FUNCTION {
             if(!config_path_value_.empty()) {
                 load_config(config_path_value_);
+            }
+            return {};
+        }
+    };
+
+    c74::min::timer<c74::min::timer_options::defer_delivery> setup_load_timer{this,
+        MIN_FUNCTION {
+            if(setup_load_pending_ && !setup_path_value_.empty()) {
+                setup_load_pending_ = false;
+                load_setup_file(setup_path_value_);
             }
             return {};
         }
@@ -94,9 +121,32 @@ public:
         init_timer.delay(0);
     }
 
+    c74::min::attribute<c74::min::symbol> setup{this, "setup", "",
+        c74::min::description{"Optional bbb.dmx setup JSON path. Loads mask config, shared paths, and defaults unless explicit object attributes override them."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                if(!applying_setup_ && !suppress_setup_attribute_load_) {
+                    setup_path_value_.clear();
+                    setup_load_pending_ = false;
+                    setup_loaded_ = false;
+                }
+                return {c74::min::symbol("")};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            setup_path_value_ = symbol_value.c_str();
+            if(!suppress_setup_attribute_load_) {
+                schedule_setup_load();
+            }
+            return {symbol_value};
+        }}
+    };
+
     c74::min::attribute<c74::min::symbol> config{this, "config", "",
         c74::min::description{"Mask JSON path."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_ && !suppress_config_attribute_load_) {
+                config_attribute_overridden_ = true;
+            }
             if(args.empty()) {
                 config_path_value_.clear();
                 return {c74::min::symbol("")};
@@ -110,6 +160,9 @@ public:
     c74::min::attribute<c74::min::symbol> patch{this, "patch", "",
         c74::min::description{"Patch JSON file path used for fixture/parameter mask rules."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_ && !suppress_patch_attribute_load_) {
+                patch_attribute_overridden_ = true;
+            }
             if(args.empty()) {
                 patch_path_value_.clear();
                 patch_load_pending_ = false;
@@ -122,7 +175,9 @@ public:
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             patch_path_value_ = symbol_value.c_str();
-            schedule_patch_load();
+            if(!suppress_patch_attribute_load_) {
+                schedule_patch_load();
+            }
             return {symbol_value};
         }}
     };
@@ -130,13 +185,18 @@ public:
     c74::min::attribute<c74::min::symbol> groups{this, "groups", "",
         c74::min::description{"Optional bbb.dmx groups JSON path for *group mask messages."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_ && !suppress_groups_attribute_load_) {
+                groups_attribute_overridden_ = true;
+            }
             if(args.empty()) {
                 clear_groups();
                 return {c74::min::symbol("")};
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             groups_path_value_ = symbol_value.c_str();
-            schedule_groups_load();
+            if(!suppress_groups_attribute_load_) {
+                schedule_groups_load();
+            }
             return {symbol_value};
         }}
     };
@@ -144,13 +204,18 @@ public:
     c74::min::attribute<c74::min::symbol> group{this, "group", "",
         c74::min::description{"Alias for @groups."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_ && !suppress_group_attribute_load_) {
+                groups_attribute_overridden_ = true;
+            }
             if(args.empty()) {
                 clear_groups();
                 return {c74::min::symbol("")};
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             groups_path_value_ = symbol_value.c_str();
-            schedule_groups_load();
+            if(!suppress_group_attribute_load_) {
+                schedule_groups_load();
+            }
             return {symbol_value};
         }}
     };
@@ -158,6 +223,9 @@ public:
     c74::min::attribute<c74::min::symbol> semantic_overrides{this, "semantic_overrides", "",
         c74::min::description{"Optional bbb.dmx semantic overrides JSON path for fixture parameter aliases."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_ && !suppress_semantic_overrides_attribute_load_) {
+                semantic_overrides_attribute_overridden_ = true;
+            }
             if(args.empty()) {
                 semantic_overrides_path_value_.clear();
                 semantic_overrides_load_pending_ = false;
@@ -168,7 +236,9 @@ public:
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             semantic_overrides_path_value_ = symbol_value.c_str();
-            schedule_semantic_overrides_load();
+            if(!suppress_semantic_overrides_attribute_load_) {
+                schedule_semantic_overrides_load();
+            }
             return {symbol_value};
         }}
     };
@@ -176,6 +246,9 @@ public:
     c74::min::attribute<int> universe{this, "universe", 1,
         c74::min::description{"Default universe for bare list input and bang output."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_) {
+                universe_attribute_overridden_ = true;
+            }
             if(args.empty() || !bbb::dmx::maxutil::finite_atom(args[0])) {
                 return {universe_value_};
             }
@@ -187,9 +260,29 @@ public:
     c74::min::attribute<bool> autobang{this, "autobang", true,
         c74::min::description{"Output immediately after input updates."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(!applying_setup_) {
+                autobang_attribute_overridden_ = true;
+            }
             autobang_value_ = args.empty() || ((int)args[0] != 0);
             return {autobang_value_};
         }}
+    };
+
+    c74::min::message<> readsetup_message{this, "readsetup", "readsetup setup_json_path",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("readsetup requires setup JSON path");
+                return {};
+            }
+            const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
+            setup_path_value_ = path_symbol.c_str();
+            suppress_setup_attribute_load_ = true;
+            setup = path_symbol;
+            suppress_setup_attribute_load_ = false;
+            setup_load_pending_ = false;
+            load_setup_file(setup_path_value_);
+            return {};
+        }
     };
 
     c74::min::message<> read_message{this, "read", "read mask_json_path",
@@ -200,7 +293,9 @@ public:
             }
             const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
             config_path_value_ = path_symbol.c_str();
+            suppress_config_attribute_load_ = true;
             config = path_symbol;
+            suppress_config_attribute_load_ = false;
             load_config(config_path_value_);
             return {};
         }
@@ -214,7 +309,9 @@ public:
             }
             const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
             patch_path_value_ = path_symbol.c_str();
+            suppress_patch_attribute_load_ = true;
             patch = path_symbol;
+            suppress_patch_attribute_load_ = false;
             patch_load_pending_ = false;
             load_patch_file(patch_path_value_);
             return {};
@@ -229,7 +326,9 @@ public:
             }
             const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
             groups_path_value_ = path_symbol.c_str();
+            suppress_groups_attribute_load_ = true;
             groups = path_symbol;
+            suppress_groups_attribute_load_ = false;
             groups_load_pending_ = false;
             load_groups_file(groups_path_value_);
             return {};
@@ -244,7 +343,9 @@ public:
             }
             const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
             semantic_overrides_path_value_ = path_symbol.c_str();
+            suppress_semantic_overrides_attribute_load_ = true;
             semantic_overrides = path_symbol;
+            suppress_semantic_overrides_attribute_load_ = false;
             semantic_overrides_load_pending_ = false;
             load_semantic_overrides_file(semantic_overrides_path_value_);
             return {};
@@ -453,6 +554,8 @@ public:
             atoms.push_back(c74::min::symbol("status"));
             atoms.push_back(c74::min::symbol("rules"));
             atoms.push_back((int)rules_.size());
+            atoms.push_back(c74::min::symbol("setup_loaded"));
+            atoms.push_back(setup_loaded_ ? 1 : 0);
             atoms.push_back(c74::min::symbol("patch_loaded"));
             atoms.push_back(mapper_.validated() ? 1 : 0);
             atoms.push_back(c74::min::symbol("groups_loaded"));
@@ -594,6 +697,110 @@ private:
         rules_ = previous_rules;
         report_error(result.message);
         return false;
+    }
+
+    void schedule_setup_load() {
+        if(setup_path_value_.empty()) {
+            setup_load_pending_ = false;
+            return;
+        }
+        setup_load_pending_ = true;
+        setup_load_timer.delay(0);
+    }
+
+    std::string setup_relative_path(const std::string &base_directory, const std::string &path) const {
+        if(path.empty()) {
+            return path;
+        }
+        if(bbb::dmx::path_is_absolute(path)) {
+            const std::string system_path{bbb::dmx::maxutil::max_path_to_system_path(path)};
+            if(!system_path.empty()) {
+                return system_path;
+            }
+            return path;
+        }
+        return bbb::dmx::join_relative_path(base_directory, path);
+    }
+
+    void set_symbol_attribute_from_setup(c74::min::attribute<c74::min::symbol> &attribute, const std::string &value) {
+        applying_setup_ = true;
+        attribute = c74::min::symbol(value.c_str());
+        applying_setup_ = false;
+    }
+
+    void set_int_attribute_from_setup(c74::min::attribute<int> &attribute, int value) {
+        applying_setup_ = true;
+        attribute = value;
+        applying_setup_ = false;
+    }
+
+    void set_bool_attribute_from_setup(c74::min::attribute<bool> &attribute, bool value) {
+        applying_setup_ = true;
+        attribute = value;
+        applying_setup_ = false;
+    }
+
+    void apply_setup_file_path(
+        c74::min::attribute<c74::min::symbol> &attribute,
+        bool &suppress_attribute_load,
+        std::string &path_value,
+        const std::string &resolved_path
+    ) {
+        suppress_attribute_load = true;
+        set_symbol_attribute_from_setup(attribute, resolved_path);
+        suppress_attribute_load = false;
+        path_value = resolved_path;
+    }
+
+    void apply_setup_values(const bbb::dmx::dmx_setup_values &values, const std::string &base_directory) {
+        if(values.universe.has_value() && !universe_attribute_overridden_) {
+            set_int_attribute_from_setup(universe, values.universe.value());
+        }
+        if(values.autobang.has_value() && !autobang_attribute_overridden_) {
+            set_bool_attribute_from_setup(autobang, values.autobang.value());
+        }
+
+        if(values.config.has_value() && !config_attribute_overridden_) {
+            const std::string resolved_path{setup_relative_path(base_directory, values.config.value())};
+            apply_setup_file_path(config, suppress_config_attribute_load_, config_path_value_, resolved_path);
+            load_config(config_path_value_);
+        }
+        if(values.patch.has_value() && !patch_attribute_overridden_) {
+            const std::string resolved_path{setup_relative_path(base_directory, values.patch.value())};
+            apply_setup_file_path(patch, suppress_patch_attribute_load_, patch_path_value_, resolved_path);
+            patch_load_pending_ = false;
+            load_patch_file(patch_path_value_);
+        }
+        if(values.groups.has_value() && !groups_attribute_overridden_) {
+            const std::string resolved_path{setup_relative_path(base_directory, values.groups.value())};
+            apply_setup_file_path(groups, suppress_groups_attribute_load_, groups_path_value_, resolved_path);
+            suppress_group_attribute_load_ = true;
+            set_symbol_attribute_from_setup(group, resolved_path);
+            suppress_group_attribute_load_ = false;
+            groups_load_pending_ = false;
+            load_groups_file(groups_path_value_);
+        }
+        if(values.semantic_overrides.has_value() && !semantic_overrides_attribute_overridden_) {
+            const std::string resolved_path{setup_relative_path(base_directory, values.semantic_overrides.value())};
+            apply_setup_file_path(semantic_overrides, suppress_semantic_overrides_attribute_load_, semantic_overrides_path_value_, resolved_path);
+            semantic_overrides_load_pending_ = false;
+            load_semantic_overrides_file(semantic_overrides_path_value_);
+        }
+    }
+
+    void load_setup_file(const std::string &path) {
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        bbb::dmx::dmx_setup_document setup_document{};
+        const bbb::dmx::mapper_result result{bbb::dmx::read_dmx_setup_file(resolved_path, setup_document)};
+        setup_loaded_ = false;
+        if(!handle_result(result)) {
+            return;
+        }
+        const std::string base_directory{bbb::dmx::parent_directory(resolved_path)};
+        const bbb::dmx::dmx_setup_values values{bbb::dmx::merge_setup_values(setup_document.common, setup_document.mask)};
+        apply_setup_values(values, base_directory);
+        setup_loaded_ = true;
+        report_status("setup_loaded");
     }
 
     void schedule_patch_load() {

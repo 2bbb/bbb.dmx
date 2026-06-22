@@ -630,9 +630,9 @@ Canonical assertion rules should include at least one of `min`, `max`, or `equal
 
 ## 11. Shared setup: `bbb.dmx.setup.v1`
 
-A setup file collects paths and object defaults that are otherwise easy to mistype in Max object boxes. It is loaded by `bbb.dmx.fixturemap` and `bbb.dmx.matrixmap` through `@setup` or `readsetup`. `@config` is intentionally not reused because other bbb.dmx objects already use it for object-specific rule files.
+A setup file collects paths and object defaults that are otherwise easy to mistype in Max object boxes. It is loaded by `bbb.dmx.fixturemap`, `bbb.dmx.matrixmap`, and `bbb.dmx.mask` through `@setup` or `readsetup`. `@setup` is intentionally separate from object-specific file attributes such as `bbb.dmx.mask @config`.
 
-Top-level fields are common defaults. The `fixturemap` and `matrixmap` objects may override those defaults in their own sections. Explicit attributes on the Max object override all setup values. Paths inside setup are resolved relative to the setup file itself, whether the setup file was loaded by absolute path or Max search path.
+Top-level fields are common defaults. The `fixturemap`, `matrixmap`, and `mask` objects may override those defaults in their own sections. Explicit attributes on the Max object override all setup values. Paths inside setup are resolved relative to the setup file itself, whether the setup file was loaded by absolute path or Max search path.
 
 ```json
 {
@@ -648,11 +648,14 @@ Top-level fields are common defaults. The `fixturemap` and `matrixmap` objects m
     "map": "../maps/rgb-grid.example.json",
     "plane_order": "rgba",
     "gamma": 1.0
+  },
+  "mask": {
+    "config": "../masks/example.json"
   }
 }
 ```
 
-Supported path fields: `patch`, `map`, `groups`/`group`, and `semantic_overrides`. Supported scalar fields mirror existing object attributes: `universe`, `universe_mode`, `autobang`, fixture tracking fields, color semantic fields, matrix plane/gamma/brightness/invert fields. Unknown fields are rejected.
+Supported path fields: `config`, `patch`, `map`, `groups`/`group`, and `semantic_overrides`. `config` is currently consumed by `bbb.dmx.mask` as its mask rules path. Supported scalar fields mirror existing object attributes: `universe`, `universe_mode`, `autobang`, fixture tracking fields, color semantic fields, matrix plane/gamma/brightness/invert fields. Unknown fields are rejected.
 
 ## 12. Validation workflow for external applications
 

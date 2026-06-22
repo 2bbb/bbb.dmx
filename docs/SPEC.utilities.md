@@ -119,7 +119,7 @@ Samples `char` or `float32` `jit.matrix` color data into fixture parameters thro
 
 ### Shared setup files
 
-`bbb.dmx.fixturemap` and `bbb.dmx.matrixmap` accept `@setup` / `readsetup` for `bbb.dmx.setup.v1` files. The setup file may define common paths/defaults at top level and object-specific overrides under `fixturemap` or `matrixmap`. Paths inside setup are resolved relative to the setup file itself. Explicit object attributes always win over setup values. `@config` is not reused here because it already means object-specific rule/config files for `curve`, `mask`, and `assert`.
+`bbb.dmx.fixturemap`, `bbb.dmx.matrixmap`, and `bbb.dmx.mask` accept `@setup` / `readsetup` for `bbb.dmx.setup.v1` files. The setup file may define common paths/defaults at top level and object-specific overrides under `fixturemap`, `matrixmap`, or `mask`. Paths inside setup are resolved relative to the setup file itself. Explicit object attributes always win over setup values. `@setup` is deliberately separate from `@config`, which remains the mask rule file attribute on `bbb.dmx.mask`.
 
 ### `bbb.dmx.palette`
 
@@ -187,9 +187,9 @@ Supported curves: `linear`, `gamma`, `invert`, `threshold`, and `points` (`[[inp
 
 Applies hard channel/range constraints to explicit multi-universe DMX frames.
 
-- Input: `list`, `universe`, `channel`, `channels`, `read`, `readpatch`, `readgroups`, `readoverrides`, `reload`, `clear`, `mute`, `hold`, `allow`, `force`, `mutefixture`, `holdfixture`, `allowfixture`, `forcefixture`, `mutegroup`, `holdgroup`, `allowgroup`, `forcegroup`, `bang`, `bangall`, `dump`
+- Input: `list`, `universe`, `channel`, `channels`, `readsetup`, `read`, `readpatch`, `readgroups`, `readoverrides`, `reload`, `clear`, `mute`, `hold`, `allow`, `force`, `mutefixture`, `holdfixture`, `allowfixture`, `forcefixture`, `mutegroup`, `holdgroup`, `allowgroup`, `forcegroup`, `bang`, `bangall`, `dump`
 - Output: masked `universe <id> <512 byte values>`
-- Attributes: `@config`, `@patch`, `@group`/`@groups`, `@semantic_overrides`, `@universe`, `@autobang`
+- Attributes: `@setup`, `@config`, `@patch`, `@group`/`@groups`, `@semantic_overrides`, `@universe`, `@autobang`
 - Config file: `masks/*.json` with `rules[]`.
 - Rule fields: `universe` (`0` = all), `start`, `count` or `end`, `action`, `value`.
 

@@ -58,7 +58,7 @@
                         740.0,
                         22.0
                     ],
-                    "text": "bbb.dmx.mask @config masks/example.json @patch patch-from-mvr.json @group group.json @semantic_overrides semantic_overrides.json"
+                    "text": "bbb.dmx.mask @setup setups/show.json @config masks/example.json @patch patch-from-mvr.json @group group.json @semantic_overrides semantic_overrides.json"
                 }
             },
             {
@@ -103,7 +103,7 @@
                         740.0,
                         22.0
                     ],
-                    "text": "read masks/example.json / readpatch patch-from-mvr.json / readgroups group.json / readoverrides semantic_overrides.json"
+                    "text": "readsetup setups/show.json / read masks/example.json / readpatch patch-from-mvr.json / readgroups group.json / readoverrides semantic_overrides.json"
                 }
             },
             {

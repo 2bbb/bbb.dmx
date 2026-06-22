@@ -19,5 +19,9 @@
     "autobang": true,
     "invert_x": false,
     "invert_y": false
+  },
+  "mask": {
+    "config": "../masks/example.json",
+    "autobang": true
   }
 }
