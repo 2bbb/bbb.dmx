@@ -187,13 +187,40 @@ Supported curves: `linear`, `gamma`, `invert`, `threshold`, and `points` (`[[inp
 
 Applies hard channel/range constraints to explicit multi-universe DMX frames.
 
-- Input: `list`, `universe`, `channel`, `channels`, `read`, `reload`, `clear`, `mute`, `hold`, `allow`, `force`, `bang`, `bangall`, `dump`
+- Input: `list`, `universe`, `channel`, `channels`, `read`, `readpatch`, `readgroups`, `readoverrides`, `reload`, `clear`, `mute`, `hold`, `allow`, `force`, `mutefixture`, `holdfixture`, `allowfixture`, `forcefixture`, `mutegroup`, `holdgroup`, `allowgroup`, `forcegroup`, `bang`, `bangall`, `dump`
 - Output: masked `universe <id> <512 byte values>`
-- Attributes: `@config`, `@universe`, `@autobang`
+- Attributes: `@config`, `@patch`, `@group`/`@groups`, `@semantic_overrides`, `@universe`, `@autobang`
 - Config file: `masks/*.json` with `rules[]`.
 - Rule fields: `universe` (`0` = all), `start`, `count` or `end`, `action`, `value`.
 
 Actions: `mute` outputs zero, `hold` keeps the previous output value, `force` outputs a fixed byte, and `allow` switches the object into whitelist mode where non-allowed channels output zero.
+
+Raw range messages are unchanged:
+
+```text
+mute universe start count
+hold universe start count
+allow universe start count
+force universe start count value
+```
+
+With `@patch`, the same actions can target fixture parameters by fixture id. The parameter token may be a real profile parameter, a `semantic_overrides` alias, or one of the built-in semantic names `dimmer`/`intensity`, `shutter`, `color`/`rgb`/`cmy`, and `fixture`/`footprint`/`all`.
+
+```text
+mute fixture_id parameter [parameter ...]
+holdfixture fixture_id parameter [parameter ...]
+allowfixture fixture_id parameter [parameter ...]
+forcefixture fixture_id parameter value [parameter value ...]
+```
+
+With `@group`/`@groups`, group variants apply the same fixture-parameter rules to every fixture resolved from the group JSON. Unknown parameters are ignored per fixture but reported if no fixture in the group supports the requested parameter.
+
+```text
+mutegroup group_id parameter [parameter ...]
+holdgroup group_id parameter [parameter ...]
+allowgroup group_id parameter [parameter ...]
+forcegroup group_id parameter value [parameter value ...]
+```
 
 ## 4. Chain example
 

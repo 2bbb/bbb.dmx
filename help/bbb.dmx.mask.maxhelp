@@ -28,7 +28,7 @@
                         740.0,
                         22.0
                     ],
-                    "text": "bbb.dmx.mask - Mute, hold, allow, or force channel ranges."
+                    "text": "bbb.dmx.mask - Mute, hold, allow, or force raw ranges, fixtures, or groups."
                 }
             },
             {
@@ -43,7 +43,7 @@
                         740.0,
                         22.0
                     ],
-                    "text": "Input universe <id> + 512 bytes. Rules can isolate ranges during rehearsal or keep dangerous channels fixed."
+                    "text": "Input universe <id> + 512 bytes. Use @patch/@group/@semantic_overrides for fixture/group semantic masks."
                 }
             },
             {
@@ -58,7 +58,7 @@
                         740.0,
                         22.0
                     ],
-                    "text": "bbb.dmx.mask @config masks/example.json"
+                    "text": "bbb.dmx.mask @config masks/example.json @patch patch-from-mvr.json @group group.json @semantic_overrides semantic_overrides.json"
                 }
             },
             {
@@ -103,7 +103,7 @@
                         740.0,
                         22.0
                     ],
-                    "text": "read masks/example.json"
+                    "text": "read masks/example.json / readpatch patch-from-mvr.json / readgroups group.json / readoverrides semantic_overrides.json"
                 }
             },
             {
@@ -118,7 +118,7 @@
                         740.0,
                         22.0
                     ],
-                    "text": "hold 1 1 16"
+                    "text": "hold 1 1 16   (raw: universe start count)"
                 }
             },
             {
@@ -133,7 +133,7 @@
                         740.0,
                         22.0
                     ],
-                    "text": "mute 2 100 12"
+                    "text": "mute fixture_id dimmer shutter color"
                 }
             },
             {
@@ -148,7 +148,7 @@
                         740.0,
                         22.0
                     ],
-                    "text": "force 0 512 1 0"
+                    "text": "forcefixture fixture_id dimmer 255"
                 }
             },
             {
@@ -163,7 +163,7 @@
                         740.0,
                         22.0
                     ],
-                    "text": "universe 1 <512 values>"
+                    "text": "mutegroup group_id dimmer shutter color"
                 }
             },
             {
@@ -178,7 +178,7 @@
                         740.0,
                         22.0
                     ],
-                    "text": "bangall"
+                    "text": "forcegroup group_id dimmer 255 / bangall"
                 }
             }
         ],
