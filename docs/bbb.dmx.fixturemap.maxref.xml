@@ -283,6 +283,36 @@
             </arglist>
             <description>Set repeated raw DMX universe/address/value triples directly, without changing the selected universe.</description>
         </method>
+        <method name="explain">
+            <arglist>
+                <arg name="fixture_id_or_channel" type="symbol" optional="0" />
+                <arg name="topic_or_universe" type="anything" optional="1" />
+                <arg name="address" type="int" optional="1" />
+            </arglist>
+            <description>Output diagnostic information for one fixture or channel from the status outlet. Use explain fixture_id [parameter|dimmer|color|shutter], explain fixture fixture_id ..., or explain channel universe address.</description>
+        </method>
+        <method name="explainchannel">
+            <arglist>
+                <arg name="universe" type="int" optional="0" />
+                <arg name="address" type="int" optional="0" />
+            </arglist>
+            <description>Output current DMX byte, best-effort last writer, owning fixture, channel key, and parameter keys for one universe/address.</description>
+        </method>
+        <method name="dumpgroups">
+            <description>Output loaded group ids and resolved fixture counts from the status outlet.</description>
+        </method>
+        <method name="resolvegroup">
+            <arglist>
+                <arg name="group_id" type="symbol" optional="0" />
+            </arglist>
+            <description>Output the exact expanded fixture id order for a loaded group after nested group and fixture_pattern expansion.</description>
+        </method>
+        <method name="dumpgroup">
+            <arglist>
+                <arg name="group_id" type="symbol" optional="0" />
+            </arglist>
+            <description>Alias for resolvegroup.</description>
+        </method>
     </methodlist>
     <attributelist>
         <attribute name="setup" get="1" set="1" type="symbol">

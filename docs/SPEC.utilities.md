@@ -150,7 +150,7 @@ Fixture groups are optional selection files, separate from fixture patches:
 ```
 
 `bbb.dmx.fixturemap` loads them with `readgroups groups/show.groups.json` or `@groups groups/show.groups.json`.
-Group operations are explicit: `setgroup`, `nsetgroup`, `rawsetgroup`, `colorgroup`, `shuttergroup`, `trackgroup`, and `trackgrouprel`. Unknown fixture ids and cyclic group references are validation errors. Fixtures are applied in expanded group JSON order, not patch order; repeated fixture ids are de-duplicated by first occurrence across nested groups and generated ranges. `fixture_pattern` supports exactly one printf-style integer conversion such as `%02d`. `setgroup`, `nsetgroup`, `rawsetgroup`, `trackgroup`, and `trackgrouprel` may use the reserved `values` marker to distribute per-group values by fixture index.
+Group operations are explicit: `setgroup`, `nsetgroup`, `rawsetgroup`, `colorgroup`, `dimmergroup`, `shuttergroup`, `trackgroup`, and `trackgrouprel`. Use `dumpgroups` to inspect loaded group ids and `resolvegroup group_id` / `dumpgroup group_id` to inspect the exact expanded fixture order. Unknown fixture ids and cyclic group references are validation errors. Fixtures are applied in expanded group JSON order, not patch order; repeated fixture ids are de-duplicated by first occurrence across nested groups and generated ranges. `fixture_pattern` supports exactly one printf-style integer conversion such as `%02d`. `setgroup`, `nsetgroup`, `rawsetgroup`, `trackgroup`, and `trackgrouprel` may use the reserved `values` marker to distribute per-group values by fixture index.
 
 ### `bbb.dmx.scene`
 

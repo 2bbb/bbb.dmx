@@ -306,6 +306,11 @@ readgroups groups/show.groups.json
 readoverrides fixtures/show.semantic-overrides.json
 reload
 dump
+dumpgroups
+resolvegroup front
+explain fixture spot_01
+explain spot_01 color
+explain channel 13 205
 clear
 reset
 bang
@@ -317,10 +322,16 @@ bangall
 - `readoverrides` loads a `bbb.dmx.semantic_overrides.v1` file. Overrides are validated against matching loaded patch fixtures.
 - `reload` reloads the current patch, current groups file, and current semantic overrides file when set.
 - `dump` reports current load status, selected universe, `universe_mode`, tracking settings, color white/fallback modes, group status, semantic override status, group ids, and known universe ids from the right outlet.
+- `dumpgroups` reports loaded group ids and resolved fixture counts.
+- `resolvegroup group_id` / `dumpgroup group_id` outputs the group fixture ids after nested group and `fixture_pattern` expansion, in the exact order used by group messages.
+- `explain fixture_id [parameter|dimmer|color|shutter]` reports fixture metadata plus current parameter values. Semantic topics report the resolved semantic mapping first, then the affected concrete profile parameters.
+- `explain channel universe address` / `explainchannel universe address` reports the current DMX byte, best-effort last writer, owning fixture, mode offset, channel key, and parameter keys that touch the channel.
 - `clear` clears loaded profiles, patch data, and universe buffers.
 - `reset` restores loaded fixture channels to profile defaults.
 - `bang` outputs according to `@universe_mode`. Default `selected` mode preserves the bare 512-value list.
 - `bangall` always outputs every known universe as `universe <id> <512 values...>` messages.
+
+The explain source trace is deliberately a debugging aid, not a provenance graph. It records the last message that changed a DMX byte; if a later message computes the same byte value, the previous source remains. After `read`/`reset`, patched fixture channels are marked as profile defaults.
 
 ### 7.2.1 Semantic overrides
 

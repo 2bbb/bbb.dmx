@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <map>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -43,6 +44,7 @@ private:
     std::map<std::string, std::size_t> fixture_indices_{};
     std::map<std::string, std::vector<std::string>> group_fixture_ids_cache_{};
     mutable std::map<std::pair<std::string, std::string>, std::string> parameter_alias_cache_{};
+    std::map<std::pair<int, int>, std::string> channel_sources_{};
     std::map<std::string, track_fixture_config> track_fixture_configs_{};
     int universe_value_{1};
     bool autobang_value_{true};
@@ -111,7 +113,7 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.movertrack"};
 
-    c74::min::inlet<> input{this, "(readsetup/read/readgroups/readoverrides/set/setall/setgroup/rawset/rawsetall/rawsetgroup/nset/nsetall/nsetgroup/color/colorall/colorgroup/dimmer/dimmerall/dimmergroup/shutter/shutterall/shuttergroup/track/trackall/trackgroup/trackrel/trackallrel/trackgrouprel/ptbytes/channel/channels/uchannels/bang/bangall) fixture mapping control"};
+    c74::min::inlet<> input{this, "(readsetup/read/readgroups/readoverrides/set/setall/setgroup/rawset/rawsetall/rawsetgroup/nset/nsetall/nsetgroup/color/colorall/colorgroup/dimmer/dimmerall/dimmergroup/shutter/shutterall/shuttergroup/track/trackall/trackgroup/trackrel/trackallrel/trackgrouprel/ptbytes/channel/channels/uchannels/explain/explainchannel/dumpgroups/resolvegroup/dumpgroup/bang/bangall) fixture mapping control"};
     c74::min::outlet<> universe_output{this, "(list/anything) selected 512-byte list, or universe id followed by 512 bytes"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
@@ -489,6 +491,7 @@ public:
             fixture_indices_.clear();
             group_fixture_ids_cache_.clear();
             parameter_alias_cache_.clear();
+            channel_sources_.clear();
             track_fixture_configs_.clear();
             groups_ = bbb::dmx::fixture_group_set{};
             groups_loaded_ = false;
@@ -505,10 +508,13 @@ public:
 
     c74::min::message<> reset_message{this, "reset", "Reset loaded fixture channels to profile defaults.",
         MIN_FUNCTION {
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             const bbb::dmx::mapper_result result{mapper_.reset_universes()};
             if(!handle_result(result)) {
                 return {};
             }
+            trace_universe_changes(previous_universes, "reset profile defaults");
+            mark_fixture_channel_sources("reset profile defaults");
             output_if_autobang();
             return {};
         }
@@ -541,6 +547,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("set", args));
             output_if_autobang();
             return {};
         }
@@ -558,6 +565,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("setall", args));
             output_if_autobang();
             return {};
         }
@@ -575,6 +583,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("setgroup", args));
             output_if_autobang();
             return {};
         }
@@ -593,6 +602,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("rawset", args));
             output_if_autobang();
             return {};
         }
@@ -610,6 +620,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("rawsetall", args));
             output_if_autobang();
             return {};
         }
@@ -627,6 +638,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("rawsetgroup", args));
             output_if_autobang();
             return {};
         }
@@ -644,6 +656,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("nset", args));
             output_if_autobang();
             return {};
         }
@@ -661,6 +674,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("nsetall", args));
             output_if_autobang();
             return {};
         }
@@ -678,6 +692,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("nsetgroup", args));
             output_if_autobang();
             return {};
         }
@@ -701,6 +716,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("color", args));
             output_if_autobang();
             return {};
         }
@@ -724,6 +740,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("colorall", args));
             output_if_autobang();
             return {};
         }
@@ -747,6 +764,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("colorgroup", args));
             output_if_autobang();
             return {};
         }
@@ -764,6 +782,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("dimmer", args));
             output_if_autobang();
             return {};
         }
@@ -781,6 +800,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("dimmerall", args));
             output_if_autobang();
             return {};
         }
@@ -798,6 +818,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("dimmergroup", args));
             output_if_autobang();
             return {};
         }
@@ -821,6 +842,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("shutter", args));
             output_if_autobang();
             return {};
         }
@@ -844,6 +866,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("shutterall", args));
             output_if_autobang();
             return {};
         }
@@ -867,6 +890,7 @@ public:
                 mapper_ = previous_mapper;
                 return {};
             }
+            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("shuttergroup", args));
             output_if_autobang();
             return {};
         }
@@ -878,6 +902,7 @@ public:
                 report_error("ptbytes requires fixture_id pan1 pan2 tilt1 tilt2");
                 return {};
             }
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             const bbb::dmx::mapper_result result{mapper_.set_pan_tilt_bytes(
                 symbol_arg(args[0]),
                 (int)args[1],
@@ -888,6 +913,7 @@ public:
             if(!handle_result(result)) {
                 return {};
             }
+            trace_universe_changes(previous_universes, trace_source_from_args("ptbytes", args));
             output_if_autobang();
             return {};
         }
@@ -912,6 +938,7 @@ public:
                 tracking_engines_ = previous_tracking_engines;
                 return {};
             }
+            trace_universe_changes(previous_universes, trace_source_from_args("track", args));
             output_if_autobang();
             return {};
         }
@@ -936,6 +963,7 @@ public:
                 tracking_engines_ = previous_tracking_engines;
                 return {};
             }
+            trace_universe_changes(previous_universes, trace_source_from_args("trackrel", args));
             output_if_autobang();
             return {};
         }
@@ -958,6 +986,7 @@ public:
                 tracking_engines_ = previous_tracking_engines;
                 return {};
             }
+            trace_universe_changes(previous_universes, trace_source_from_args("trackall", args));
             output_if_autobang();
             return {};
         }
@@ -996,6 +1025,7 @@ public:
                 restore_tracking_engines(previous_tracking_engines);
                 return {};
             }
+            trace_universe_changes(previous_universes, trace_source_from_args("trackgroup", args));
             output_if_autobang();
             return {};
         }
@@ -1018,6 +1048,7 @@ public:
                 tracking_engines_ = previous_tracking_engines;
                 return {};
             }
+            trace_universe_changes(previous_universes, trace_source_from_args("trackallrel", args));
             output_if_autobang();
             return {};
         }
@@ -1056,6 +1087,7 @@ public:
                 restore_tracking_engines(previous_tracking_engines);
                 return {};
             }
+            trace_universe_changes(previous_universes, trace_source_from_args("trackgrouprel", args));
             output_if_autobang();
             return {};
         }
@@ -1080,10 +1112,12 @@ public:
                 report_error("channel requires address value");
                 return {};
             }
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             const bbb::dmx::mapper_result result{mapper_.set_channel(universe_value_, (int)args[0], (int)args[1])};
             if(!handle_result(result)) {
                 return {};
             }
+            trace_universe_changes(previous_universes, trace_source_from_args("channel", args));
             output_if_autobang();
             return {};
         }
@@ -1095,6 +1129,7 @@ public:
                 report_error("channels requires address/value pairs");
                 return {};
             }
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             for(std::size_t index = 0; index < args.size(); index += 2) {
                 if(!finite_atom(args[index]) || !finite_atom(args[index + 1])) {
                     report_error("channels pair must be numeric");
@@ -1105,6 +1140,7 @@ public:
                     return {};
                 }
             }
+            trace_universe_changes(previous_universes, trace_source_from_args("channels", args));
             output_if_autobang();
             return {};
         }
@@ -1116,6 +1152,7 @@ public:
                 report_error("uchannels requires universe/address/value triples");
                 return {};
             }
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             for(std::size_t index = 0; index < args.size(); index += 3) {
                 if(!finite_atom(args[index]) || !finite_atom(args[index + 1]) || !finite_atom(args[index + 2])) {
                     report_error("uchannels triple must be numeric");
@@ -1127,7 +1164,82 @@ public:
                     return {};
                 }
             }
+            trace_universe_changes(previous_universes, trace_source_from_args("uchannels", args));
             output_if_autobang();
+            return {};
+        }
+    };
+
+    c74::min::message<> explain_message{this, "explain", "explain fixture_id [parameter|dimmer|color|shutter] OR explain fixture fixture_id ... OR explain channel universe address",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("explain requires fixture id or channel universe address");
+                return {};
+            }
+            const std::string first{symbol_arg(args[0])};
+            if(first == "channel") {
+                if(args.size() < 3 || !finite_atom(args[1]) || !finite_atom(args[2])) {
+                    report_error("explain channel requires universe address");
+                    return {};
+                }
+                explain_channel((int)args[1], (int)args[2]);
+                return {};
+            }
+            std::string fixture_id{first};
+            std::string topic{};
+            if(first == "fixture") {
+                if(args.size() < 2) {
+                    report_error("explain fixture requires fixture_id");
+                    return {};
+                }
+                fixture_id = symbol_arg(args[1]);
+                if(2 < args.size()) {
+                    topic = symbol_arg(args[2]);
+                }
+            } else if(1 < args.size()) {
+                topic = symbol_arg(args[1]);
+            }
+            explain_fixture(fixture_id, topic);
+            return {};
+        }
+    };
+
+    c74::min::message<> explainchannel_message{this, "explainchannel", "explainchannel universe address",
+        MIN_FUNCTION {
+            if(args.size() < 2 || !finite_atom(args[0]) || !finite_atom(args[1])) {
+                report_error("explainchannel requires universe address");
+                return {};
+            }
+            explain_channel((int)args[0], (int)args[1]);
+            return {};
+        }
+    };
+
+    c74::min::message<> dumpgroups_message{this, "dumpgroups", "Output loaded group ids and resolved fixture counts.",
+        MIN_FUNCTION {
+            dump_groups();
+            return {};
+        }
+    };
+
+    c74::min::message<> resolvegroup_message{this, "resolvegroup", "resolvegroup group_id: output resolved fixture ids in order.",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("resolvegroup requires group_id");
+                return {};
+            }
+            explain_group(symbol_arg(args[0]));
+            return {};
+        }
+    };
+
+    c74::min::message<> dumpgroup_message{this, "dumpgroup", "Alias for resolvegroup group_id.",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("dumpgroup requires group_id");
+                return {};
+            }
+            explain_group(symbol_arg(args[0]));
             return {};
         }
     };
@@ -1171,6 +1283,401 @@ public:
     };
 
 private:
+    static const char *parameter_type_name(bbb::dmx::fixture_parameter_type type) {
+        switch(type) {
+            case bbb::dmx::fixture_parameter_type::u8: return "u8";
+            case bbb::dmx::fixture_parameter_type::u16: return "u16";
+            case bbb::dmx::fixture_parameter_type::u24: return "u24";
+            case bbb::dmx::fixture_parameter_type::enum_u8: return "enum_u8";
+            default: return "unknown";
+        }
+    }
+
+    static int parameter_raw_max(const bbb::dmx::fixture_parameter &parameter) {
+        if(parameter.type == bbb::dmx::fixture_parameter_type::u24) {
+            return 16777215;
+        }
+        if(parameter.type == bbb::dmx::fixture_parameter_type::u16) {
+            return 65535;
+        }
+        return 255;
+    }
+
+    static std::string atom_to_trace_string(const c74::min::atom &atom) {
+        if(atom.a_type == c74::max::A_LONG) {
+            return std::to_string((int)atom);
+        }
+        if(atom.a_type == c74::max::A_FLOAT) {
+            std::ostringstream stream;
+            stream << (double)atom;
+            return stream.str();
+        }
+        return symbol_arg(atom);
+    }
+
+    static std::string trace_source_from_args(const char *selector, const c74::min::atoms &args) {
+        std::string source{selector};
+        for(const auto &atom : args) {
+            source += " ";
+            source += atom_to_trace_string(atom);
+        }
+        return source;
+    }
+
+    std::string channel_source(int universe_id, int address) const {
+        const auto found = channel_sources_.find({universe_id, address});
+        if(found == channel_sources_.end()) {
+            return "untracked";
+        }
+        return found->second;
+    }
+
+    void trace_universe_changes(const bbb::dmx::fixture_mapper::universe_map &previous_universes, const std::string &source) {
+        std::set<int> universe_ids{};
+        for(const auto &entry : previous_universes) {
+            universe_ids.insert(entry.first);
+        }
+        for(const int universe_id : mapper_.universe_ids()) {
+            universe_ids.insert(universe_id);
+        }
+
+        for(const int universe_id : universe_ids) {
+            const auto previous_found = previous_universes.find(universe_id);
+            const bbb::dmx::dmx_universe previous_universe{previous_found == previous_universes.end() ? bbb::dmx::dmx_universe{} : previous_found->second};
+            const bbb::dmx::dmx_universe &current_universe{mapper_.universe(universe_id)};
+            for(int address{1}; address <= bbb::dmx::universe_channel_count; address++) {
+                if(previous_universe.channel(address) != current_universe.channel(address)) {
+                    channel_sources_[{universe_id, address}] = source;
+                }
+            }
+        }
+    }
+
+    void mark_fixture_channel_sources(const std::string &source) {
+        channel_sources_.clear();
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture.profile)};
+            if(!profile) {
+                continue;
+            }
+            const bbb::dmx::fixture_mode *mode{profile->find_mode(fixture.mode)};
+            if(!mode) {
+                continue;
+            }
+            for(const auto &channel : mode->channels) {
+                channel_sources_[{fixture.universe, fixture.address + channel.offset - 1}] = source;
+            }
+        }
+    }
+
+    void append_address_atoms(c74::min::atoms &atoms, const std::vector<std::pair<int, int>> &addresses) const {
+        atoms.push_back(c74::min::symbol("addresses"));
+        for(const auto &address : addresses) {
+            atoms.push_back(c74::min::symbol((std::to_string(address.first) + ":" + std::to_string(address.second)).c_str()));
+        }
+    }
+
+    void append_source_atoms(c74::min::atoms &atoms, const std::vector<std::pair<int, int>> &addresses) const {
+        atoms.push_back(c74::min::symbol("sources"));
+        for(const auto &address : addresses) {
+            atoms.push_back(c74::min::symbol((std::to_string(address.first) + ":" + std::to_string(address.second)).c_str()));
+            atoms.push_back(c74::min::symbol(channel_source(address.first, address.second).c_str()));
+        }
+    }
+
+    void append_current_range_atoms(c74::min::atoms &atoms, const bbb::dmx::fixture_parameter &parameter, int raw_value) const {
+        for(const auto &range : parameter.ranges) {
+            if(!bbb::dmx::range_contains_value(range, raw_value)) {
+                continue;
+            }
+            atoms.push_back(c74::min::symbol("range"));
+            atoms.push_back(range.from);
+            atoms.push_back(range.to);
+            atoms.push_back(c74::min::symbol("function"));
+            atoms.push_back(c74::min::symbol(range.function.c_str()));
+            atoms.push_back(c74::min::symbol("label"));
+            atoms.push_back(c74::min::symbol(range.label.c_str()));
+            return;
+        }
+    }
+
+    void send_parameter_explain(
+        const bbb::dmx::fixture_instance &fixture,
+        const bbb::dmx::fixture_parameter &parameter,
+        const std::string &requested_key
+    ) {
+        int raw_value{0};
+        const bbb::dmx::mapper_result value_result{mapper_.current_raw_value(fixture.id, parameter.key, raw_value)};
+        std::vector<std::pair<int, int>> addresses{};
+        const bbb::dmx::mapper_result address_result{mapper_.parameter_channel_addresses(fixture.id, parameter.key, addresses)};
+
+        c74::min::atoms atoms;
+        atoms.push_back(c74::min::symbol("explain"));
+        atoms.push_back(c74::min::symbol("parameter"));
+        atoms.push_back(c74::min::symbol("fixture"));
+        atoms.push_back(c74::min::symbol(fixture.id.c_str()));
+        atoms.push_back(c74::min::symbol("requested"));
+        atoms.push_back(c74::min::symbol(requested_key.c_str()));
+        atoms.push_back(c74::min::symbol("resolved"));
+        atoms.push_back(c74::min::symbol(parameter.key.c_str()));
+        atoms.push_back(c74::min::symbol("type"));
+        atoms.push_back(c74::min::symbol(parameter_type_name(parameter.type)));
+        atoms.push_back(c74::min::symbol("default"));
+        atoms.push_back(parameter.default_value);
+        atoms.push_back(c74::min::symbol("current"));
+        atoms.push_back(value_result.ok ? raw_value : 0);
+        atoms.push_back(c74::min::symbol("normalized"));
+        atoms.push_back(value_result.ok ? ((double)raw_value / (double)parameter_raw_max(parameter)) : 0.0);
+        if(address_result.ok) {
+            append_address_atoms(atoms, addresses);
+            append_source_atoms(atoms, addresses);
+        }
+        if(value_result.ok) {
+            append_current_range_atoms(atoms, parameter, raw_value);
+        }
+        status_output.send(atoms);
+    }
+
+    void explain_semantic_mapping(
+        const bbb::dmx::fixture_instance &fixture,
+        const bbb::dmx::fixture_mode &mode,
+        const std::string &topic
+    ) {
+        const bbb::dmx::fixture_semantic_mode_override *mode_override{semantic_override_for_fixture(fixture)};
+        bbb::dmx::semantic_color_mapping color_mapping{};
+        bool color_mapping_valid{false};
+        if(topic == "dimmer" || topic == "intensity") {
+            color_mapping = bbb::dmx::semantic_intensity_parameters_for_mode(mode, 1.0, mode_override);
+            color_mapping_valid = true;
+        } else if(topic == "color") {
+            const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture.profile)};
+            color_mapping = bbb::dmx::semantic_color_parameters_for_mode(
+                profile,
+                mode,
+                bbb::dmx::make_semantic_color_request(1.0, 1.0, 1.0),
+                bbb::dmx::semantic_color_options{color_use_white_value_, color_wheel_fallback_value_},
+                current_color_wheel_parameter_values(fixture.id, mode),
+                mode_override
+            );
+            color_mapping_valid = true;
+        }
+        if(color_mapping_valid) {
+            c74::min::atoms atoms;
+            atoms.push_back(c74::min::symbol("explain"));
+            atoms.push_back(c74::min::symbol("semantic"));
+            atoms.push_back(c74::min::symbol("fixture"));
+            atoms.push_back(c74::min::symbol(fixture.id.c_str()));
+            atoms.push_back(c74::min::symbol("topic"));
+            atoms.push_back(c74::min::symbol(topic.c_str()));
+            atoms.push_back(c74::min::symbol("ok"));
+            atoms.push_back(color_mapping.ok ? 1 : 0);
+            if(!color_mapping.ok) {
+                atoms.push_back(c74::min::symbol("message"));
+                atoms.push_back(c74::min::symbol(color_mapping.message.c_str()));
+            }
+            atoms.push_back(c74::min::symbol("parameters"));
+            for(const auto &parameter : color_mapping.parameters) {
+                atoms.push_back(c74::min::symbol(parameter.first.c_str()));
+                atoms.push_back(parameter.second);
+            }
+            status_output.send(atoms);
+            if(color_mapping.ok) {
+                for(const auto &parameter : color_mapping.parameters) {
+                    if(const bbb::dmx::fixture_parameter *resolved_parameter = mode.find_parameter(parameter.first)) {
+                        send_parameter_explain(fixture, *resolved_parameter, topic);
+                    }
+                }
+            }
+            return;
+        }
+
+        if(topic == "shutter") {
+            const bbb::dmx::semantic_shutter_mappings open_mappings{bbb::dmx::semantic_shutter_parameters_for_mode(mode, true, mode_override)};
+            const bbb::dmx::semantic_shutter_mappings closed_mappings{bbb::dmx::semantic_shutter_parameters_for_mode(mode, false, mode_override)};
+            c74::min::atoms atoms;
+            atoms.push_back(c74::min::symbol("explain"));
+            atoms.push_back(c74::min::symbol("semantic"));
+            atoms.push_back(c74::min::symbol("fixture"));
+            atoms.push_back(c74::min::symbol(fixture.id.c_str()));
+            atoms.push_back(c74::min::symbol("topic"));
+            atoms.push_back(c74::min::symbol("shutter"));
+            atoms.push_back(c74::min::symbol("open"));
+            atoms.push_back(open_mappings.ok ? 1 : 0);
+            for(const auto &mapping : open_mappings.mappings) {
+                atoms.push_back(c74::min::symbol(mapping.parameter.c_str()));
+                atoms.push_back(mapping.value);
+            }
+            atoms.push_back(c74::min::symbol("closed"));
+            atoms.push_back(closed_mappings.ok ? 1 : 0);
+            for(const auto &mapping : closed_mappings.mappings) {
+                atoms.push_back(c74::min::symbol(mapping.parameter.c_str()));
+                atoms.push_back(mapping.value);
+            }
+            status_output.send(atoms);
+            for(const auto &mapping : open_mappings.mappings) {
+                if(const bbb::dmx::fixture_parameter *parameter = mode.find_parameter(mapping.parameter)) {
+                    send_parameter_explain(fixture, *parameter, topic);
+                }
+            }
+        }
+    }
+
+    void explain_fixture(const std::string &fixture_id, const std::string &topic) {
+        const bbb::dmx::fixture_instance *fixture{find_fixture_instance(fixture_id)};
+        if(!fixture) {
+            report_error(("unknown fixture: " + fixture_id).c_str());
+            return;
+        }
+        const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture->profile)};
+        if(!profile) {
+            report_error(("missing profile: " + fixture->profile).c_str());
+            return;
+        }
+        const bbb::dmx::fixture_mode *mode{profile->find_mode(fixture->mode)};
+        if(!mode) {
+            report_error(("missing mode: " + fixture->mode).c_str());
+            return;
+        }
+
+        c74::min::atoms fixture_atoms;
+        fixture_atoms.push_back(c74::min::symbol("explain"));
+        fixture_atoms.push_back(c74::min::symbol("fixture"));
+        fixture_atoms.push_back(c74::min::symbol(fixture->id.c_str()));
+        fixture_atoms.push_back(c74::min::symbol("profile"));
+        fixture_atoms.push_back(c74::min::symbol(fixture->profile.c_str()));
+        fixture_atoms.push_back(c74::min::symbol("mode"));
+        fixture_atoms.push_back(c74::min::symbol(fixture->mode.c_str()));
+        fixture_atoms.push_back(c74::min::symbol("universe"));
+        fixture_atoms.push_back(fixture->universe);
+        fixture_atoms.push_back(c74::min::symbol("address"));
+        fixture_atoms.push_back(fixture->address);
+        fixture_atoms.push_back(c74::min::symbol("footprint"));
+        fixture_atoms.push_back(mode->footprint);
+        fixture_atoms.push_back(c74::min::symbol("position"));
+        fixture_atoms.push_back(fixture->position.x);
+        fixture_atoms.push_back(fixture->position.y);
+        fixture_atoms.push_back(fixture->position.z);
+        fixture_atoms.push_back(c74::min::symbol("semantic_overrides"));
+        fixture_atoms.push_back(semantic_override_for_fixture(*fixture) ? 1 : 0);
+        status_output.send(fixture_atoms);
+
+        if(topic.empty()) {
+            for(const auto &parameter : mode->parameters) {
+                send_parameter_explain(*fixture, parameter, parameter.key);
+            }
+            return;
+        }
+
+        const std::string normalized_topic{bbb::dmx::normalized_semantic_key(topic)};
+        if(normalized_topic == "dimmer" || normalized_topic == "intensity" || normalized_topic == "color" || normalized_topic == "shutter") {
+            explain_semantic_mapping(*fixture, *mode, normalized_topic);
+        }
+
+        const std::string resolved_parameter_key{resolve_parameter_alias(fixture->id, topic)};
+        if(const bbb::dmx::fixture_parameter *parameter = mode->find_parameter(resolved_parameter_key)) {
+            send_parameter_explain(*fixture, *parameter, topic);
+            return;
+        }
+        if(normalized_topic != "dimmer" && normalized_topic != "intensity" && normalized_topic != "color" && normalized_topic != "shutter") {
+            report_error(("unknown parameter: " + fixture->id + ":" + topic).c_str());
+        }
+    }
+
+    void explain_channel(int universe_id, int address) {
+        const int sanitized_universe{std::max(1, universe_id)};
+        const int sanitized_address{std::max(1, std::min(bbb::dmx::universe_channel_count, address))};
+        c74::min::atoms atoms;
+        atoms.push_back(c74::min::symbol("explain"));
+        atoms.push_back(c74::min::symbol("channel"));
+        atoms.push_back(c74::min::symbol("universe"));
+        atoms.push_back(sanitized_universe);
+        atoms.push_back(c74::min::symbol("address"));
+        atoms.push_back(sanitized_address);
+        atoms.push_back(c74::min::symbol("value"));
+        atoms.push_back(mapper_.universe(sanitized_universe).channel(sanitized_address));
+        atoms.push_back(c74::min::symbol("source"));
+        atoms.push_back(c74::min::symbol(channel_source(sanitized_universe, sanitized_address).c_str()));
+
+        for(const auto &fixture : mapper_.patch().fixtures) {
+            if(fixture.universe != sanitized_universe) {
+                continue;
+            }
+            const bbb::dmx::fixture_profile *profile{mapper_.find_profile(fixture.profile)};
+            if(!profile) {
+                continue;
+            }
+            const bbb::dmx::fixture_mode *mode{profile->find_mode(fixture.mode)};
+            if(!mode || sanitized_address < fixture.address || fixture.address + mode->footprint <= sanitized_address) {
+                continue;
+            }
+            atoms.push_back(c74::min::symbol("fixture"));
+            atoms.push_back(c74::min::symbol(fixture.id.c_str()));
+            atoms.push_back(c74::min::symbol("profile"));
+            atoms.push_back(c74::min::symbol(fixture.profile.c_str()));
+            atoms.push_back(c74::min::symbol("mode"));
+            atoms.push_back(c74::min::symbol(fixture.mode.c_str()));
+            const int offset{sanitized_address - fixture.address + 1};
+            atoms.push_back(c74::min::symbol("offset"));
+            atoms.push_back(offset);
+            for(const auto &channel : mode->channels) {
+                if(channel.offset == offset) {
+                    atoms.push_back(c74::min::symbol("channel_key"));
+                    atoms.push_back(c74::min::symbol(channel.key.c_str()));
+                    atoms.push_back(c74::min::symbol("label"));
+                    atoms.push_back(c74::min::symbol(channel.label.c_str()));
+                    break;
+                }
+            }
+            atoms.push_back(c74::min::symbol("parameters"));
+            for(const auto &parameter : mode->parameters) {
+                for(const auto &channel_key : parameter.channels) {
+                    const bbb::dmx::fixture_channel *channel{mode->find_channel(channel_key)};
+                    if(channel && channel->offset == offset) {
+                        atoms.push_back(c74::min::symbol(parameter.key.c_str()));
+                        break;
+                    }
+                }
+            }
+            break;
+        }
+        status_output.send(atoms);
+    }
+
+    void dump_groups() {
+        c74::min::atoms atoms;
+        atoms.push_back(c74::min::symbol("groups"));
+        atoms.push_back(c74::min::symbol("loaded"));
+        atoms.push_back(groups_loaded_ ? 1 : 0);
+        atoms.push_back(c74::min::symbol("validated"));
+        atoms.push_back(groups_validated_ ? 1 : 0);
+        for(const auto &group : groups_.groups) {
+            atoms.push_back(c74::min::symbol(group.id.c_str()));
+            if(mapper_.validated() && groups_loaded_) {
+                std::vector<std::string> fixture_ids{};
+                const bbb::dmx::mapper_result result{resolve_group_fixture_ids(group.id, fixture_ids)};
+                atoms.push_back(result.ok ? (int)fixture_ids.size() : -1);
+            }
+        }
+        status_output.send(atoms);
+    }
+
+    void explain_group(const std::string &group_id) {
+        std::vector<std::string> fixture_ids{};
+        const bbb::dmx::mapper_result result{resolve_group_fixture_ids(group_id, fixture_ids)};
+        if(!handle_result(result)) {
+            return;
+        }
+        c74::min::atoms atoms;
+        atoms.push_back(c74::min::symbol("group"));
+        atoms.push_back(c74::min::symbol(group_id.c_str()));
+        atoms.push_back(c74::min::symbol("fixtures"));
+        atoms.push_back((int)fixture_ids.size());
+        for(const auto &fixture_id : fixture_ids) {
+            atoms.push_back(c74::min::symbol(fixture_id.c_str()));
+        }
+        status_output.send(atoms);
+    }
+
     void schedule_setup_load() {
         if(setup_path_value_.empty()) {
             setup_load_pending_ = false;
@@ -1342,6 +1849,7 @@ private:
         rebuild_fixture_indices();
         group_fixture_ids_cache_.clear();
         parameter_alias_cache_.clear();
+        mark_fixture_channel_sources("profile default");
         track_fixture_configs_.clear();
         tracking_engines_.clear();
         groups_validated_ = false;
