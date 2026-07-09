@@ -108,7 +108,7 @@ public:
 
 private:
     void validate_patch(const std::string &path) {
-        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path)};
         bbb::dmx::fixture_mapper mapper{};
         const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(resolved_path, mapper)};
         if(!result.ok) {
@@ -118,7 +118,7 @@ private:
         bbb::dmx::fixture_group_set group_set{};
         bool groups_loaded{false};
         if(!groups_path_value_.empty()) {
-            const std::string resolved_groups_path{bbb::dmx::maxutil::resolve_file_path(groups_path_value_)};
+            const std::string resolved_groups_path{bbb::dmx::maxutil::resolve_file_path(this->maxobj(), groups_path_value_)};
             const bbb::dmx::mapper_result groups_read_result{bbb::dmx::read_fixture_groups_file(resolved_groups_path, group_set)};
             if(!groups_read_result.ok) {
                 send_error(groups_read_result.message.c_str());

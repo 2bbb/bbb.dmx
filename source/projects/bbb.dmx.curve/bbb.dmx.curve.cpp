@@ -226,7 +226,7 @@ private:
     }
 
     void load_config(const std::string &path) {
-        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path)};
         std::string text{};
         bbb::dmx::mapper_result result{bbb::dmx::read_text_file(resolved_path, text)};
         if(!result.ok) {

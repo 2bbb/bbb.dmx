@@ -691,7 +691,7 @@ private:
     }
 
     void load_setup(const std::string &path) {
-        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path)};
         bbb::dmx::dmx_setup_document setup_document{};
         const bbb::dmx::mapper_result result{bbb::dmx::read_dmx_setup_file(resolved_path, setup_document)};
         if(!result.ok) {
@@ -705,7 +705,7 @@ private:
     }
 
     void load_patch(const std::string &path) {
-        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path)};
         bbb::dmx::fixture_mapper loaded_mapper{};
         const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(resolved_path, loaded_mapper)};
         if(!result.ok) {
@@ -742,7 +742,7 @@ private:
     }
 
     void load_map(const std::string &path) {
-        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path)};
         std::string text{};
         bbb::dmx::mapper_result result{bbb::dmx::read_text_file(resolved_path, text)};
         if(!result.ok) {
@@ -808,7 +808,7 @@ private:
     }
 
     void load_groups(const std::string &path) {
-        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path)};
         bbb::dmx::fixture_group_set loaded_groups{};
         const bbb::dmx::mapper_result result{bbb::dmx::read_fixture_groups_file(resolved_path, loaded_groups)};
         if(!result.ok) {
@@ -832,7 +832,7 @@ private:
     }
 
     void load_semantic_overrides(const std::string &path) {
-        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path)};
         bbb::dmx::fixture_semantic_overrides loaded_overrides{};
         const bbb::dmx::mapper_result result{bbb::dmx::read_fixture_semantic_overrides_file(resolved_path, loaded_overrides)};
         if(!result.ok) {

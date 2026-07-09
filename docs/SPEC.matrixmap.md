@@ -21,7 +21,7 @@ Network output remains outside this repository. Feed the result to `bbb.dmx.merg
 Input:
 
 - `jit_matrix <name>` — read one Jitter matrix by registered name and patch sampled values into fixture parameters.
-- `readsetup <path>` — load shared `bbb.dmx.setup.v1` JSON. Paths inside it are resolved relative to that setup file; explicit object attributes override setup values.
+- `readsetup <path>` — load shared `bbb.dmx.setup.v1` JSON. Relative setup paths resolve against the saved Max patcher directory first, then Max's search path. Paths inside the setup file are resolved relative to that setup file; explicit object attributes override setup values.
 - `readpatch <path>` — load fixture patch JSON.
 - `readmap <path>` — load matrix map JSON.
 - `readgroups <path>` — load optional fixture groups JSON for explicit/nested/pattern group mappings.
@@ -32,7 +32,7 @@ Input:
 
 Attributes:
 
-- `@setup <path>` — optional shared `bbb.dmx.setup.v1` JSON. This is deliberately separate from `@config`, which is already used by rule-file objects.
+- `@setup <path>` — optional shared `bbb.dmx.setup.v1` JSON. Relative paths resolve patcher-relative first. This is deliberately separate from `@config`, which is already used by rule-file objects.
 - `@patch <path>` — fixture patch JSON.
 - `@map <path>` — matrix map JSON.
 - `@group` / `@groups <path>` — optional fixture groups JSON.

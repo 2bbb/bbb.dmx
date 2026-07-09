@@ -234,7 +234,7 @@ private:
 
     void load_patch(const std::string &path) {
         bbb::dmx::fixture_mapper loaded_mapper{};
-        const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(bbb::dmx::maxutil::resolve_file_path(path), loaded_mapper)};
+        const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path), loaded_mapper)};
         if(!result.ok) {
             loaded_ = false;
             send_error(result.message.c_str());

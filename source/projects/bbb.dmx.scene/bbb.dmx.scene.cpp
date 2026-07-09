@@ -222,7 +222,7 @@ private:
 
     void load_patch(const std::string &path) {
         bbb::dmx::fixture_mapper loaded_mapper{};
-        const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(bbb::dmx::maxutil::resolve_file_path(path), loaded_mapper)};
+        const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path), loaded_mapper)};
         if(!result.ok) {
             patch_loaded_ = false;
             report_error(result.message);
@@ -235,7 +235,7 @@ private:
 
     void load_scene(const std::string &path) {
         std::string text{};
-        bbb::dmx::mapper_result result{bbb::dmx::read_text_file(bbb::dmx::maxutil::resolve_file_path(path), text)};
+        bbb::dmx::mapper_result result{bbb::dmx::read_text_file(bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path), text)};
         if(!result.ok) {
             scene_loaded_ = false;
             report_error(result.message);

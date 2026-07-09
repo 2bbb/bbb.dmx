@@ -193,7 +193,7 @@ public:
 
 private:
     void load_patch(const std::string &path) {
-        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(path)};
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path)};
         bbb::dmx::fixture_mapper loaded_mapper{};
         const bbb::dmx::mapper_result result{bbb::dmx::load_fixture_mapper_from_patch_file(resolved_path, loaded_mapper)};
         if(!result.ok) {

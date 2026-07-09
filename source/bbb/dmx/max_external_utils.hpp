@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -183,6 +184,29 @@ inline bool path_is_absolute(const std::string &path) {
     return 1 < path.size() && path[1] == ':';
 }
 
+inline std::string parent_directory(const std::string &path) {
+    const std::size_t slash_position{path.find_last_of("/\\")};
+    if(slash_position == std::string::npos) {
+        return "";
+    }
+    return path.substr(0, slash_position + 1);
+}
+
+inline std::string join_relative_path(const std::string &base_directory, const std::string &path) {
+    if(path_is_absolute(path) || base_directory.empty()) {
+        return path;
+    }
+    return base_directory + path;
+}
+
+inline bool file_exists(const std::string &path) {
+    if(path.empty()) {
+        return false;
+    }
+    std::ifstream stream(path.c_str(), std::ios::in | std::ios::binary);
+    return (bool)stream;
+}
+
 inline std::string max_path_to_system_path(const std::string &path) {
     if(path.empty()) {
         return {};
@@ -201,6 +225,33 @@ inline std::string max_path_to_system_path(const std::string &path) {
         return {};
     }
     return system_path;
+}
+
+inline std::string normalize_system_path(const std::string &path) {
+    const std::string system_path{max_path_to_system_path(path)};
+    if(!system_path.empty()) {
+        return system_path;
+    }
+    return path;
+}
+
+inline std::string patcher_file_path(c74::max::t_object *max_object) {
+    if(!max_object) {
+        return {};
+    }
+    c74::max::t_object *patcher{c74::max::object_attr_getobj(max_object, c74::max::gensym("patcher"))};
+    if(!patcher) {
+        return {};
+    }
+    c74::max::t_symbol *filepath_symbol{c74::max::object_attr_getsym(patcher, c74::max::gensym("filepath"))};
+    if(!filepath_symbol || !filepath_symbol->s_name || filepath_symbol->s_name[0] == '\0') {
+        return {};
+    }
+    return normalize_system_path(filepath_symbol->s_name);
+}
+
+inline std::string patcher_directory(c74::max::t_object *max_object) {
+    return parent_directory(patcher_file_path(max_object));
 }
 
 inline std::string resolve_file_path(const std::string &path) {
@@ -232,6 +283,22 @@ inline std::string resolve_file_path(const std::string &path) {
         return resolved_path;
     }
     return path;
+}
+
+inline std::string resolve_file_path(c74::max::t_object *max_object, const std::string &path) {
+    if(path.empty() || path_is_absolute(path)) {
+        return resolve_file_path(path);
+    }
+
+    const std::string patcher_base_directory{patcher_directory(max_object)};
+    if(!patcher_base_directory.empty()) {
+        const std::string patcher_relative_path{normalize_system_path(join_relative_path(patcher_base_directory, path))};
+        if(file_exists(patcher_relative_path)) {
+            return patcher_relative_path;
+        }
+    }
+
+    return resolve_file_path(path);
 }
 
 template <typename outlet_type>
