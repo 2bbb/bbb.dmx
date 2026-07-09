@@ -44,6 +44,7 @@ private:
     bool groups_validated_{false};
     bool semantic_overrides_loaded_{false};
     bool applying_setup_{false};
+    bool attributes_initialized_{false};
     bool suppress_setup_attribute_load_{false};
     bool suppress_config_attribute_load_{false};
     bool suppress_patch_attribute_load_{false};
@@ -117,6 +118,7 @@ public:
     };
 
     bbb_dmx_mask() {
+        attributes_initialized_ = true;
         bbb::dmx::report_external_build_info(cout, "bbb.dmx.mask");
         init_timer.delay(0);
     }
@@ -246,7 +248,7 @@ public:
     c74::min::attribute<int> universe{this, "universe", 1,
         c74::min::description{"Default universe for bare list input and bang output."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 universe_attribute_overridden_ = true;
             }
             if(args.empty() || !bbb::dmx::maxutil::finite_atom(args[0])) {
@@ -260,7 +262,7 @@ public:
     c74::min::attribute<bool> autobang{this, "autobang", true,
         c74::min::description{"Output immediately after input updates."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 autobang_attribute_overridden_ = true;
             }
             autobang_value_ = args.empty() || ((int)args[0] != 0);

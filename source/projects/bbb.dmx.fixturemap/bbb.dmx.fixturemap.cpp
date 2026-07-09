@@ -70,6 +70,7 @@ private:
     bool semantic_overrides_loaded_{false};
     bool semantic_overrides_validated_{false};
     bool applying_setup_{false};
+    bool attributes_initialized_{false};
     bool suppress_setup_attribute_load_{false};
     bool suppress_patch_attribute_load_{false};
     bool suppress_groups_attribute_load_{false};
@@ -158,6 +159,7 @@ public:
     };
 
     bbb_dmx_fixturemap() {
+        attributes_initialized_ = true;
         bbb::dmx::report_external_build_info(cout, "bbb.dmx.fixturemap");
     }
 
@@ -268,7 +270,7 @@ public:
     c74::min::attribute<int> universe{this, "universe", 1,
         c74::min::description{"Universe id to output."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 universe_attribute_overridden_ = true;
             }
             if(args.empty() || !finite_atom(args[0])) {
@@ -283,7 +285,7 @@ public:
     c74::min::attribute<bool> autobang{this, "autobang", true,
         c74::min::description{"Output the full universe immediately after successful updates."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 autobang_attribute_overridden_ = true;
             }
             autobang_value_ = args.empty() || ((int)args[0] != 0);
@@ -295,7 +297,7 @@ public:
         c74::min::description{"Autobang and bang output mode: selected or all. selected outputs a bare 512-byte list; all outputs universe id 512-byte messages."},
         c74::min::enum_map{"selected", "all"},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 universe_mode_attribute_overridden_ = true;
             }
             if(args.empty()) {
@@ -319,7 +321,7 @@ public:
         c74::min::description{"Pan continuity mode for track/trackall messages: smart, pan, or off."},
         c74::min::enum_map{"smart", "pan", "off"},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 tracking_mode_attribute_overridden_ = true;
             }
             if(args.empty()) {
@@ -338,7 +340,7 @@ public:
     c74::min::attribute<double> default_pan_range{this, "default_pan_range", 540.0,
         c74::min::description{"Fallback pan range in degrees when the fixture profile omits pan.range_degrees."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 default_pan_range_attribute_overridden_ = true;
             }
             if(args.empty() || !finite_atom(args[0]) || (double)args[0] <= 0.0) {
@@ -354,7 +356,7 @@ public:
     c74::min::attribute<double> default_tilt_range{this, "default_tilt_range", 270.0,
         c74::min::description{"Fallback tilt range in degrees when the fixture profile omits tilt.range_degrees."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 default_tilt_range_attribute_overridden_ = true;
             }
             if(args.empty() || !finite_atom(args[0]) || (double)args[0] <= 0.0) {
@@ -370,7 +372,7 @@ public:
     c74::min::attribute<bool> track_strict{this, "track_strict", false,
         c74::min::description{"When non-zero, trackall reports fixtures without pan/tilt as errors instead of skipping them."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 track_strict_attribute_overridden_ = true;
             }
             track_strict_value_ = !args.empty() && ((int)args[0] != 0);
@@ -381,7 +383,7 @@ public:
     c74::min::attribute<bool> color_use_white{this, "color_use_white", true,
         c74::min::description{"When non-zero, semantic color extracts RGBW white from min(r,g,b). When zero, semantic color leaves white untouched and RGB channels carry the full color."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 color_use_white_attribute_overridden_ = true;
             }
             color_use_white_value_ = args.empty() || ((int)args[0] != 0);
@@ -392,7 +394,7 @@ public:
     c74::min::attribute<bool> color_wheel_fallback{this, "color_wheel_fallback", false,
         c74::min::description{"When non-zero, fixtures without RGB/RGBW/CMY use color wheel hue plus dimmer brightness when available."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 color_wheel_fallback_attribute_overridden_ = true;
             }
             color_wheel_fallback_value_ = !args.empty() && ((int)args[0] != 0);

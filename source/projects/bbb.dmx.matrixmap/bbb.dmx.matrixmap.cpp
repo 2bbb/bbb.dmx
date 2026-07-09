@@ -73,6 +73,7 @@ private:
     bool groups_load_pending_{false};
     bool semantic_overrides_load_pending_{false};
     bool applying_setup_{false};
+    bool attributes_initialized_{false};
     bool suppress_setup_attribute_load_{false};
     bool suppress_patch_attribute_load_{false};
     bool suppress_map_attribute_load_{false};
@@ -281,7 +282,7 @@ public:
     c74::min::attribute<int> universe{this, "universe", 1,
         c74::min::description{"Selected universe for universe_mode selected."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 universe_attribute_overridden_ = true;
             }
             if(args.empty() || !bbb::dmx::maxutil::finite_atom(args[0])) {
@@ -295,7 +296,7 @@ public:
     c74::min::attribute<bool> color_use_white{this, "color_use_white", true,
         c74::min::description{"RGBW semantic matrix color behavior. When false, RGBW white parameters are left untouched."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 color_use_white_attribute_overridden_ = true;
             }
             color_use_white_value_ = args.empty() || ((int)args[0] != 0);
@@ -306,7 +307,7 @@ public:
     c74::min::attribute<bool> color_wheel_fallback{this, "color_wheel_fallback", false,
         c74::min::description{"Allow semantic matrix RGB mappings to drive nearest color-wheel slots when no RGB/CMY model exists."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 color_wheel_fallback_attribute_overridden_ = true;
             }
             color_wheel_fallback_value_ = !args.empty() && ((int)args[0] != 0);
@@ -317,7 +318,7 @@ public:
     c74::min::attribute<c74::min::symbol> plane_order{this, "plane_order", "rgba",
         c74::min::description{"Matrix plane order: rgba, argb, bgra, or gray."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 plane_order_attribute_overridden_ = true;
             }
             if(args.empty()) {
@@ -337,7 +338,7 @@ public:
     c74::min::attribute<c74::min::symbol> universe_mode{this, "universe_mode", "all",
         c74::min::description{"Output mode: all, selected, or changed."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 universe_mode_attribute_overridden_ = true;
             }
             if(args.empty()) {
@@ -357,7 +358,7 @@ public:
     c74::min::attribute<double> gamma{this, "gamma", 1.0,
         c74::min::description{"Gamma applied to sampled values. 1.0 leaves values unchanged."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 gamma_attribute_overridden_ = true;
             }
             if(args.empty() || !bbb::dmx::maxutil::finite_atom(args[0])) {
@@ -371,7 +372,7 @@ public:
     c74::min::attribute<double> brightness{this, "brightness", 1.0,
         c74::min::description{"Brightness multiplier applied after gamma."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 brightness_attribute_overridden_ = true;
             }
             if(args.empty() || !bbb::dmx::maxutil::finite_atom(args[0])) {
@@ -385,7 +386,7 @@ public:
     c74::min::attribute<bool> autobang{this, "autobang", true,
         c74::min::description{"Output DMX immediately when a jit_matrix is processed."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 autobang_attribute_overridden_ = true;
             }
             autobang_value_ = args.empty() || ((int)args[0] != 0);
@@ -396,7 +397,7 @@ public:
     c74::min::attribute<bool> invert_x{this, "invert_x", false,
         c74::min::description{"Mirror normalized sample coordinates horizontally."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 invert_x_attribute_overridden_ = true;
             }
             invert_x_value_ = !args.empty() && ((int)args[0] != 0);
@@ -407,7 +408,7 @@ public:
     c74::min::attribute<bool> invert_y{this, "invert_y", false,
         c74::min::description{"Mirror normalized sample coordinates vertically."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
-            if(!applying_setup_) {
+            if(attributes_initialized_ && !applying_setup_) {
                 invert_y_attribute_overridden_ = true;
             }
             invert_y_value_ = !args.empty() && ((int)args[0] != 0);
@@ -416,6 +417,7 @@ public:
     };
 
     bbb_dmx_matrixmap() {
+        attributes_initialized_ = true;
         bbb::dmx::report_external_build_info(cout, "bbb.dmx.matrixmap");
     }
 
