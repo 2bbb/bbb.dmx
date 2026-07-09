@@ -712,13 +712,13 @@ public:
                 handle_result(result);
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             result = apply_semantic_color(symbol_arg(args[0]), color, false);
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 return {};
             }
-            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("color", args));
+            trace_universe_changes(previous_universes, trace_source_from_args("color", args));
             output_if_autobang();
             return {};
         }
@@ -736,13 +736,13 @@ public:
                 handle_result(result);
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             result = apply_semantic_color_all(color);
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 return {};
             }
-            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("colorall", args));
+            trace_universe_changes(previous_universes, trace_source_from_args("colorall", args));
             output_if_autobang();
             return {};
         }
@@ -760,13 +760,13 @@ public:
                 handle_result(result);
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             result = apply_semantic_color_group(symbol_arg(args[0]), color);
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 return {};
             }
-            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("colorgroup", args));
+            trace_universe_changes(previous_universes, trace_source_from_args("colorgroup", args));
             output_if_autobang();
             return {};
         }
@@ -778,13 +778,13 @@ public:
                 report_error("dimmer requires fixture_id normalized_0_to_1");
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             const bbb::dmx::mapper_result result{apply_semantic_intensity(symbol_arg(args[0]), (double)args[1], false)};
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 return {};
             }
-            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("dimmer", args));
+            trace_universe_changes(previous_universes, trace_source_from_args("dimmer", args));
             output_if_autobang();
             return {};
         }
@@ -796,13 +796,13 @@ public:
                 report_error("dimmerall requires normalized_0_to_1");
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             const bbb::dmx::mapper_result result{apply_semantic_intensity_all((double)args[0])};
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 return {};
             }
-            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("dimmerall", args));
+            trace_universe_changes(previous_universes, trace_source_from_args("dimmerall", args));
             output_if_autobang();
             return {};
         }
@@ -814,13 +814,13 @@ public:
                 report_error("dimmergroup requires group_id normalized_0_to_1");
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             const bbb::dmx::mapper_result result{apply_semantic_intensity_group(symbol_arg(args[0]), (double)args[1])};
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 return {};
             }
-            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("dimmergroup", args));
+            trace_universe_changes(previous_universes, trace_source_from_args("dimmergroup", args));
             output_if_autobang();
             return {};
         }
@@ -838,13 +838,13 @@ public:
                 handle_result(result);
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             result = apply_semantic_shutter(symbol_arg(args[0]), open, false);
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 return {};
             }
-            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("shutter", args));
+            trace_universe_changes(previous_universes, trace_source_from_args("shutter", args));
             output_if_autobang();
             return {};
         }
@@ -862,13 +862,13 @@ public:
                 handle_result(result);
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             result = apply_semantic_shutter_all(open);
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 return {};
             }
-            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("shutterall", args));
+            trace_universe_changes(previous_universes, trace_source_from_args("shutterall", args));
             output_if_autobang();
             return {};
         }
@@ -886,13 +886,13 @@ public:
                 handle_result(result);
                 return {};
             }
-            const bbb::dmx::fixture_mapper previous_mapper{mapper_};
+            const bbb::dmx::fixture_mapper::universe_map previous_universes{mapper_.universe_snapshot()};
             result = apply_semantic_shutter_group(symbol_arg(args[0]), open);
             if(!handle_result(result)) {
-                mapper_ = previous_mapper;
+                mapper_.restore_universes(previous_universes);
                 return {};
             }
-            trace_universe_changes(previous_mapper.universe_snapshot(), trace_source_from_args("shuttergroup", args));
+            trace_universe_changes(previous_universes, trace_source_from_args("shuttergroup", args));
             output_if_autobang();
             return {};
         }
@@ -2199,12 +2199,10 @@ private:
             return bbb::dmx::mapper_result::failure("fixture has no semantic color model: " + fixture_id);
         }
 
-        bbb::dmx::fixture_mapper trial_mapper{mapper_};
-        const bbb::dmx::mapper_result result{apply_normalized_color_parameters(trial_mapper, fixture_id, mapping.parameters)};
+        const bbb::dmx::mapper_result result{apply_normalized_color_parameters(mapper_, fixture_id, mapping.parameters)};
         if(!result.ok) {
             return result;
         }
-        mapper_ = trial_mapper;
         return bbb::dmx::mapper_result::success();
     }
 
@@ -2286,12 +2284,10 @@ private:
             return bbb::dmx::mapper_result::failure("fixture has no semantic intensity parameter: " + fixture_id);
         }
 
-        bbb::dmx::fixture_mapper trial_mapper{mapper_};
-        const bbb::dmx::mapper_result result{apply_normalized_color_parameters(trial_mapper, fixture_id, mapping.parameters)};
+        const bbb::dmx::mapper_result result{apply_normalized_color_parameters(mapper_, fixture_id, mapping.parameters)};
         if(!result.ok) {
             return result;
         }
-        mapper_ = trial_mapper;
         return bbb::dmx::mapper_result::success();
     }
 
@@ -2364,14 +2360,12 @@ private:
             return bbb::dmx::mapper_result::failure("fixture has no semantic shutter parameter: " + fixture_id);
         }
 
-        bbb::dmx::fixture_mapper trial_mapper{mapper_};
         for(const auto &mapping : mappings.mappings) {
-            const bbb::dmx::mapper_result result{set_parameter_value_on_mapper(trial_mapper, fixture_id, mapping.parameter, mapping.value)};
+            const bbb::dmx::mapper_result result{set_parameter_value_on_mapper(mapper_, fixture_id, mapping.parameter, mapping.value)};
             if(!result.ok) {
                 return result;
             }
         }
-        mapper_ = trial_mapper;
         return bbb::dmx::mapper_result::success();
     }
 
