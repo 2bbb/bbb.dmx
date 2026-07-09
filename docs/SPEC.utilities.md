@@ -33,9 +33,9 @@ Stores the latest known frame per universe and can emit either full frames or ch
 
 Merges named layers across multiple universes.
 
-- Input: `universe layer id ...`, `layer layer id ...`, `channel`, `channels`, `priority`, `readpatch`, `readoverrides`, `reload`, `clear`, `bang`, `bangall`, `dump`
+- Input: `universe layer id ...`, `layer layer id ...`, `channel`, `channels`, `priority`, `readsetup`, `readpatch`, `readoverrides`, `reload`, `clear`, `bang`, `bangall`, `dump`
 - Output: merged `universe <id> ...`
-- Attributes: `@universe`, `@mode`, `@patch`, `@semantic_overrides`
+- Attributes: `@setup`, `@universe`, `@mode`, `@patch`, `@semantic_overrides`
 - Modes: `priority`, `htp`, `ltp`
 
 `priority` is the deterministic default for show-control patches. `htp` is useful for intensities. `ltp` is useful for controller takeover, but it is easier to misunderstand because recent zero values are still intentional values.
@@ -92,8 +92,9 @@ This should sit late in the chain, immediately before the sender. It is not a su
 
 Validates fixture patch/profile JSON.
 
-- Input: `read`, `readgroups`, `bang`
+- Input: `readsetup`, `read`, `readgroups`, `bang`
 - Output: `ok fixtures <count> groups <count> universes <id...>` or `error <message>`
+- Attributes: `@setup`, `@patch`, `@groups`
 - Optional groups validation: set `@groups` or send `readgroups path` before `bang`; output includes `groups <count>`.
 
 ### `bbb.dmx.fixtureinfo`
@@ -120,15 +121,15 @@ Samples `char` or `float32` `jit.matrix` color data into fixture parameters thro
 
 ### Shared setup files
 
-`bbb.dmx.fixturemap`, `bbb.dmx.matrixmap`, `bbb.dmx.mask`, and `bbb.dmx.fixtureinfo` accept `@setup` / `readsetup` for `bbb.dmx.setup.v1` files. JSON file paths supplied to Max externals are resolved through the shared object-aware resolver: relative paths are tried against the saved Max patcher directory first, then Max's normal search path. The setup file may define common paths/defaults at top level and object-specific overrides under `fixturemap`, `matrixmap`, `mask`, or `fixtureinfo`. Paths inside setup are resolved relative to the setup file itself. Explicit object attributes always win over setup values. `@setup` is deliberately separate from `@config`, which remains the mask rule file attribute on `bbb.dmx.mask`.
+All patch-aware objects accept `@setup` / `readsetup` for `bbb.dmx.setup.v1` files. JSON file paths supplied to Max externals are resolved through the shared object-aware resolver: relative paths are tried against the saved Max patcher directory first, then Max's normal search path. The setup file may define common paths/defaults at top level and object-specific overrides under `fixturemap`, `matrixmap`, `mask`, or `fixtureinfo`. Simpler patch consumers (`merge`, `palette`, `scene`, `fixtureview`, and `patchcheck`) read only the top-level values they need, such as `patch`, `groups`, and `semantic_overrides`. Paths inside setup are resolved relative to the setup file itself. Explicit object attributes always win over setup values. `@setup` is deliberately separate from `@config`, which remains the mask rule file attribute on `bbb.dmx.mask`.
 
 ### `bbb.dmx.palette`
 
 Applies named normalized parameter palettes through fixture patch/profile metadata.
 
-- Input: `readpatch`, `readpalette`, `reload`, `apply`, `clear`, `bang`, `dump`
+- Input: `readsetup`, `readpatch`, `readpalette`, `reload`, `apply`, `clear`, `bang`, `dump`
 - Output: `universe <id> <512 byte values>` for all universes used by the patch
-- Attributes: `@patch`, `@palette`, `@autobang`
+- Attributes: `@setup`, `@patch`, `@palette`, `@autobang`
 - Config file: `palettes/*.json` with `palettes` object.
 - `apply palette_name [fixture_pattern ...]` filters fixture ids with `*`/`?` wildcards.
 
@@ -157,9 +158,9 @@ Group operations are explicit: `setgroup`, `nsetgroup`, `rawsetgroup`, `colorgro
 
 Recalls named fixture-pattern looks through fixture patch/profile metadata.
 
-- Input: `readpatch`, `readscene`, `reload`, `apply`, `bang`, `dump`
+- Input: `readsetup`, `readpatch`, `readscene`, `reload`, `apply`, `bang`, `dump`
 - Output: `universe <id> <512 byte values>` for all universes used by the patch
-- Attributes: `@patch`, `@scene`, `@autobang`
+- Attributes: `@setup`, `@patch`, `@scene`, `@autobang`
 - Config file: `scenes/*.json` with `scenes` object.
 - `apply scene_name` resets patched fixture channels to defaults, then applies scene rules.
 
@@ -167,9 +168,9 @@ Recalls named fixture-pattern looks through fixture patch/profile metadata.
 
 Decodes current raw DMX frames through fixture patch/profile metadata.
 
-- Input: `list`, `universe`, `channel`, `channels`, `read`, `reload`, `bang`, `listfixtures`, `fixture`, `listparams`, `param`
+- Input: `list`, `universe`, `channel`, `channels`, `readsetup`, `read`, `reload`, `bang`, `listfixtures`, `fixture`, `listparams`, `param`
 - Output selectors: `summary`, `fixture`, `param`, `error`
-- Attributes: `@patch`, `@universe`
+- Attributes: `@setup`, `@patch`, `@universe`
 - `param fixture_id parameter_key` reports parameter type, universe, DMX addresses, raw bytes, combined raw value, and normalized value.
 
 ### `bbb.dmx.curve`

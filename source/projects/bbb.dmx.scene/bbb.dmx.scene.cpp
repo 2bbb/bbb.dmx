@@ -25,11 +25,16 @@ class bbb_dmx_scene : public c74::min::object<bbb_dmx_scene> {
 private:
     bbb::dmx::fixture_mapper mapper_{};
     std::map<std::string, std::vector<scene_rule>> scenes_{};
+    std::string setup_path_value_{};
     std::string patch_path_value_{};
     std::string scene_path_value_{};
     bool patch_loaded_{false};
     bool scene_loaded_{false};
     bool autobang_value_{true};
+    bool setup_load_pending_{false};
+    bool suppress_setup_attribute_load_{false};
+    bool suppress_patch_attribute_load_{false};
+    bool patch_attribute_overridden_{false};
 
 public:
     MIN_DESCRIPTION{"Recall named fixture-parameter scenes into multi-universe DMX frames."};
@@ -41,6 +46,26 @@ public:
     c74::min::outlet<> output{this, "(anything) universe frames"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
+    c74::min::attribute<c74::min::symbol> setup{this, "setup", "",
+        c74::min::description{"Optional bbb.dmx.setup.v1 JSON path. Uses the top-level patch value unless @patch overrides it."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                if(!suppress_setup_attribute_load_) {
+                    setup_path_value_.clear();
+                    setup_load_pending_ = false;
+                }
+                return {c74::min::symbol("")};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            setup_path_value_ = symbol_value.c_str();
+            if(!suppress_setup_attribute_load_) {
+                setup_load_pending_ = true;
+                init_timer.delay(0);
+            }
+            return {symbol_value};
+        }}
+    };
+
     c74::min::attribute<c74::min::symbol> patch{this, "patch", "",
         c74::min::description{"Fixture patch JSON path."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
@@ -50,6 +75,9 @@ public:
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             patch_path_value_ = symbol_value.c_str();
+            if(bbb::dmx::maxutil::should_mark_explicit_symbol_override(args, false, suppress_patch_attribute_load_)) {
+                patch_attribute_overridden_ = true;
+            }
             return {symbol_value};
         }}
     };
@@ -77,7 +105,11 @@ public:
 
     c74::min::timer<c74::min::timer_options::defer_delivery> init_timer{this,
         MIN_FUNCTION {
-            if(!patch_path_value_.empty()) {
+            if(!setup_path_value_.empty()) {
+                setup_load_pending_ = false;
+                load_setup(setup_path_value_);
+            }
+            if(!patch_loaded_ && !patch_path_value_.empty()) {
                 load_patch(patch_path_value_);
             }
             if(!scene_path_value_.empty()) {
@@ -102,6 +134,23 @@ public:
             patch_path_value_ = path_symbol.c_str();
             patch = path_symbol;
             load_patch(patch_path_value_);
+            return {};
+        }
+    };
+
+    c74::min::message<> readsetup_message{this, "readsetup", "readsetup setup_json_path",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                report_error("readsetup requires setup JSON path");
+                return {};
+            }
+            const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
+            setup_path_value_ = path_symbol.c_str();
+            suppress_setup_attribute_load_ = true;
+            setup = path_symbol;
+            suppress_setup_attribute_load_ = false;
+            setup_load_pending_ = false;
+            load_setup(setup_path_value_);
             return {};
         }
     };
@@ -158,6 +207,21 @@ public:
     };
 
 private:
+    void load_setup(const std::string &path) {
+        bbb::dmx::maxutil::setup_load_result setup_result{};
+        const bbb::dmx::mapper_result result{bbb::dmx::maxutil::read_common_setup_values(this->maxobj(), path, setup_result)};
+        if(!result.ok) {
+            report_error(result.message);
+            return;
+        }
+        if(setup_result.values.patch.has_value() && !patch_attribute_overridden_) {
+            const std::string resolved_path{bbb::dmx::maxutil::setup_relative_path(setup_result.base_directory, setup_result.values.patch.value())};
+            bbb::dmx::maxutil::apply_setup_symbol_path(patch, suppress_patch_attribute_load_, patch_path_value_, resolved_path);
+            load_patch(patch_path_value_);
+        }
+        report_status("setup_loaded");
+    }
+
     void recall_from_args(const c74::min::atoms &args) {
         if(args.empty()) {
             report_error("apply requires scene name");

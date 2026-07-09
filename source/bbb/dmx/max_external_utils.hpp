@@ -12,6 +12,7 @@
 
 #include "bbb/dmx/frame_set.hpp"
 #include "bbb/dmx/math.hpp"
+#include "bbb/dmx/setup.hpp"
 
 namespace bbb::dmx::maxutil {
 
@@ -343,6 +344,31 @@ inline void apply_setup_symbol_path(
     storage = path;
     attribute = c74::min::symbol(path.c_str());
     suppress_attribute_load = false;
+}
+
+struct setup_load_result {
+public:
+    std::string resolved_path{};
+    std::string base_directory{};
+    bbb::dmx::dmx_setup_values values{};
+};
+
+inline bbb::dmx::mapper_result read_common_setup_values(
+    c74::max::t_object *max_object,
+    const std::string &path,
+    setup_load_result &result
+) {
+    const std::string resolved_path{resolve_file_path(max_object, path)};
+    bbb::dmx::dmx_setup_document setup_document{};
+    const bbb::dmx::mapper_result read_result{bbb::dmx::read_dmx_setup_file(resolved_path, setup_document)};
+    if(!read_result.ok) {
+        return read_result;
+    }
+
+    result.resolved_path = resolved_path;
+    result.base_directory = parent_directory(resolved_path);
+    result.values = setup_document.common;
+    return bbb::dmx::mapper_result::success();
 }
 
 template <typename outlet_type>

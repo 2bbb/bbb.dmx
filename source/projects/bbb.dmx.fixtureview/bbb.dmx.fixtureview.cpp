@@ -15,9 +15,14 @@ class bbb_dmx_fixtureview : public c74::min::object<bbb_dmx_fixtureview> {
 private:
     bbb::dmx::fixture_mapper mapper_{};
     bbb::dmx::dmx_frame_set frames_{};
+    std::string setup_path_value_{};
     std::string patch_path_value_{};
     int universe_value_{1};
     bool loaded_{false};
+    bool setup_load_pending_{false};
+    bool suppress_setup_attribute_load_{false};
+    bool suppress_patch_attribute_load_{false};
+    bool patch_attribute_overridden_{false};
 
 public:
     MIN_DESCRIPTION{"Inspect current DMX frame values through fixture patch/profile metadata."};
@@ -28,6 +33,26 @@ public:
     c74::min::inlet<> input{this, "(read/universe/list/channel/fixture/param) fixture view input"};
     c74::min::outlet<> output{this, "(anything) decoded fixture values and errors"};
 
+    c74::min::attribute<c74::min::symbol> setup{this, "setup", "",
+        c74::min::description{"Optional bbb.dmx.setup.v1 JSON path. Uses the top-level patch value unless @patch overrides it."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                if(!suppress_setup_attribute_load_) {
+                    setup_path_value_.clear();
+                    setup_load_pending_ = false;
+                }
+                return {c74::min::symbol("")};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            setup_path_value_ = symbol_value.c_str();
+            if(!suppress_setup_attribute_load_) {
+                setup_load_pending_ = true;
+                init_timer.delay(0);
+            }
+            return {symbol_value};
+        }}
+    };
+
     c74::min::attribute<c74::min::symbol> patch{this, "patch", "",
         c74::min::description{"Patch JSON path to inspect."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
@@ -37,6 +62,9 @@ public:
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             patch_path_value_ = symbol_value.c_str();
+            if(bbb::dmx::maxutil::should_mark_explicit_symbol_override(args, false, suppress_patch_attribute_load_)) {
+                patch_attribute_overridden_ = true;
+            }
             return {symbol_value};
         }}
     };
@@ -54,7 +82,11 @@ public:
 
     c74::min::timer<c74::min::timer_options::defer_delivery> init_timer{this,
         MIN_FUNCTION {
-            if(!patch_path_value_.empty()) {
+            if(!setup_path_value_.empty()) {
+                setup_load_pending_ = false;
+                load_setup(setup_path_value_);
+            }
+            if(!loaded_ && !patch_path_value_.empty()) {
                 load_patch(patch_path_value_);
             }
             return {};
@@ -76,6 +108,23 @@ public:
             patch_path_value_ = path_symbol.c_str();
             patch = path_symbol;
             load_patch(patch_path_value_);
+            return {};
+        }
+    };
+
+    c74::min::message<> readsetup_message{this, "readsetup", "readsetup setup_json_path",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                send_error("readsetup requires setup JSON path");
+                return {};
+            }
+            const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
+            setup_path_value_ = path_symbol.c_str();
+            suppress_setup_attribute_load_ = true;
+            setup = path_symbol;
+            suppress_setup_attribute_load_ = false;
+            setup_load_pending_ = false;
+            load_setup(setup_path_value_);
             return {};
         }
     };
@@ -214,6 +263,21 @@ public:
     };
 
 private:
+    void load_setup(const std::string &path) {
+        bbb::dmx::maxutil::setup_load_result setup_result{};
+        const bbb::dmx::mapper_result result{bbb::dmx::maxutil::read_common_setup_values(this->maxobj(), path, setup_result)};
+        if(!result.ok) {
+            send_error(result.message.c_str());
+            return;
+        }
+        if(setup_result.values.patch.has_value() && !patch_attribute_overridden_) {
+            const std::string resolved_path{bbb::dmx::maxutil::setup_relative_path(setup_result.base_directory, setup_result.values.patch.value())};
+            bbb::dmx::maxutil::apply_setup_symbol_path(patch, suppress_patch_attribute_load_, patch_path_value_, resolved_path);
+            load_patch(patch_path_value_);
+        }
+        bbb::dmx::maxutil::send_status(output, "status", "setup_loaded");
+    }
+
     void set_universe_from_atoms(int universe_id, const c74::min::atoms &args, std::size_t start) {
         if(args.size() < start + (std::size_t)bbb::dmx::universe_channel_count || !bbb::dmx::maxutil::finite_atoms(args, start, bbb::dmx::universe_channel_count)) {
             send_error("universe input requires 512 numeric values");
