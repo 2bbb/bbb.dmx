@@ -100,9 +100,10 @@ Validates fixture patch/profile JSON.
 
 Reports fixture metadata from loaded patch/profile JSON.
 
-- Input: `read`, `bang`, `listfixtures`, `fixture`, `listparams`, `modeparams`, `param`, `dump`
+- Input: `readsetup`, `read`, `bang`, `listfixtures`, `fixture`, `listparams`, `modeparams`, `param`, `dump`
 - `listparams fixture_id` / `param fixture_id parameter_key` inspect a patched fixture instance.
 - `listparams profile_key mode_key`, `modeparams profile_key mode_key`, and `param profile_key mode_key parameter_key` inspect a loaded profile/mode directly.
+- Attributes: `@setup`, `@patch`
 - Output selectors: `summary`, `fixture`, `param`, `error`
 
 ### `bbb.dmx.matrixmap`
@@ -119,7 +120,7 @@ Samples `char` or `float32` `jit.matrix` color data into fixture parameters thro
 
 ### Shared setup files
 
-`bbb.dmx.fixturemap`, `bbb.dmx.matrixmap`, and `bbb.dmx.mask` accept `@setup` / `readsetup` for `bbb.dmx.setup.v1` files. JSON file paths supplied to Max externals are resolved through the shared object-aware resolver: relative paths are tried against the saved Max patcher directory first, then Max's normal search path. The setup file may define common paths/defaults at top level and object-specific overrides under `fixturemap`, `matrixmap`, or `mask`. Paths inside setup are resolved relative to the setup file itself. Explicit object attributes always win over setup values. `@setup` is deliberately separate from `@config`, which remains the mask rule file attribute on `bbb.dmx.mask`.
+`bbb.dmx.fixturemap`, `bbb.dmx.matrixmap`, `bbb.dmx.mask`, and `bbb.dmx.fixtureinfo` accept `@setup` / `readsetup` for `bbb.dmx.setup.v1` files. JSON file paths supplied to Max externals are resolved through the shared object-aware resolver: relative paths are tried against the saved Max patcher directory first, then Max's normal search path. The setup file may define common paths/defaults at top level and object-specific overrides under `fixturemap`, `matrixmap`, `mask`, or `fixtureinfo`. Paths inside setup are resolved relative to the setup file itself. Explicit object attributes always win over setup values. `@setup` is deliberately separate from `@config`, which remains the mask rule file attribute on `bbb.dmx.mask`.
 
 ### `bbb.dmx.palette`
 

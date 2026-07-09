@@ -4,6 +4,7 @@
 
 #include <bbb/dmx/fixture_json.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
+#include <bbb/dmx/setup.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -21,8 +22,15 @@ private:
     };
 
     bbb::dmx::fixture_mapper mapper_{};
+    std::string setup_path_value_{};
     std::string patch_path_value_{};
     bool loaded_{false};
+    bool setup_load_pending_{false};
+    bool patch_load_pending_{false};
+    bool applying_setup_{false};
+    bool suppress_setup_attribute_load_{false};
+    bool suppress_patch_attribute_load_{false};
+    bool patch_attribute_overridden_{false};
 
 public:
     MIN_DESCRIPTION{"Inspect bbb.dmx fixture patch/profile metadata without outputting DMX."};
@@ -30,8 +38,24 @@ public:
     MIN_AUTHOR{"2bit"};
     MIN_RELATED{"bbb.dmx.fixturemap, bbb.dmx.patchcheck"};
 
-    c74::min::inlet<> input{this, "(read/bang/listfixtures/fixture/listparams/modeparams/param) fixture info input"};
+    c74::min::inlet<> input{this, "(readsetup/read/bang/listfixtures/fixture/listparams/modeparams/param) fixture info input"};
     c74::min::outlet<> output{this, "(anything) fixture metadata and errors"};
+
+    c74::min::attribute<c74::min::symbol> setup{this, "setup", "",
+        c74::min::description{"Optional bbb.dmx.setup.v1 JSON path. The fixtureinfo section overrides top-level setup values."},
+        c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
+            if(args.empty()) {
+                setup_path_value_.clear();
+                return {c74::min::symbol("")};
+            }
+            const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
+            setup_path_value_ = symbol_value.c_str();
+            if(!suppress_setup_attribute_load_) {
+                setup_load_pending_ = true;
+            }
+            return {symbol_value};
+        }}
+    };
 
     c74::min::attribute<c74::min::symbol> patch{this, "patch", "",
         c74::min::description{"Patch JSON path to inspect."},
@@ -42,12 +66,32 @@ public:
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             patch_path_value_ = symbol_value.c_str();
+            if(!suppress_patch_attribute_load_) {
+                if(!applying_setup_) {
+                    patch_attribute_overridden_ = true;
+                }
+                patch_load_pending_ = true;
+            }
             return {symbol_value};
         }}
     };
 
     c74::min::timer<c74::min::timer_options::defer_delivery> init_timer{this,
         MIN_FUNCTION {
+            if(setup_load_pending_ && !setup_path_value_.empty()) {
+                setup_load_pending_ = false;
+                load_setup(setup_path_value_);
+                return {};
+            }
+            if(patch_load_pending_ && !patch_path_value_.empty()) {
+                patch_load_pending_ = false;
+                load_patch(patch_path_value_);
+                return {};
+            }
+            if(!setup_path_value_.empty()) {
+                load_setup(setup_path_value_);
+                return {};
+            }
             if(!patch_path_value_.empty()) {
                 load_patch(patch_path_value_);
             }
@@ -59,6 +103,21 @@ public:
         bbb::dmx::report_external_build_info(cout, "bbb.dmx.fixtureinfo");
         init_timer.delay(0);
     }
+
+
+    c74::min::message<> readsetup_message{this, "readsetup", "readsetup setup_json_path",
+        MIN_FUNCTION {
+            if(args.empty()) {
+                send_error("readsetup requires a setup JSON path");
+                return {};
+            }
+            const c74::min::symbol path_symbol{(c74::min::symbol)args[0]};
+            setup_path_value_ = path_symbol.c_str();
+            setup = path_symbol;
+            load_setup(setup_path_value_);
+            return {};
+        }
+    };
 
     c74::min::message<> read_message{this, "read", "read patch_json_path",
         MIN_FUNCTION {
@@ -192,6 +251,57 @@ public:
     };
 
 private:
+    std::string setup_relative_path(const std::string &base_directory, const std::string &path) const {
+        if(path.empty()) {
+            return path;
+        }
+        if(bbb::dmx::path_is_absolute(path)) {
+            const std::string system_path{bbb::dmx::maxutil::max_path_to_system_path(path)};
+            if(!system_path.empty()) {
+                return system_path;
+            }
+            return path;
+        }
+        return bbb::dmx::join_relative_path(base_directory, path);
+    }
+
+    void apply_setup_file_path(
+        c74::min::attribute<c74::min::symbol> &attribute,
+        bool &suppress_attribute_load,
+        std::string &storage,
+        const std::string &path
+    ) {
+        suppress_attribute_load = true;
+        storage = path;
+        attribute = c74::min::symbol(path.c_str());
+        suppress_attribute_load = false;
+    }
+
+    void apply_setup_values(const bbb::dmx::dmx_setup_values &values, const std::string &base_directory) {
+        applying_setup_ = true;
+        if(values.patch.has_value() && !patch_attribute_overridden_) {
+            const std::string resolved_path{setup_relative_path(base_directory, values.patch.value())};
+            apply_setup_file_path(patch, suppress_patch_attribute_load_, patch_path_value_, resolved_path);
+        }
+        applying_setup_ = false;
+    }
+
+    void load_setup(const std::string &path) {
+        const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path)};
+        bbb::dmx::dmx_setup_document setup_document{};
+        const bbb::dmx::mapper_result result{bbb::dmx::read_dmx_setup_file(resolved_path, setup_document)};
+        if(!result.ok) {
+            send_error(result.message.c_str());
+            return;
+        }
+        const std::string base_directory{bbb::dmx::parent_directory(resolved_path)};
+        const bbb::dmx::dmx_setup_values values{bbb::dmx::merge_setup_values(setup_document.common, setup_document.fixtureinfo)};
+        apply_setup_values(values, base_directory);
+        if(!patch_path_value_.empty()) {
+            load_patch(patch_path_value_);
+        }
+    }
+
     void load_patch(const std::string &path) {
         const std::string resolved_path{bbb::dmx::maxutil::resolve_file_path(this->maxobj(), path)};
         bbb::dmx::fixture_mapper loaded_mapper{};

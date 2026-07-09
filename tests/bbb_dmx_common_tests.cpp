@@ -698,6 +698,9 @@ int main() {
         "mask": {
             "config": "masks/show.mask.json",
             "autobang": false
+        },
+        "fixtureinfo": {
+            "patch": "patch-for-info.json"
         }
     })json", setup_document);
     require(map_result.ok, "setup JSON parses");
@@ -718,6 +721,9 @@ int main() {
     require(mask_setup.config.has_value() && mask_setup.config.value() == "masks/show.mask.json", "setup mask section overrides common config");
     require(mask_setup.patch.has_value() && mask_setup.patch.value() == "patch-from-mvr.json", "setup mask inherits common patch");
     require(mask_setup.autobang.has_value() && !mask_setup.autobang.value(), "setup mask autobang parses");
+    const bbb::dmx::dmx_setup_values fixtureinfo_setup{bbb::dmx::merge_setup_values(setup_document.common, setup_document.fixtureinfo)};
+    require(fixtureinfo_setup.patch.has_value() && fixtureinfo_setup.patch.value() == "patch-for-info.json", "setup fixtureinfo section overrides common patch");
+    require(fixtureinfo_setup.groups.has_value() && fixtureinfo_setup.groups.value() == "groups/show.groups.json", "setup fixtureinfo inherits common groups");
     map_result = bbb::dmx::parse_dmx_setup_text(R"json({
         "schema": "bbb.dmx.setup.v1",
         "fixturemap": { "patchh": "typo.json" }

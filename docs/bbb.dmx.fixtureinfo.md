@@ -17,12 +17,20 @@ or:
 read patches/example.json
 ```
 
+Shared setup files are also supported:
+
+```max
+[bbb.dmx.fixtureinfo @setup show.setup.json]
+```
+
+`fixtureinfo` reads the top-level `patch` value from `bbb.dmx.setup.v1`; a `fixtureinfo.patch` section value overrides the top-level patch. Explicit `@patch` on the object overrides setup values.
+
 The object loads a patch JSON file (`bbb.dmx.patch.v2`). Fixture profiles are loaded from the patch file's `profiles` array.
 
 Important constraints:
 
 - Profile/mode inspection only works for profiles that have been loaded through the patch JSON.
-- Relative paths are resolved through the shared bbb.dmx Max file resolver. In practice, put project data where Max can resolve it, or use an absolute path if Max path lookup is ambiguous.
+- Relative paths are resolved through the shared bbb.dmx Max file resolver: saved patcher directory first, then Max search path. Paths inside setup files are relative to the setup file itself.
 - Numeric fixture IDs in imported MVR/MA3 data are normalized to strings internally. In Max, `fixture 101` and `listparams 101` target fixture id `"101"`.
 
 ## Messages

@@ -630,9 +630,9 @@ Canonical assertion rules should include at least one of `min`, `max`, or `equal
 
 ## 11. Shared setup: `bbb.dmx.setup.v1`
 
-A setup file collects paths and object defaults that are otherwise easy to mistype in Max object boxes. It is loaded by `bbb.dmx.fixturemap`, `bbb.dmx.matrixmap`, and `bbb.dmx.mask` through `@setup` or `readsetup`. `@setup` is intentionally separate from object-specific file attributes such as `bbb.dmx.mask @config`.
+A setup file collects paths and object defaults that are otherwise easy to mistype in Max object boxes. It is loaded by `bbb.dmx.fixturemap`, `bbb.dmx.matrixmap`, `bbb.dmx.mask`, and `bbb.dmx.fixtureinfo` through `@setup` or `readsetup`. `@setup` is intentionally separate from object-specific file attributes such as `bbb.dmx.mask @config`.
 
-Top-level fields are common defaults. The `fixturemap`, `matrixmap`, and `mask` objects may override those defaults in their own sections. Explicit attributes on the Max object override all setup values. Paths inside setup are resolved relative to the setup file itself, whether the setup file was loaded by absolute path or Max search path.
+Top-level fields are common defaults. The `fixturemap`, `matrixmap`, `mask`, and `fixtureinfo` objects may override those defaults in their own sections. Explicit attributes on the Max object override all setup values. Paths inside setup are resolved relative to the setup file itself, whether the setup file was loaded by absolute path or Max search path.
 
 ```json
 {

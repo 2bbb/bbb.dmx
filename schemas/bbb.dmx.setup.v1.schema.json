@@ -98,6 +98,9 @@
     },
     "mask": {
       "$ref": "#/$defs/setup_values"
+    },
+    "fixtureinfo": {
+      "$ref": "#/$defs/setup_values"
     }
   },
   "$defs": {

@@ -239,11 +239,14 @@ inline std::string patcher_file_path(c74::max::t_object *max_object) {
     if(!max_object) {
         return {};
     }
-    c74::max::t_object *patcher{c74::max::object_attr_getobj(max_object, c74::max::gensym("patcher"))};
-    if(!patcher) {
+
+    c74::max::t_object *patcher{nullptr};
+    const c74::max::t_max_err lookup_error{c74::max::object_obex_lookup(max_object, c74::max::gensym("#P"), &patcher)};
+    if(lookup_error != 0 || !patcher) {
         return {};
     }
-    c74::max::t_symbol *filepath_symbol{c74::max::object_attr_getsym(patcher, c74::max::gensym("filepath"))};
+
+    c74::max::t_symbol *filepath_symbol{c74::max::jpatcher_get_filepath(patcher)};
     if(!filepath_symbol || !filepath_symbol->s_name || filepath_symbol->s_name[0] == '\0') {
         return {};
     }
