@@ -66,10 +66,10 @@ public:
             }
             const c74::min::symbol symbol_value{(c74::min::symbol)args[0]};
             patch_path_value_ = symbol_value.c_str();
+            if(bbb::dmx::maxutil::should_mark_explicit_symbol_override(args, applying_setup_, suppress_patch_attribute_load_)) {
+                patch_attribute_overridden_ = true;
+            }
             if(!suppress_patch_attribute_load_) {
-                if(!applying_setup_) {
-                    patch_attribute_overridden_ = true;
-                }
                 patch_load_pending_ = true;
             }
             return {symbol_value};
@@ -251,37 +251,11 @@ public:
     };
 
 private:
-    std::string setup_relative_path(const std::string &base_directory, const std::string &path) const {
-        if(path.empty()) {
-            return path;
-        }
-        if(bbb::dmx::path_is_absolute(path)) {
-            const std::string system_path{bbb::dmx::maxutil::max_path_to_system_path(path)};
-            if(!system_path.empty()) {
-                return system_path;
-            }
-            return path;
-        }
-        return bbb::dmx::join_relative_path(base_directory, path);
-    }
-
-    void apply_setup_file_path(
-        c74::min::attribute<c74::min::symbol> &attribute,
-        bool &suppress_attribute_load,
-        std::string &storage,
-        const std::string &path
-    ) {
-        suppress_attribute_load = true;
-        storage = path;
-        attribute = c74::min::symbol(path.c_str());
-        suppress_attribute_load = false;
-    }
-
     void apply_setup_values(const bbb::dmx::dmx_setup_values &values, const std::string &base_directory) {
         applying_setup_ = true;
         if(values.patch.has_value() && !patch_attribute_overridden_) {
-            const std::string resolved_path{setup_relative_path(base_directory, values.patch.value())};
-            apply_setup_file_path(patch, suppress_patch_attribute_load_, patch_path_value_, resolved_path);
+            const std::string resolved_path{bbb::dmx::maxutil::setup_relative_path(base_directory, values.patch.value())};
+            bbb::dmx::maxutil::apply_setup_symbol_path(patch, suppress_patch_attribute_load_, patch_path_value_, resolved_path);
         }
         applying_setup_ = false;
     }

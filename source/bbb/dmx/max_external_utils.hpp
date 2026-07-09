@@ -304,6 +304,47 @@ inline std::string resolve_file_path(c74::max::t_object *max_object, const std::
     return resolve_file_path(path);
 }
 
+inline bool explicit_symbol_attribute_value(const c74::min::atoms &args) {
+    if(args.empty()) {
+        return false;
+    }
+    return !symbol_arg(args[0]).empty();
+}
+
+inline bool should_mark_explicit_symbol_override(
+    const c74::min::atoms &args,
+    bool applying_setup,
+    bool suppress_attribute_load
+) {
+    return explicit_symbol_attribute_value(args) && !applying_setup && !suppress_attribute_load;
+}
+
+inline std::string setup_relative_path(const std::string &base_directory, const std::string &path) {
+    if(path.empty()) {
+        return path;
+    }
+    if(path_is_absolute(path)) {
+        const std::string system_path{max_path_to_system_path(path)};
+        if(!system_path.empty()) {
+            return system_path;
+        }
+        return path;
+    }
+    return join_relative_path(base_directory, path);
+}
+
+inline void apply_setup_symbol_path(
+    c74::min::attribute<c74::min::symbol> &attribute,
+    bool &suppress_attribute_load,
+    std::string &storage,
+    const std::string &path
+) {
+    suppress_attribute_load = true;
+    storage = path;
+    attribute = c74::min::symbol(path.c_str());
+    suppress_attribute_load = false;
+}
+
 template <typename outlet_type>
 void send_status(outlet_type &outlet, const char *selector, const std::string &message) {
     outlet.send(status_atoms(selector, message));
