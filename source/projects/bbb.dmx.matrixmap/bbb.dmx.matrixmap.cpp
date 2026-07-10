@@ -9,6 +9,7 @@
 #include <bbb/dmx/frame_set.hpp>
 #include <bbb/dmx/max_external_utils.hpp>
 #include <bbb/dmx/matrix_map.hpp>
+#include <bbb/dmx/matrixmap_diagnostics.hpp>
 #include <bbb/dmx/semantic_overrides.hpp>
 #include <bbb/dmx/setup.hpp>
 
@@ -98,6 +99,7 @@ private:
     std::map<int, std::set<int>> owned_output_channels_{};
     std::map<int, std::set<int>> pending_output_channels_{};
     bool collecting_output_channels_{false};
+    bbb::dmx::matrixmap::autobang_warning_gate autobang_warning_gate_{};
 
 public:
     MIN_DESCRIPTION{"Sample jit.matrix color data and patch it into multi-universe DMX fixture parameters."};
@@ -390,6 +392,9 @@ public:
                 autobang_attribute_overridden_ = true;
             }
             autobang_value_ = args.empty() || ((int)args[0] != 0);
+            if(autobang_value_) {
+                autobang_warning_gate_.reset();
+            }
             return {autobang_value_};
         }}
     };
@@ -546,7 +551,7 @@ public:
         }
     };
 
-    c74::min::message<> dump_message{this, "dump", "Output load status.",
+    c74::min::message<> dump_message{this, "dump", "Output load status and effective settings.",
         MIN_FUNCTION {
             c74::min::atoms atoms;
             atoms.push_back(c74::min::symbol("status"));
@@ -566,6 +571,74 @@ public:
             atoms.push_back((int)matrix_map_.fixtures.size());
             atoms.push_back(c74::min::symbol("universe_mode"));
             atoms.push_back(c74::min::symbol(universe_output_mode_to_string(output_mode_value_)));
+            atoms.push_back(c74::min::symbol("patch_fixtures"));
+            atoms.push_back((int)mapper_.patch().fixtures.size());
+            atoms.push_back(c74::min::symbol("setup"));
+            atoms.push_back(c74::min::symbol(setup_path_value_.c_str()));
+            atoms.push_back(c74::min::symbol("patch"));
+            atoms.push_back(c74::min::symbol(patch_path_value_.c_str()));
+            atoms.push_back(c74::min::symbol("map"));
+            atoms.push_back(c74::min::symbol(map_path_value_.c_str()));
+            atoms.push_back(c74::min::symbol("groups"));
+            atoms.push_back(c74::min::symbol(groups_path_value_.c_str()));
+            atoms.push_back(c74::min::symbol("semantic_overrides"));
+            atoms.push_back(c74::min::symbol(semantic_overrides_path_value_.c_str()));
+            atoms.push_back(c74::min::symbol("universe"));
+            atoms.push_back(universe_value_);
+            atoms.push_back(c74::min::symbol("plane_order"));
+            atoms.push_back(c74::min::symbol(plane_order_to_string(plane_order_value_)));
+            atoms.push_back(c74::min::symbol("gamma"));
+            atoms.push_back(gamma_value_);
+            atoms.push_back(c74::min::symbol("brightness"));
+            atoms.push_back(brightness_value_);
+            atoms.push_back(c74::min::symbol("autobang"));
+            atoms.push_back(autobang_value_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("invert_x"));
+            atoms.push_back(invert_x_value_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("invert_y"));
+            atoms.push_back(invert_y_value_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("color_use_white"));
+            atoms.push_back(color_use_white_value_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("color_wheel_fallback"));
+            atoms.push_back(color_wheel_fallback_value_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("setup_load_pending"));
+            atoms.push_back(setup_load_pending_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("patch_load_pending"));
+            atoms.push_back(patch_load_pending_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("map_load_pending"));
+            atoms.push_back(map_load_pending_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("groups_load_pending"));
+            atoms.push_back(groups_load_pending_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("semantic_overrides_load_pending"));
+            atoms.push_back(semantic_overrides_load_pending_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("patch_attribute_overridden"));
+            atoms.push_back(patch_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("map_attribute_overridden"));
+            atoms.push_back(map_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("groups_attribute_overridden"));
+            atoms.push_back(groups_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("semantic_overrides_attribute_overridden"));
+            atoms.push_back(semantic_overrides_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("universe_attribute_overridden"));
+            atoms.push_back(universe_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("plane_order_attribute_overridden"));
+            atoms.push_back(plane_order_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("universe_mode_attribute_overridden"));
+            atoms.push_back(universe_mode_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("gamma_attribute_overridden"));
+            atoms.push_back(gamma_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("brightness_attribute_overridden"));
+            atoms.push_back(brightness_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("autobang_attribute_overridden"));
+            atoms.push_back(autobang_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("invert_x_attribute_overridden"));
+            atoms.push_back(invert_x_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("invert_y_attribute_overridden"));
+            atoms.push_back(invert_y_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("color_use_white_attribute_overridden"));
+            atoms.push_back(color_use_white_attribute_overridden_ ? 1 : 0);
+            atoms.push_back(c74::min::symbol("color_wheel_fallback_attribute_overridden"));
+            atoms.push_back(color_wheel_fallback_attribute_overridden_ ? 1 : 0);
             status_output.send(atoms);
             return {};
         }
@@ -678,6 +751,7 @@ private:
         const bbb::dmx::dmx_setup_values values{bbb::dmx::merge_setup_values(setup_document.common, setup_document.matrixmap)};
         apply_setup_values(values, base_directory);
         report_status("setup_loaded");
+        report_setup_summary();
     }
 
     void load_patch(const std::string &path) {
@@ -937,8 +1011,11 @@ private:
 
         apply_matrix(view);
         c74::max::jit_object_method(matrix, c74::max::gensym("lock"), (void *)savelock);
+        const bool report_autobang_warning{autobang_warning_gate_.should_report(autobang_value_)};
         if(autobang_value_) {
             output_universes();
+        } else if(report_autobang_warning) {
+            report_warning("matrix applied but not output: autobang is disabled; send bang to output");
         }
     }
 
@@ -1333,6 +1410,30 @@ private:
 
     void report_status(const char *message) {
         bbb::dmx::maxutil::send_status(status_output, "status", message);
+    }
+
+    void report_setup_summary() {
+        c74::min::atoms atoms;
+        atoms.push_back(c74::min::symbol("status"));
+        atoms.push_back(c74::min::symbol("setup_summary"));
+        atoms.push_back(c74::min::symbol("patch_loaded"));
+        atoms.push_back(patch_loaded_ ? 1 : 0);
+        atoms.push_back(c74::min::symbol("map_loaded"));
+        atoms.push_back(map_loaded_ ? 1 : 0);
+        atoms.push_back(c74::min::symbol("universe_mode"));
+        atoms.push_back(c74::min::symbol(universe_output_mode_to_string(output_mode_value_)));
+        atoms.push_back(c74::min::symbol("autobang"));
+        atoms.push_back(autobang_value_ ? 1 : 0);
+        status_output.send(atoms);
+        cout << "bbb.dmx.matrixmap: setup summary: patch_loaded " << (patch_loaded_ ? 1 : 0)
+             << " map_loaded " << (map_loaded_ ? 1 : 0)
+             << " universe_mode " << universe_output_mode_to_string(output_mode_value_)
+             << " autobang " << (autobang_value_ ? 1 : 0) << c74::min::endl;
+    }
+
+    void report_warning(const char *message) {
+        cout << "bbb.dmx.matrixmap: warning: " << message << c74::min::endl;
+        bbb::dmx::maxutil::send_status(status_output, "warning", message);
     }
 
     void report_error(const char *message) {

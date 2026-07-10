@@ -12,6 +12,7 @@
 #include "bbb/dmx/curve.hpp"
 #include "bbb/dmx/mask.hpp"
 #include "bbb/dmx/matrix_map.hpp"
+#include "bbb/dmx/matrixmap_diagnostics.hpp"
 #include "bbb/dmx/movertrack.hpp"
 #include "bbb/dmx/pattern.hpp"
 #include "bbb/dmx/semantic_merge.hpp"
@@ -683,6 +684,7 @@ int main() {
         "config": "masks/common.json",
         "universe": 3,
         "universe_mode": "all",
+        "autobang": false,
         "color_wheel_fallback": true,
         "fixturemap": {
             "universe": 4,
@@ -693,7 +695,8 @@ int main() {
             "map": "pixelmap.json",
             "plane_order": "bgra",
             "gamma": 2.2,
-            "invert_x": true
+            "invert_x": true,
+            "autobang": true
         },
         "mask": {
             "config": "masks/show.mask.json",
@@ -717,6 +720,8 @@ int main() {
     require(matrixmap_setup.plane_order.has_value() && matrixmap_setup.plane_order.value() == "bgra", "setup matrixmap plane order parses");
     require(matrixmap_setup.gamma.has_value() && nearly_equal(matrixmap_setup.gamma.value(), 2.2), "setup matrixmap gamma parses");
     require(matrixmap_setup.invert_x.has_value() && matrixmap_setup.invert_x.value(), "setup matrixmap invert_x parses");
+    require(matrixmap_setup.autobang.has_value() && matrixmap_setup.autobang.value(), "setup matrixmap autobang overrides common value");
+    require(fixturemap_setup.autobang.has_value() && !fixturemap_setup.autobang.value(), "setup fixturemap inherits common autobang value");
     const bbb::dmx::dmx_setup_values mask_setup{bbb::dmx::merge_setup_values(setup_document.common, setup_document.mask)};
     require(mask_setup.config.has_value() && mask_setup.config.value() == "masks/show.mask.json", "setup mask section overrides common config");
     require(mask_setup.patch.has_value() && mask_setup.patch.value() == "patch-from-mvr.json", "setup mask inherits common patch");
@@ -729,6 +734,12 @@ int main() {
         "fixturemap": { "patchh": "typo.json" }
     })json", setup_document);
     require(!map_result.ok, "setup JSON rejects unknown keys");
+
+    bbb::dmx::matrixmap::autobang_warning_gate autobang_warning_gate{};
+    require(autobang_warning_gate.should_report(false), "matrixmap reports disabled autobang on first matrix");
+    require(!autobang_warning_gate.should_report(false), "matrixmap suppresses repeated disabled autobang warnings");
+    require(!autobang_warning_gate.should_report(true), "matrixmap emits no autobang warning while enabled");
+    require(autobang_warning_gate.should_report(false), "matrixmap reports disabled autobang after re-enabling resets warning gate");
 
     bbb::dmx::fixture_group_set group_set{};
     map_result = bbb::dmx::parse_fixture_groups_text(R"json({

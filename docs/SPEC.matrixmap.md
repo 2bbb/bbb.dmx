@@ -28,7 +28,7 @@ Input:
 - `readoverrides <path>` — load optional semantic overrides JSON for aliases and semantic color mapping.
 - `reload` — reload current patch, map, groups, and semantic overrides files.
 - `bang` — output current DMX buffers without re-sampling.
-- `dump` — output load status.
+- `dump` — output load/validation state, resolved paths, effective mapping attributes, pending loads, and attribute-override flags.
 
 Attributes:
 
@@ -44,8 +44,10 @@ Attributes:
 - `@plane_order rgba|argb|bgra|gray` — plane layout of incoming `char` or `float32` matrices.
 - `@gamma <0.01..8.0>` — gamma curve applied to sampled color components.
 - `@brightness <0.0..8.0>` — post-gamma multiplier.
-- `@autobang 0|1` — output immediately after `jit_matrix`.
+- `@autobang 0|1` — output immediately after `jit_matrix`. When disabled, matrix data only updates the internal mapped frame; send `bang` afterward to emit DMX. The first matrix received during each disabled period reports a warning instead of failing silently.
 - `@invert_x 0|1`, `@invert_y 0|1` — mirror normalized sample coordinates.
+
+After a setup file loads, the status outlet emits a `setup_summary` containing `patch_loaded`, `map_loaded`, the effective `universe_mode`, and the effective `autobang` value. The same summary is posted to the Max console.
 
 Input value policy:
 

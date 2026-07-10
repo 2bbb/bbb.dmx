@@ -61,7 +61,7 @@
             <description>Reload the current patch, matrix map, groups, and semantic overrides files when their paths are set.</description>
         </method>
         <method name="dump">
-            <description>Output load status, validation status, fixture count, and universe mode from the status outlet.</description>
+            <description>Output load and validation state, resolved paths, effective settings, pending loads, and explicit attribute-override flags from the status outlet.</description>
         </method>
     </methodlist>
     <attributelist>
@@ -99,7 +99,7 @@
             <description>Brightness multiplier applied after gamma.</description>
         </attribute>
         <attribute name="autobang" get="1" set="1" type="int">
-            <description>When non-zero, output automatically after a jit_matrix is processed.</description>
+            <description>When non-zero, output automatically after a jit_matrix is processed. When zero, matrix input only updates the internal frame and bang is required to emit DMX; the first matrix received while disabled reports a warning.</description>
         </attribute>
         <attribute name="invert_x" get="1" set="1" type="int">
             <description>When non-zero, mirror normalized sample coordinates horizontally.</description>
