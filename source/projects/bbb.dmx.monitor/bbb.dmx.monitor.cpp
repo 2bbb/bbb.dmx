@@ -11,7 +11,7 @@
 class bbb_dmx_monitor : public c74::min::object<bbb_dmx_monitor> {
 private:
     bbb::dmx::dmx_frame_set frames_{};
-    int universe_value_{1};
+    int default_universe_value_{1};
     bool changed_only_value_{false};
 
 public:
@@ -28,14 +28,14 @@ public:
     c74::min::outlet<> output{this, "(anything) universe or changed channel data"};
     c74::min::outlet<> status_output{this, "(anything) status and error messages"};
 
-    c74::min::attribute<int> universe{this, "universe", 1,
+    c74::min::attribute<int> default_universe{this, "default_universe", 1,
         c74::min::description{"Default universe for bare 512-value list input and bang output."},
         c74::min::setter{[this](const c74::min::atoms &args, int) -> c74::min::atoms {
             if(args.empty() || !bbb::dmx::maxutil::finite_atom(args[0])) {
-                return {universe_value_};
+                return {default_universe_value_};
             }
-            universe_value_ = bbb::dmx::sanitize_universe_id((int)args[0]);
-            return {universe_value_};
+            default_universe_value_ = bbb::dmx::sanitize_universe_id((int)args[0]);
+            return {default_universe_value_};
         }}
     };
 
@@ -49,7 +49,7 @@ public:
 
     c74::min::message<> list_message{this, "list", "512 DMX byte values for the default universe.",
         MIN_FUNCTION {
-            update_universe(universe_value_, args, 0);
+            update_universe(default_universe_value_, args, 0);
             return {};
         }
     };
@@ -111,7 +111,7 @@ public:
 
     c74::min::message<> bang_message{this, "bang", "Output the default universe." ,
         MIN_FUNCTION {
-            output.send(bbb::dmx::maxutil::universe_atoms(universe_value_, frames_.universe(universe_value_)));
+            output.send(bbb::dmx::maxutil::universe_atoms(default_universe_value_, frames_.universe(default_universe_value_)));
             return {};
         }
     };
@@ -172,7 +172,7 @@ private:
     void output_all_universes() {
         const std::vector<int> ids{frames_.universe_ids()};
         if(ids.empty()) {
-            output.send(bbb::dmx::maxutil::universe_atoms(universe_value_, frames_.universe(universe_value_)));
+            output.send(bbb::dmx::maxutil::universe_atoms(default_universe_value_, frames_.universe(default_universe_value_)));
             return;
         }
         for(const int universe_id : ids) {

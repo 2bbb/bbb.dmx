@@ -55,7 +55,7 @@
             720,
             22
           ],
-          "text": "Common input: universe <id> <512 values>. Bare 512-value list uses @universe."
+          "text": "Common input: universe <id> <512 values>. Bare 512-value list uses @default_universe."
         }
       },
       {
@@ -146,7 +146,7 @@
             220,
             22
           ],
-          "text": "bbb.dmx.monitor @universe 1"
+          "text": "bbb.dmx.monitor @default_universe 1"
         }
       },
       {

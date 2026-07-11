@@ -17,7 +17,7 @@ Rules:
 - Universe ids are 1-based. Values below `1` are sanitized to `1`.
 - DMX channel addresses are 1-based `1..512`.
 - Byte values are clamped to `0..255`.
-- Bare `list` input, where supported, is shorthand for the object's default `@universe` only. It is not the canonical multi-universe boundary format.
+- Bare `list` input, where supported, is shorthand for the object's default universe attribute only. It is not the canonical multi-universe boundary format.
 
 ## 3. Implemented objects
 
@@ -27,7 +27,9 @@ Stores the latest known frame per universe and can emit either full frames or ch
 
 - Input: `list`, `universe`, `channel`, `channels`, `bang`, `bangall`, `dump`, `clear`
 - Output: `universe <id> ...` or `changed <id> address value ...`
-- Attributes: `@universe`, `@changed_only`
+- Attributes: `@default_universe`, `@changed_only`
+
+`@default_universe` is intentionally distinct from the canonical `universe <id> ...` input message selector.
 
 ### `bbb.dmx.merge`
 
