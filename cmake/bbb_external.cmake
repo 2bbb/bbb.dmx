@@ -138,12 +138,16 @@ macro(bbb_add_external)
 
     # --- min-api post-target ---
     if(APPLE)
+        string(TOLOWER "${${PROJECT_NAME}_EXTERN_OUTPUT_NAME}" _bbb_identifier_component)
+        string(REGEX REPLACE "[^a-z0-9.-]+" "-" _bbb_identifier_component "${_bbb_identifier_component}")
+        string(REGEX REPLACE "^-+" "" _bbb_identifier_component "${_bbb_identifier_component}")
+        string(REGEX REPLACE "-+$" "" _bbb_identifier_component "${_bbb_identifier_component}")
         set(AUTHOR_DOMAIN "jp.2bit")
-        set(BUNDLE_IDENTIFIER "${PROJECT_NAME}")
+        set(BUNDLE_IDENTIFIER "${_bbb_identifier_component}")
     endif()
     include(${C74_MIN_API_DIR}/script/min-posttarget.cmake)
     if(APPLE)
-        set(_bbb_bundle_identifier "jp.2bit.${PROJECT_NAME}")
+        set(_bbb_bundle_identifier "jp.2bit.${_bbb_identifier_component}")
         set_target_properties(${PROJECT_NAME} PROPERTIES
             MACOSX_BUNDLE_GUI_IDENTIFIER "${_bbb_bundle_identifier}"
             XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${_bbb_bundle_identifier}"
