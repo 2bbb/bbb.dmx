@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/2bbb/bbb.dmx/schemas/bbb.dmx.curve.v1.schema.json",
+  "$id": "https://github.com/bbb-max-externals/bbb.dmx/schemas/bbb.dmx.curve.v1.schema.json",
   "title": "bbb.dmx curve rules v1",
   "type": "object",
   "additionalProperties": false,

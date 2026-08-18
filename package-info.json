@@ -3,7 +3,7 @@
     "description": "DMX utility external object suite for Max/MSP",
     "version": "0.7.1",
     "author": "2bit",
-    "website": "https://github.com/2bbb/bbb.dmx",
+    "website": "https://github.com/bbb-max-externals/bbb.dmx",
     "extends": "",
     "extensible": 0,
     "homepatcher": "",
