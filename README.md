@@ -1,5 +1,8 @@
 # bbb.dmx
 
+> [!WARNING]
+> This repository is published as AI-assisted, insufficiently tested work in progress ("AI slop"). Treat it as experimental. Correctness, stability, compatibility, and fitness for production use are not guaranteed.
+
 DMX utility external object suite for Max/MSP.
 
 This repository deliberately does **not** implement DMX network output. Art-Net output belongs in `bbb.artnet`. `bbb.dmx.*` objects produce, inspect, transform, and guard DMX frame data inside Max.
